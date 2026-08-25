@@ -23,6 +23,16 @@ export const BTN = {
   SEND_LOCATION: "📍 ارسال موقعیت",
 } as const;
 
+export const REG = {
+  LANG_FA: "🇮🇷 فارسی",
+  LANG_EN: "🇬🇧 English",
+  GENDER_F: "👩 خانم",
+  GENDER_M: "👨 آقا",
+  LOOK_F: "👩 دنبال خانم",
+  LOOK_M: "👨 دنبال آقا",
+  LOOK_ANY: "🎲 فرقی ندارد",
+} as const;
+
 export function mainKeyboard() {
   return new Keyboard()
     .text(BTN.PROFILE)
@@ -67,37 +77,81 @@ export function locationKeyboard() {
     .oneTime();
 }
 
+/** ReplyKeyboard — دکمه‌های بزرگ موبایل، ستون زیاد = اسکرول کمتر */
+function gridReply(labels: string[], cols: number) {
+  const kb = new Keyboard();
+  labels.forEach((label, i) => {
+    kb.text(label);
+    if ((i + 1) % cols === 0) kb.row();
+  });
+  if (labels.length % cols !== 0) kb.row();
+  return kb.resized().persistent();
+}
+
+export function languageReplyKeyboard() {
+  return gridReply([REG.LANG_FA, REG.LANG_EN], 2);
+}
+
+export function countryReplyKeyboard() {
+  return gridReply(
+    COUNTRIES.map((c) => c.label),
+    2,
+  );
+}
+
+export function provinceReplyKeyboard(country: string) {
+  const list = provincesForCountry(country);
+  // ۳ ستون تا روی گوشی جا شود و اسکرول کمتر باشد
+  return gridReply(list, 3);
+}
+
+export function cityReplyKeyboard(country: string, province: string) {
+  const list = citiesFor(country, province);
+  return gridReply(list, 3);
+}
+
+export function genderReplyKeyboard() {
+  return gridReply([REG.GENDER_F, REG.GENDER_M], 2);
+}
+
+export function lookingReplyKeyboard() {
+  return gridReply([REG.LOOK_F, REG.LOOK_M, REG.LOOK_ANY], 1);
+}
+
+/** سن ۱۸–۶۰ در ۷ ستون — دکمه‌های بزرگ ReplyKeyboard */
+export function ageReplyKeyboard() {
+  const ages: string[] = [];
+  for (let a = 18; a <= 60; a++) ages.push(String(a));
+  return gridReply(ages, 7);
+}
+
+// --- سازگاری با کدهای قبلی (ویرایش پروفایل / ادمین) ---
 export function registerGenderKeyboard() {
-  return new InlineKeyboard()
-    .text("👩 خانم", "reg:gender:female")
-    .row()
-    .text("👨 آقا", "reg:gender:male");
+  return genderReplyKeyboard();
 }
 
 export function lookingForKeyboard() {
-  return new InlineKeyboard()
-    .text("👩 خانم", "reg:looking:female")
-    .row()
-    .text("👨 آقا", "reg:looking:male")
-    .row()
-    .text("🎲 فرقی ندارد", "reg:looking:any");
+  return lookingReplyKeyboard();
 }
 
-export function agePickerKeyboard(page = 0, prefix = "reg") {
-  const minAge = 18;
-  const maxAge = 60;
-  // همه سن‌ها در یک صفحه — ۵ ستون (۴۳ دکمه)
-  const ages: number[] = [];
-  for (let a = minAge; a <= maxAge; a++) ages.push(a);
+export function agePickerKeyboard(_page = 0, _prefix = "reg") {
+  return ageReplyKeyboard();
+}
 
-  const kb = new InlineKeyboard();
-  ages.forEach((age, i) => {
-    kb.text(`${age}`, `${prefix}:age:${age}`);
-    if ((i + 1) % 5 === 0) kb.row();
-  });
-  if (ages.length % 5 !== 0) kb.row();
-  kb.text("— سن خودت را انتخاب کن —", `${prefix}:agenoop`);
-  return kb;
+export function languageKeyboard() {
+  return languageReplyKeyboard();
+}
+
+export function countryKeyboard() {
+  return countryReplyKeyboard();
+}
+
+export function provinceKeyboard(country: string, _page = 0) {
+  return provinceReplyKeyboard(country);
+}
+
+export function cityKeyboard(country: string, province: string, _page = 0) {
+  return cityReplyKeyboard(country, province);
 }
 
 export function diamondPackagesKeyboard() {
@@ -136,9 +190,8 @@ export function moreKeyboard() {
     .text("🔗 لینک ناشناس من", "more:anonlink");
 }
 
-/** پنل پروفایل منسجم شبیه DorDor */
 export function profilePanelKeyboard(isActive: boolean, faceVerified: boolean) {
-  const kb = new InlineKeyboard()
+  return new InlineKeyboard()
     .text("ویرایش پروفایل 📝", "prof:edit")
     .text("تکمیل پروفایل 🧾", "prof:complete")
     .row()
@@ -149,7 +202,6 @@ export function profilePanelKeyboard(isActive: boolean, faceVerified: boolean) {
       faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۱ 💎)",
       "prof:face",
     );
-  return kb;
 }
 
 export function profileEditKeyboard() {
@@ -188,57 +240,4 @@ export function adminFaceKeyboard(userId: number) {
   return new InlineKeyboard()
     .text("✅ تأیید احراز", `adm:face:ok:${userId}`)
     .text("❌ رد احراز", `adm:face:no:${userId}`);
-}
-
-export function languageKeyboard() {
-  const kb = new InlineKeyboard();
-  for (const l of LANGUAGES) {
-    kb.text(l.label, `reg:lang:${l.id}`).row();
-  }
-  return kb;
-}
-
-export function countryKeyboard() {
-  const kb = new InlineKeyboard();
-  for (const c of COUNTRIES) {
-    kb.text(c.label, `reg:country:${c.id}`).row();
-  }
-  return kb;
-}
-
-export function provinceKeyboard(country: string, page = 0) {
-  const list = provincesForCountry(country);
-  const perPage = 16; // صفحه شلوغ‌تر
-  const totalPages = Math.max(1, Math.ceil(list.length / perPage));
-  const safePage = Math.max(0, Math.min(page, totalPages - 1));
-  const slice = list.slice(safePage * perPage, safePage * perPage + perPage);
-
-  const kb = new InlineKeyboard();
-  slice.forEach((name, i) => {
-    const idx = safePage * perPage + i;
-    kb.text(name, `reg:prov:${idx}`);
-    if ((i + 1) % 2 === 0) kb.row();
-  });
-  if (slice.length % 2 !== 0) kb.row();
-
-  if (totalPages > 1) {
-    if (safePage > 0) kb.text("◀️ قبلی", `reg:provpage:${safePage - 1}`);
-    kb.text(`${safePage + 1}/${totalPages}`, "reg:noop");
-    if (safePage < totalPages - 1) {
-      kb.text("بعدی ▶️", `reg:provpage:${safePage + 1}`);
-    }
-  }
-  return kb;
-}
-
-export function cityKeyboard(country: string, province: string, page = 0) {
-  const list = citiesFor(country, province);
-  // معمولاً کم‌تعدادند — همه در یک صفحه، ۳ ستون
-  const kb = new InlineKeyboard();
-  list.forEach((name, i) => {
-    kb.text(name, `reg:city:${i}`);
-    if ((i + 1) % 3 === 0) kb.row();
-  });
-  if (list.length % 3 !== 0) kb.row();
-  return kb;
 }

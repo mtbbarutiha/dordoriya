@@ -27,10 +27,6 @@ chatHandler.on("message:text", async (ctx, next) => {
     await ctx.reply("نام به‌روز شد ✅", { reply_markup: mainKeyboard() });
     return;
   }
-  if (user.state === "edit_age") {
-    await ctx.reply("سن را از دکمه‌ها انتخاب کن 👇");
-    return;
-  }
   if (user.state === "edit_bio") {
     if (text.length > 150) {
       await ctx.reply("بیو حداکثر ۱۵۰ حرف.");

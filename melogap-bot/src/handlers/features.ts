@@ -5,11 +5,11 @@ import { prisma } from "../db/prisma.js";
 import {
   mainKeyboard,
   paymentKeyboard,
-  lookingForKeyboard,
+  lookingReplyKeyboard,
+  ageReplyKeyboard,
   cancelKeyboard,
   locationKeyboard,
   moreKeyboard,
-  agePickerKeyboard,
 } from "../keyboards/main.js";
 import {
   createOrder,
@@ -301,42 +301,8 @@ featuresHandler.callbackQuery("edit:age", async (ctx) => {
   }
   await patchUser(user.id, { state: "edit_age" });
   await ctx.answerCallbackQuery();
-  await ctx.reply("سن جدید را انتخاب کن:", {
-    reply_markup: agePickerKeyboard(0, "edit"),
-  });
-});
-
-featuresHandler.callbackQuery(/^edit:agepage:(\d+)$/, async (ctx) => {
-  const user = await requireRegistered(ctx);
-  if (!user || user.state !== "edit_age") {
-    await ctx.answerCallbackQuery({ text: "منقضی شده" });
-    return;
-  }
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageReplyMarkup({
-    reply_markup: agePickerKeyboard(Number(ctx.match[1]), "edit"),
-  });
-});
-
-featuresHandler.callbackQuery(/^edit:agenoop$/, async (ctx) => {
-  await ctx.answerCallbackQuery({ text: "صفحه سن" });
-});
-
-featuresHandler.callbackQuery(/^edit:age:(\d+)$/, async (ctx) => {
-  const user = await requireRegistered(ctx);
-  if (!user) {
-    await ctx.answerCallbackQuery();
-    return;
-  }
-  const age = Number(ctx.match[1]);
-  if (age < 18 || age > 60) {
-    await ctx.answerCallbackQuery({ text: "سن نامعتبر" });
-    return;
-  }
-  await patchUser(user.id, { age, state: "idle" });
-  await ctx.answerCallbackQuery({ text: "ذخیره شد" });
-  await ctx.reply(`سن روی ${age} به‌روز شد ✅`, {
-    reply_markup: mainKeyboard(),
+  await ctx.reply("سن جدید را از دکمه‌های بزرگ پایین انتخاب کن:", {
+    reply_markup: ageReplyKeyboard(),
   });
 });
 
@@ -359,9 +325,10 @@ featuresHandler.callbackQuery("edit:looking", async (ctx) => {
     await ctx.answerCallbackQuery();
     return;
   }
+  await patchUser(user.id, { state: "edit_looking" });
   await ctx.answerCallbackQuery();
   await ctx.reply("به دنبال چه کسی هستی؟", {
-    reply_markup: lookingForKeyboard(),
+    reply_markup: lookingReplyKeyboard(),
   });
 });
 
@@ -377,20 +344,6 @@ featuresHandler.callbackQuery("edit:photo", async (ctx) => {
     "یک عکس واضح بفرست.\nتا تأیید ادمین با عکس پیش‌فرض دیده می‌شوی.",
     { reply_markup: cancelKeyboard() },
   );
-});
-
-// وقتی از looking در حالت ویرایش/ثبت استفاده می‌شود برای کاربر ثبت‌شده
-featuresHandler.callbackQuery(/^reg:looking:(female|male|any)$/, async (ctx) => {
-  const user = await findByTelegram(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery();
-    return;
-  }
-  if (!user.registered) return; // start handler handles reg
-  const lookingFor = ctx.match[1]!;
-  await patchUser(user.id, { lookingFor, state: "idle" });
-  await ctx.answerCallbackQuery({ text: "ذخیره شد" });
-  await ctx.reply("علاقه به‌روز شد.", { reply_markup: mainKeyboard() });
 });
 
 featuresHandler.on("message:location", async (ctx) => {

@@ -3,13 +3,13 @@ import { ensureUser, findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
 import {
   mainKeyboard,
-  registerGenderKeyboard,
-  lookingForKeyboard,
-  agePickerKeyboard,
-  languageKeyboard,
-  countryKeyboard,
-  provinceKeyboard,
-  cityKeyboard,
+  languageReplyKeyboard,
+  countryReplyKeyboard,
+  provinceReplyKeyboard,
+  cityReplyKeyboard,
+  genderReplyKeyboard,
+  ageReplyKeyboard,
+  lookingReplyKeyboard,
 } from "../keyboards/main.js";
 import { WELCOME_DIAMONDS } from "../data/packages.js";
 
@@ -22,7 +22,7 @@ export async function beginRegistration(ctx: Context, userId: number) {
       "برای شروع، ثبت‌نام را کامل کن.",
       "۱/۸ — زبان خودت را انتخاب کن:",
     ].join("\n"),
-    { reply_markup: languageKeyboard() },
+    { reply_markup: languageReplyKeyboard() },
   );
 }
 
@@ -38,17 +38,17 @@ export async function resumeRegistration(
   switch (user.state) {
     case "language":
       await ctx.reply("۱/۸ — زبان را انتخاب کن:", {
-        reply_markup: languageKeyboard(),
+        reply_markup: languageReplyKeyboard(),
       });
       break;
     case "country":
       await ctx.reply("۲/۸ — کشور را انتخاب کن:", {
-        reply_markup: countryKeyboard(),
+        reply_markup: countryReplyKeyboard(),
       });
       break;
     case "province":
       await ctx.reply("۳/۸ — استان را انتخاب کن:", {
-        reply_markup: provinceKeyboard(user.country ?? "IR", 0),
+        reply_markup: provinceReplyKeyboard(user.country ?? "IR"),
       });
       break;
     case "city":
@@ -57,25 +57,27 @@ export async function resumeRegistration(
         break;
       }
       await ctx.reply("۴/۸ — شهر را انتخاب کن:", {
-        reply_markup: cityKeyboard(user.country, user.province, 0),
+        reply_markup: cityReplyKeyboard(user.country, user.province),
       });
       break;
     case "gender":
       await ctx.reply("۵/۸ — جنسیت را انتخاب کن:", {
-        reply_markup: registerGenderKeyboard(),
+        reply_markup: genderReplyKeyboard(),
       });
       break;
     case "age":
-      await ctx.reply("۶/۸ — سن را انتخاب کن:", {
-        reply_markup: agePickerKeyboard(0, "reg"),
+      await ctx.reply("۶/۸ — سن را انتخاب کن (دکمه‌های بزرگ پایین):", {
+        reply_markup: ageReplyKeyboard(),
       });
       break;
     case "name":
-      await ctx.reply("۷/۸ — یک نام نمایشی بفرست:");
+      await ctx.reply("۷/۸ — یک نام نمایشی بفرست:", {
+        reply_markup: { remove_keyboard: true },
+      });
       break;
     case "looking":
       await ctx.reply("۸/۸ — به دنبال چه کسی هستی؟", {
-        reply_markup: lookingForKeyboard(),
+        reply_markup: lookingReplyKeyboard(),
       });
       break;
     default:

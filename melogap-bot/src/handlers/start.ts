@@ -1,7 +1,7 @@
 import { Composer } from "grammy";
 import { ensureUser, findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
-import { mainKeyboard } from "../keyboards/main.js";
+import { mainKeyboard, REG } from "../keyboards/main.js";
 import {
   beginRegistration,
   finishRegistration,
@@ -9,15 +9,19 @@ import {
 } from "../services/register.js";
 import { leaveQueueOrChat } from "../services/match.js";
 import {
-  lookingForKeyboard,
-  registerGenderKeyboard,
-  agePickerKeyboard,
-  languageKeyboard,
-  countryKeyboard,
-  provinceKeyboard,
-  cityKeyboard,
+  lookingReplyKeyboard,
+  genderReplyKeyboard,
+  ageReplyKeyboard,
+  languageReplyKeyboard,
+  countryReplyKeyboard,
+  provinceReplyKeyboard,
+  cityReplyKeyboard,
 } from "../keyboards/main.js";
-import { provincesForCountry, citiesFor } from "../data/locations.js";
+import {
+  COUNTRIES,
+  provincesForCountry,
+  citiesFor,
+} from "../data/locations.js";
 
 export const startHandler = new Composer();
 
@@ -27,7 +31,6 @@ startHandler.command("start", async (ctx) => {
 
   const payload = ctx.match?.trim() || "";
 
-  // پیام ناشناس از لینک
   if (payload.startsWith("anon_")) {
     const anonCode = payload.slice(5);
     const me = await ensureUser({
@@ -115,178 +118,9 @@ startHandler.command("end", async (ctx) => {
   await ctx.reply("چت قطع شد.", { reply_markup: mainKeyboard() });
 });
 
-/** ادامه ثبت‌نام با کالبک و متن */
 export const registerHandler = new Composer();
 
-registerHandler.callbackQuery("reg:noop", async (ctx) => {
-  await ctx.answerCallbackQuery();
-});
-
-registerHandler.callbackQuery(/^reg:lang:(fa|en)$/, async (ctx) => {
-  const language = ctx.match[1]!;
-  const user = await findByTelegram(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  await patchUser(user.id, { language, state: "country" });
-  await ctx.answerCallbackQuery({ text: "ثبت شد" });
-  await ctx.reply("۲/۸ — کشور را انتخاب کن:", {
-    reply_markup: countryKeyboard(),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:country:(IR|AF|TR|OTHER)$/, async (ctx) => {
-  const country = ctx.match[1]!;
-  const user = await findByTelegram(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  await patchUser(user.id, {
-    country,
-    province: null,
-    city: null,
-    state: "province",
-  });
-  await ctx.answerCallbackQuery({ text: "ثبت شد" });
-  await ctx.reply("۳/۸ — استان را انتخاب کن:", {
-    reply_markup: provinceKeyboard(country, 0),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:provpage:(\d+)$/, async (ctx) => {
-  const page = Number(ctx.match[1]);
-  const user = await findByTelegram(ctx.from.id);
-  if (!user || user.state !== "province" || !user.country) {
-    await ctx.answerCallbackQuery({ text: "منقضی شده" });
-    return;
-  }
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageReplyMarkup({
-    reply_markup: provinceKeyboard(user.country, page),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:prov:(\d+)$/, async (ctx) => {
-  const idx = Number(ctx.match[1]);
-  const user = await findByTelegram(ctx.from.id);
-  if (!user || !user.country) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  const list = provincesForCountry(user.country);
-  const province = list[idx];
-  if (!province) {
-    await ctx.answerCallbackQuery({ text: "نامعتبر" });
-    return;
-  }
-  await patchUser(user.id, { province, city: null, state: "city" });
-  await ctx.answerCallbackQuery({ text: province });
-  await ctx.reply(`۴/۸ — شهر را در «${province}» انتخاب کن:`, {
-    reply_markup: cityKeyboard(user.country, province, 0),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:citypage:(\d+)$/, async (ctx) => {
-  const page = Number(ctx.match[1]);
-  const user = await findByTelegram(ctx.from.id);
-  if (!user || user.state !== "city" || !user.country || !user.province) {
-    await ctx.answerCallbackQuery({ text: "منقضی شده" });
-    return;
-  }
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageReplyMarkup({
-    reply_markup: cityKeyboard(user.country, user.province, page),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:city:(\d+)$/, async (ctx) => {
-  const idx = Number(ctx.match[1]);
-  const user = await findByTelegram(ctx.from.id);
-  if (!user || !user.country || !user.province) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  const list = citiesFor(user.country, user.province);
-  const city = list[idx];
-  if (!city) {
-    await ctx.answerCallbackQuery({ text: "نامعتبر" });
-    return;
-  }
-  await patchUser(user.id, { city, state: "gender" });
-  await ctx.answerCallbackQuery({ text: city });
-  await ctx.reply("۵/۸ — جنسیت را انتخاب کن:", {
-    reply_markup: registerGenderKeyboard(),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:gender:(female|male)$/, async (ctx) => {
-  const gender = ctx.match[1]!;
-  const user = await findByTelegram(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  await patchUser(user.id, { gender, state: "age" });
-  await ctx.answerCallbackQuery({ text: "ثبت شد" });
-  await ctx.reply("۶/۸ — سنت را از دکمه‌ها انتخاب کن:", {
-    reply_markup: agePickerKeyboard(0, "reg"),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:agepage:(\d+)$/, async (ctx) => {
-  const page = Number(ctx.match[1]);
-  const user = await findByTelegram(ctx.from.id);
-  if (!user || user.state !== "age") {
-    await ctx.answerCallbackQuery({ text: "منقضی شده" });
-    return;
-  }
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageReplyMarkup({
-    reply_markup: agePickerKeyboard(page, "reg"),
-  });
-});
-
-registerHandler.callbackQuery(/^reg:agenoop$/, async (ctx) => {
-  await ctx.answerCallbackQuery({ text: "صفحه سن" });
-});
-
-registerHandler.callbackQuery(/^reg:age:(\d+)$/, async (ctx) => {
-  const age = Number(ctx.match[1]);
-  const user = await findByTelegram(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  if (age < 18 || age > 60) {
-    await ctx.answerCallbackQuery({ text: "سن نامعتبر" });
-    return;
-  }
-  await patchUser(user.id, { age, state: "name" });
-  await ctx.answerCallbackQuery({ text: `سن ${age} ثبت شد` });
-  await ctx.reply(
-    [
-      `سن ${age} ثبت شد ✅`,
-      "",
-      "۷/۸ — یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
-    ].join("\n"),
-  );
-});
-
-registerHandler.callbackQuery(/^reg:looking:(female|male|any)$/, async (ctx, next) => {
-  const lookingFor = ctx.match[1]!;
-  const user = await findByTelegram(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
-    return;
-  }
-  if (user.registered) return next();
-  await patchUser(user.id, { lookingFor, state: "done" });
-  await ctx.answerCallbackQuery({ text: "ثبت شد" });
-  await finishRegistration(ctx, user.id);
-});
-
+/** علاقه برای کاربر ثبت‌شده (ویرایش) — inline دیگر نداریم، از متن */
 registerHandler.on("message:text", async (ctx, next) => {
   const from = ctx.from;
   if (!from) return next();
@@ -294,20 +128,191 @@ registerHandler.on("message:text", async (ctx, next) => {
   if (text.startsWith("/")) return next();
 
   const user = await findByTelegram(from.id);
-  if (!user || user.registered) return next();
+  if (!user) return next();
 
-  if (user.state === "name") {
-    if (text.length < 2 || text.length > 24) {
-      await ctx.reply("نام باید بین ۲ تا ۲۴ حرف باشد.");
+  // --- ثبت‌نام ---
+  if (!user.registered) {
+    if (user.state === "language") {
+      const language =
+        text === REG.LANG_FA ? "fa" : text === REG.LANG_EN ? "en" : null;
+      if (!language) {
+        await ctx.reply("از دکمه‌های پایین زبان را انتخاب کن:", {
+          reply_markup: languageReplyKeyboard(),
+        });
+        return;
+      }
+      await patchUser(user.id, { language, state: "country" });
+      await ctx.reply("۲/۸ — کشور را انتخاب کن:", {
+        reply_markup: countryReplyKeyboard(),
+      });
       return;
     }
-    await patchUser(user.id, { displayName: text, state: "looking" });
-    await ctx.reply("۸/۸ — به دنبال چه کسی هستی؟", {
-      reply_markup: lookingForKeyboard(),
+
+    if (user.state === "country") {
+      const found = COUNTRIES.find((c) => c.label === text);
+      if (!found) {
+        await ctx.reply("از دکمه‌های پایین کشور را انتخاب کن:", {
+          reply_markup: countryReplyKeyboard(),
+        });
+        return;
+      }
+      await patchUser(user.id, {
+        country: found.id,
+        province: null,
+        city: null,
+        state: "province",
+      });
+      await ctx.reply("۳/۸ — استان را انتخاب کن:", {
+        reply_markup: provinceReplyKeyboard(found.id),
+      });
+      return;
+    }
+
+    if (user.state === "province") {
+      if (!user.country) {
+        await resumeRegistration(ctx, user);
+        return;
+      }
+      const list = provincesForCountry(user.country);
+      if (!list.includes(text)) {
+        await ctx.reply("از دکمه‌های پایین استان را انتخاب کن:", {
+          reply_markup: provinceReplyKeyboard(user.country),
+        });
+        return;
+      }
+      await patchUser(user.id, { province: text, city: null, state: "city" });
+      await ctx.reply(`۴/۸ — شهر را در «${text}» انتخاب کن:`, {
+        reply_markup: cityReplyKeyboard(user.country, text),
+      });
+      return;
+    }
+
+    if (user.state === "city") {
+      if (!user.country || !user.province) {
+        await resumeRegistration(ctx, user);
+        return;
+      }
+      const list = citiesFor(user.country, user.province);
+      if (!list.includes(text)) {
+        await ctx.reply("از دکمه‌های پایین شهر را انتخاب کن:", {
+          reply_markup: cityReplyKeyboard(user.country, user.province),
+        });
+        return;
+      }
+      await patchUser(user.id, { city: text, state: "gender" });
+      await ctx.reply("۵/۸ — جنسیت را انتخاب کن:", {
+        reply_markup: genderReplyKeyboard(),
+      });
+      return;
+    }
+
+    if (user.state === "gender") {
+      const gender =
+        text === REG.GENDER_F ? "female" : text === REG.GENDER_M ? "male" : null;
+      if (!gender) {
+        await ctx.reply("از دکمه‌های پایین جنسیت را انتخاب کن:", {
+          reply_markup: genderReplyKeyboard(),
+        });
+        return;
+      }
+      await patchUser(user.id, { gender, state: "age" });
+      await ctx.reply("۶/۸ — سنت را انتخاب کن (همه سن‌ها پایین صفحه):", {
+        reply_markup: ageReplyKeyboard(),
+      });
+      return;
+    }
+
+    if (user.state === "age") {
+      const age = Number(text);
+      if (!Number.isFinite(age) || age < 18 || age > 60) {
+        await ctx.reply("از دکمه‌های پایین سن را انتخاب کن:", {
+          reply_markup: ageReplyKeyboard(),
+        });
+        return;
+      }
+      await patchUser(user.id, { age, state: "name" });
+      await ctx.reply(
+        [
+          `سن ${age} ثبت شد ✅`,
+          "",
+          "۷/۸ — یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
+        ].join("\n"),
+        { reply_markup: { remove_keyboard: true } },
+      );
+      return;
+    }
+
+    if (user.state === "name") {
+      if (text.length < 2 || text.length > 24) {
+        await ctx.reply("نام باید بین ۲ تا ۲۴ حرف باشد.");
+        return;
+      }
+      await patchUser(user.id, { displayName: text, state: "looking" });
+      await ctx.reply("۸/۸ — به دنبال چه کسی هستی؟", {
+        reply_markup: lookingReplyKeyboard(),
+      });
+      return;
+    }
+
+    if (user.state === "looking") {
+      const lookingFor =
+        text === REG.LOOK_F
+          ? "female"
+          : text === REG.LOOK_M
+            ? "male"
+            : text === REG.LOOK_ANY
+              ? "any"
+              : null;
+      if (!lookingFor) {
+        await ctx.reply("از دکمه‌های پایین انتخاب کن:", {
+          reply_markup: lookingReplyKeyboard(),
+        });
+        return;
+      }
+      await patchUser(user.id, { lookingFor, state: "done" });
+      await finishRegistration(ctx, user.id);
+      return;
+    }
+
+    await resumeRegistration(ctx, user);
+    return;
+  }
+
+  // --- ویرایش سن بعد از ثبت‌نام ---
+  if (user.state === "edit_age") {
+    const age = Number(text);
+    if (!Number.isFinite(age) || age < 18 || age > 60) {
+      await ctx.reply("از دکمه‌های پایین سن را انتخاب کن:", {
+        reply_markup: ageReplyKeyboard(),
+      });
+      return;
+    }
+    await patchUser(user.id, { age, state: "idle" });
+    await ctx.reply(`سن روی ${age} به‌روز شد ✅`, {
+      reply_markup: mainKeyboard(),
     });
     return;
   }
 
-  const { resumeRegistration } = await import("../services/register.js");
-  await resumeRegistration(ctx, user);
+  if (user.state === "edit_looking") {
+    const lookingFor =
+      text === REG.LOOK_F
+        ? "female"
+        : text === REG.LOOK_M
+          ? "male"
+          : text === REG.LOOK_ANY
+            ? "any"
+            : null;
+    if (!lookingFor) {
+      await ctx.reply("از دکمه‌ها انتخاب کن:", {
+        reply_markup: lookingReplyKeyboard(),
+      });
+      return;
+    }
+    await patchUser(user.id, { lookingFor, state: "idle" });
+    await ctx.reply("علاقه به‌روز شد.", { reply_markup: mainKeyboard() });
+    return;
+  }
+
+  return next();
 });
