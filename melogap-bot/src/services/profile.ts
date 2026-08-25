@@ -39,6 +39,7 @@ export async function sendProfileCard(ctx: Context, userId: number) {
           : user.country,
   ].filter(Boolean);
 
+  const hasGps = user.latitude != null && user.longitude != null;
   const box = [
     `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
@@ -46,6 +47,7 @@ export async function sendProfileCard(ctx: Context, userId: number) {
     "",
     `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)} | ❤️ ${formatNum(user.likesCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,
+    hasGps ? "📍 موقعیت: ثبت‌شده (قابل ویرایش)" : "📍 موقعیت: ثبت نشده",
     !user.isActive ? "⏸️ حساب غیرفعال" : null,
   ]
     .filter(Boolean)

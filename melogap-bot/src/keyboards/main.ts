@@ -91,6 +91,24 @@ export function locationKeyboard() {
     .oneTime();
 }
 
+/** لوکیشن اجباری در ثبت‌نام — بدون بازگشت به منو */
+export function regLocationKeyboard() {
+  return new Keyboard()
+    .requestLocation("📍 ارسال موقعیت من")
+    .resized()
+    .oneTime();
+}
+
+/** ویرایش لوکیشن از پروفایل */
+export function editLocationKeyboard() {
+  return new Keyboard()
+    .requestLocation("📍 به‌روزرسانی موقعیت")
+    .row()
+    .text(BTN.BACK)
+    .resized()
+    .oneTime();
+}
+
 /**
  * ReplyKeyboard ثبت‌نام: ستون زیاد = اسکرول کمتر،
  * oneTime = بعد از انتخاب کیبورد جمع می‌شود تا مرحله بعد فول‌صفحه باشد.
@@ -271,6 +289,9 @@ export function profileEditKeyboard() {
     .row()
     .text("📄 بیو", "edit:bio")
     .text("🎯 علاقه", "edit:looking")
+    .row()
+    .text("📍 موقعیت", "edit:location")
+    .text("📷 عکس", "edit:photo")
     .row()
     .text("↩️ بازگشت به پروفایل", "prof:back");
 }

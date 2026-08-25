@@ -45,6 +45,7 @@ profileHandler.callbackQuery("prof:complete", async (ctx) => {
   if (user.photoStatus !== "approved") missing.push("عکس تأییدشده");
   if (!user.faceVerified) missing.push("احراز چهره");
   if (!user.city) missing.push("شهر");
+  if (user.latitude == null || user.longitude == null) missing.push("موقعیت GPS");
 
   await ctx.reply(
     [
@@ -60,7 +61,9 @@ profileHandler.callbackQuery("prof:complete", async (ctx) => {
       reply_markup: profileEditKeyboard()
         .row()
         .text("📷 ارسال عکس", "prof:photo")
-        .text("احراز چهره", "prof:face"),
+        .text("احراز چهره", "prof:face")
+        .row()
+        .text("📍 موقعیت", "edit:location"),
     },
   );
 });

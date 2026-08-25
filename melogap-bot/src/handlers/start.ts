@@ -13,10 +13,10 @@ import {
   countryReplyKeyboard,
   provinceReplyKeyboard,
   cityReplyKeyboard,
+  regLocationKeyboard,
 } from "../keyboards/main.js";
 import {
   beginRegistration,
-  finishRegistration,
   resumeRegistration,
 } from "../services/register.js";
 import { leaveQueueOrChat } from "../services/match.js";
@@ -146,7 +146,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { language, state: "country" });
-      await ctx.reply("۲/۸ — کشور را انتخاب کن:", {
+      await ctx.reply("۲/۹ — کشور را انتخاب کن:", {
         reply_markup: countryReplyKeyboard(),
       });
       return;
@@ -168,8 +168,8 @@ registerHandler.on("message:text", async (ctx, next) => {
       });
       await ctx.reply(
         found.id === "IR"
-          ? "۳/۸ — منطقه را انتخاب کن:"
-          : "۳/۸ — استان را انتخاب کن:",
+          ? "۳/۹ — منطقه را انتخاب کن:"
+          : "۳/۹ — استان را انتخاب کن:",
         {
           reply_markup: provinceReplyKeyboard(found.id),
         },
@@ -210,7 +210,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { province: text, city: null, state: "city" });
-      await ctx.reply(`۴/۸ — شهر را در «${text}» انتخاب کن:`, {
+      await ctx.reply(`۴/۹ — شهر را در «${text}» انتخاب کن:`, {
         reply_markup: cityReplyKeyboard(user.country, text),
       });
       return;
@@ -229,7 +229,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { city: text, state: "gender" });
-      await ctx.reply("۵/۸ — جنسیت را انتخاب کن:", {
+      await ctx.reply("۵/۹ — جنسیت را انتخاب کن:", {
         reply_markup: genderReplyKeyboard(),
       });
       return;
@@ -245,7 +245,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { gender, state: "age" });
-      await ctx.reply("۶/۸ — بازه سنت را بزن (دکمه‌های بزرگ پایین):", {
+      await ctx.reply("۶/۹ — بازه سنت را بزن (دکمه‌های بزرگ پایین):", {
         reply_markup: ageRangeReplyKeyboard(),
       });
       return;
@@ -277,7 +277,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         [
           `سن ${age} ثبت شد ✅`,
           "",
-          "۷/۸ — یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
+          "۷/۹ — یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
         ].join("\n"),
         { reply_markup: { remove_keyboard: true } },
       );
@@ -290,7 +290,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { displayName: text, state: "looking" });
-      await ctx.reply("۸/۸ — به دنبال چه کسی هستی؟", {
+      await ctx.reply("۸/۹ — به دنبال چه کسی هستی؟", {
         reply_markup: lookingReplyKeyboard(),
       });
       return;
@@ -311,8 +311,26 @@ registerHandler.on("message:text", async (ctx, next) => {
         });
         return;
       }
-      await patchUser(user.id, { lookingFor, state: "done" });
-      await finishRegistration(ctx, user.id);
+      await patchUser(user.id, { lookingFor, state: "location" });
+      await ctx.reply(
+        [
+          "۹/۹ — موقعیتت را بفرست 📍",
+          "",
+          "برای نشان‌دادن افراد اطراف، موقعیت لازم است.",
+          "مختصات دقیق به کسی نشان داده نمی‌شود — فقط فاصله تقریبی.",
+          "",
+          "دکمه «📍 ارسال موقعیت من» را بزن.",
+        ].join("\n"),
+        { reply_markup: regLocationKeyboard() },
+      );
+      return;
+    }
+
+    if (user.state === "location") {
+      await ctx.reply(
+        "برای اتمام ثبت‌نام، دکمه «📍 ارسال موقعیت من» را بزن.",
+        { reply_markup: regLocationKeyboard() },
+      );
       return;
     }
 

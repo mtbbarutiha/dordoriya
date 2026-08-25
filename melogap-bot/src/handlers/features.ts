@@ -9,6 +9,7 @@ import {
   ageRangeReplyKeyboard,
   cancelKeyboard,
   locationKeyboard,
+  editLocationKeyboard,
   moreKeyboard,
 } from "../keyboards/main.js";
 import {
@@ -262,6 +263,7 @@ featuresHandler.callbackQuery("more:edit", async (ctx) => {
       .text("بیو", "edit:bio")
       .text("علاقه", "edit:looking")
       .row()
+      .text("📍 موقعیت", "edit:location")
       .text("عکس پروفایل", "edit:photo"),
   });
 });
@@ -332,6 +334,25 @@ featuresHandler.callbackQuery("edit:looking", async (ctx) => {
   });
 });
 
+featuresHandler.callbackQuery("edit:location", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "edit_location" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      "📍 به‌روزرسانی موقعیت",
+      "",
+      "موقعیت جدیدت را بفرست تا افراد اطراف دقیق‌تر پیدا شوند.",
+      "مختصات دقیق به کسی نشان داده نمی‌شود.",
+    ].join("\n"),
+    { reply_markup: editLocationKeyboard() },
+  );
+});
+
 featuresHandler.callbackQuery("edit:photo", async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {
@@ -346,11 +367,39 @@ featuresHandler.callbackQuery("edit:photo", async (ctx) => {
   );
 });
 
-featuresHandler.on("message:location", async (ctx) => {
-  const user = await requireRegistered(ctx);
-  if (!user) return;
+featuresHandler.on("message:location", async (ctx, next) => {
+  const from = ctx.from;
+  if (!from) return next();
+  const user = await findByTelegram(from.id);
+  if (!user) return next();
+
   const { latitude, longitude } = ctx.message.location;
+
+  // ثبت‌نام — مرحله لوکیشن
+  if (!user.registered && user.state === "location") {
+    await saveLocation(user.id, latitude, longitude);
+    const { finishRegistration } = await import("../services/register.js");
+    await finishRegistration(ctx, user.id);
+    return;
+  }
+
+  if (!user.registered) return next();
+
+  if (user.state === "edit_location") {
+    await saveLocation(user.id, latitude, longitude);
+    await patchUser(user.id, { state: "idle" });
+    await ctx.reply("✅ موقعیتت به‌روز شد.\nالان می‌توانی نزدیک‌ها را ببینی.", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+
+  // نزدیک‌ها / به‌روزرسانی عمومی موقعیت
   await saveLocation(user.id, latitude, longitude);
+  if (user.state !== "await_location") {
+    await patchUser(user.id, { state: "idle" });
+  }
+
   const nearby = await findNearby(user.id);
   if (!nearby.length) {
     await ctx.reply(
