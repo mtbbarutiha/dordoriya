@@ -8,15 +8,54 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  telegramId   BigInt   @unique
-  username     String?
-  firstName    String?
-  coins        Int      @default(0)
-  referralCode String   @unique
-  referredById Int?
-  referredBy   User?    @relation("Referrals", fields: [referredById], references: [id])
-  referrals    User[]   @relation("Referrals")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            Int       @id @default(autoincrement())
+  telegramId    BigInt    @unique
+  username      String?
+  firstName     String?
+  coins         Int       @default(0)
+  referralCode  String    @unique
+  anonCode      String    @unique
+  referredById  Int?
+  referredBy    User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]    @relation("Referrals")
+  latitude      Float?
+  longitude     Float?
+  locationAt    DateTime?
+  gender        String?
+  age           Int?
+  city          String?
+  /// idle | waiting | chatting | await_location | await_anon_msg | await_gender
+  state         String    @default("idle")
+  /// هدف پیام ناشناس (anonCode صاحب صندوق)
+  pendingAnonTo String?
+  chatPartnerId Int?
+  lastActiveAt  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  coinOrders    CoinOrder[]
+  anonInbox     AnonMessage[] @relation("AnonTo")
+  anonSent      AnonMessage[] @relation("AnonFrom")
+}
+
+model CoinOrder {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  packageId   String
+  coins       Int
+  amountToman Int
+  status      String   @default("pending")
+  paymentCode String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AnonMessage {
+  id         Int      @id @default(autoincrement())
+  toUserId   Int
+  toUser     User     @relation("AnonTo", fields: [toUserId], references: [id])
+  fromUserId Int?
+  fromUser   User?    @relation("AnonFrom", fields: [fromUserId], references: [id])
+  text       String
+  createdAt  DateTime @default(now())
 }
