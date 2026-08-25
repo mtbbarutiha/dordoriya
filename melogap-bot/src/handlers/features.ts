@@ -398,7 +398,7 @@ featuresHandler.callbackQuery(/^gift:menu:(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
-      `🎁 خرید سکه برای «${target.displayName ?? "کاربر"}»`,
+      `💰 خرید سکه برای «${target.displayName ?? "کاربر"}»`,
       "",
       `موجودی تو: ${formatNum(user.diamonds)} 🪙`,
       "مقدار هدیه را انتخاب کن (از موجودی خودت کم می‌شود):",

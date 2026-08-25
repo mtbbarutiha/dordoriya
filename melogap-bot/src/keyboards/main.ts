@@ -275,7 +275,7 @@ export function exploreKeyboard(targetId: number, likesCount: number) {
   return new InlineKeyboard()
     .text(`❤️ ${formatNum(likesCount)}`, `exp:likes:${targetId}`)
     .row()
-    .text("🎁 خرید سکه برای کاربر", `gift:menu:${targetId}`)
+    .text("💰 خرید سکه برای کاربر", `gift:menu:${targetId}`)
     .row()
     .text(`❤️ لایک (+۱🪙)`, `exp:like:${targetId}`)
     .text("💬 درخواست چت", `exp:chat:${targetId}`)
