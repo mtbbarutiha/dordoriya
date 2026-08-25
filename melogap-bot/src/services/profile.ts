@@ -5,6 +5,7 @@ import {
   ownPhotoInput,
   photoStatusLabel,
 } from "../lib/avatars.js";
+import { ownFaceBadge, faceBadgeShort } from "../lib/badges.js";
 import {
   profilePanelKeyboard,
   adminPhotoKeyboard,
@@ -40,17 +41,17 @@ export async function sendProfileCard(ctx: Context, userId: number) {
   ].filter(Boolean);
 
   const box = [
+    ownFaceBadge({
+      faceVerified: user.faceVerified,
+      faceStatus: user.faceStatus,
+    }),
     `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
     interest,
     "",
     `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)} | ❤️ ${formatNum(user.likesCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,
-    user.faceVerified
-      ? "✅ احراز چهره"
-      : user.faceStatus === "pending"
-        ? "⏳ احراز در انتظار"
-        : null,
+    `چهره: ${faceBadgeShort(user.faceVerified)}`,
     !user.isActive ? "⏸️ حساب غیرفعال" : null,
   ]
     .filter(Boolean)

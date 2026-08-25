@@ -5,6 +5,7 @@ import type { Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
 import { publicPhotoInput } from "../lib/avatars.js";
+import { faceBadge } from "../lib/badges.js";
 
 export async function nextExploreProfile(
   ctx: Context,
@@ -81,21 +82,19 @@ export async function nextExploreProfile(
   });
 
   const loc = [candidate.province, candidate.city].filter(Boolean).join("، ");
-  const title = opts.sameProvince ? "🏘 هم‌استانی" : "🎡 اکسپلور";
   const text = [
-    `┏━━ ${title} ━━┓`,
+    faceBadge(candidate.faceVerified),
     `┃ 👤 ${candidate.displayName ?? "بدون نام"}`,
     `┃ ${genderLabel(candidate.gender)} | ${candidate.age ?? "—"} سال`,
     loc ? `┃ 📍 ${loc}` : null,
     candidate.bio ? `┃ ${candidate.bio}` : null,
     `┃ 👁 ${formatNum(candidate.viewsCount + 1)} | ❤️ ${formatNum(candidate.likesCount)}`,
-    candidate.faceVerified ? "┃ ✅ احراز چهره" : null,
     candidate.boostUntil && candidate.boostUntil > new Date()
       ? "┃ 🚀 شتاب‌دهی"
       : null,
     candidate.isPro ? "┃ 🅿️ پرو" : null,
     candidate.photoStatus !== "approved" ? "┃ 🖼️ عکس پیش‌فرض" : null,
-    "┗━━━━━━━━━━━━┛",
+    "┗━━━━━━━━━━━━━━━━┛",
   ]
     .filter(Boolean)
     .join("\n");

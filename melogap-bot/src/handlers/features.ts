@@ -24,6 +24,7 @@ import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
 import { nearbyUserKeyboard } from "../keyboards/nearby.js";
 import { publicPhotoInput } from "../lib/avatars.js";
+import { faceBadge } from "../lib/badges.js";
 
 export const featuresHandler = new Composer();
 
@@ -366,10 +367,12 @@ featuresHandler.on("message:location", async (ctx) => {
     const u = item.user;
     await ctx.replyWithPhoto(publicPhotoInput(u), {
       caption: [
-        `👤 ${u.displayName ?? "ناشناس"}`,
-        `فاصله تقریبی: ${item.distanceLabel}`,
-        `سن: ${u.age ?? "—"}`,
-        u.photoStatus !== "approved" ? "🖼️ عکس پیش‌فرض" : null,
+        faceBadge(Boolean(u.faceVerified)),
+        `┃ 👤 ${u.displayName ?? "ناشناس"}`,
+        `┃ فاصله تقریبی: ${item.distanceLabel}`,
+        `┃ سن: ${u.age ?? "—"}`,
+        u.photoStatus !== "approved" ? "┃ 🖼️ عکس پیش‌فرض" : null,
+        "┗━━━━━━━━━━━━━━━━┛",
       ]
         .filter(Boolean)
         .join("\n"),
