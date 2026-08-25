@@ -23,8 +23,7 @@ import { nextExploreProfile } from "../services/explore.js";
 import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
 import { nearbyUserKeyboard } from "../keyboards/nearby.js";
-import { publicPhotoInput } from "../lib/avatars.js";
-import { faceBadge } from "../lib/badges.js";
+import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
 
 export const featuresHandler = new Composer();
 
@@ -365,14 +364,12 @@ featuresHandler.on("message:location", async (ctx) => {
   });
   for (const item of nearby) {
     const u = item.user;
-    await ctx.replyWithPhoto(publicPhotoInput(u), {
+    await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, u), {
       caption: [
-        faceBadge(Boolean(u.faceVerified)),
-        `┃ 👤 ${u.displayName ?? "ناشناس"}`,
-        `┃ فاصله تقریبی: ${item.distanceLabel}`,
-        `┃ سن: ${u.age ?? "—"}`,
-        u.photoStatus !== "approved" ? "┃ 🖼️ عکس پیش‌فرض" : null,
-        "┗━━━━━━━━━━━━━━━━┛",
+        `👤 ${u.displayName ?? "ناشناس"}`,
+        `فاصله تقریبی: ${item.distanceLabel}`,
+        `سن: ${u.age ?? "—"}`,
+        u.photoStatus !== "approved" ? "🖼️ عکس پیش‌فرض" : null,
       ]
         .filter(Boolean)
         .join("\n"),

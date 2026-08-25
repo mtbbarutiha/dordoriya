@@ -4,8 +4,7 @@ import { genderLabel, formatNum } from "../data/packages.js";
 import type { Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
-import { publicPhotoInput } from "../lib/avatars.js";
-import { faceBadge } from "../lib/badges.js";
+import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
 
 export async function nextExploreProfile(
   ctx: Context,
@@ -82,8 +81,9 @@ export async function nextExploreProfile(
   });
 
   const loc = [candidate.province, candidate.city].filter(Boolean).join("، ");
+  const title = opts.sameProvince ? "🏘 هم‌استانی" : "🎡 اکسپلور";
   const text = [
-    faceBadge(candidate.faceVerified),
+    `┏━━ ${title} ━━┓`,
     `┃ 👤 ${candidate.displayName ?? "بدون نام"}`,
     `┃ ${genderLabel(candidate.gender)} | ${candidate.age ?? "—"} سال`,
     loc ? `┃ 📍 ${loc}` : null,
@@ -94,7 +94,7 @@ export async function nextExploreProfile(
       : null,
     candidate.isPro ? "┃ 🅿️ پرو" : null,
     candidate.photoStatus !== "approved" ? "┃ 🖼️ عکس پیش‌فرض" : null,
-    "┗━━━━━━━━━━━━━━━━┛",
+    "┗━━━━━━━━━━━━┛",
   ]
     .filter(Boolean)
     .join("\n");
@@ -104,7 +104,7 @@ export async function nextExploreProfile(
     state: opts.sameProvince ? "explore_province" : "explore",
   });
 
-  await ctx.replyWithPhoto(publicPhotoInput(candidate), {
+  await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, candidate), {
     caption: text,
     reply_markup: exploreKeyboard(candidate.id),
   });

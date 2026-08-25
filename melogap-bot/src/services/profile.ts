@@ -2,10 +2,9 @@ import type { Api, Context } from "grammy";
 import { prisma } from "../db/prisma.js";
 import { formatNum, FACE_VERIFY_REWARD } from "../data/packages.js";
 import {
-  ownPhotoInput,
   photoStatusLabel,
 } from "../lib/avatars.js";
-import { ownFaceBadge, faceBadgeShort } from "../lib/badges.js";
+import { ownPhotoWithBadge } from "../lib/faceBadgePhoto.js";
 import {
   profilePanelKeyboard,
   adminPhotoKeyboard,
@@ -41,23 +40,18 @@ export async function sendProfileCard(ctx: Context, userId: number) {
   ].filter(Boolean);
 
   const box = [
-    ownFaceBadge({
-      faceVerified: user.faceVerified,
-      faceStatus: user.faceStatus,
-    }),
     `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
     interest,
     "",
     `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)} | ❤️ ${formatNum(user.likesCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,
-    `چهره: ${faceBadgeShort(user.faceVerified)}`,
     !user.isActive ? "⏸️ حساب غیرفعال" : null,
   ]
     .filter(Boolean)
     .join("\n");
 
-  await ctx.replyWithPhoto(ownPhotoInput(user), {
+  await ctx.replyWithPhoto(await ownPhotoWithBadge(ctx.api, user), {
     caption: box,
     reply_markup: profilePanelKeyboard(user.isActive, user.faceVerified),
   });
