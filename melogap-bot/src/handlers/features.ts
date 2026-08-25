@@ -23,6 +23,7 @@ import { nextExploreProfile } from "../services/explore.js";
 import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
 import { nearbyUserKeyboard } from "../keyboards/nearby.js";
+import { profilePhotoInput } from "../lib/avatars.js";
 
 export const featuresHandler = new Composer();
 
@@ -386,14 +387,17 @@ featuresHandler.on("message:location", async (ctx) => {
   });
   for (const item of nearby) {
     const u = item.user;
-    await ctx.reply(
-      [
+    await ctx.replyWithPhoto(profilePhotoInput(u.photoFileId, u.gender), {
+      caption: [
         `👤 ${u.displayName ?? "ناشناس"}`,
         `فاصله تقریبی: ${item.distanceLabel}`,
         `سن: ${u.age ?? "—"}`,
-      ].join("\n"),
-      { reply_markup: nearbyUserKeyboard(u.id) },
-    );
+        !u.photoFileId ? "🖼️ عکس پیش‌فرض" : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      reply_markup: nearbyUserKeyboard(u.id),
+    });
   }
 });
 

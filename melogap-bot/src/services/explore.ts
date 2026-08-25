@@ -4,6 +4,7 @@ import { genderLabel, formatNum } from "../data/packages.js";
 import type { Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
+import { profilePhotoInput } from "../lib/avatars.js";
 
 export async function nextExploreProfile(ctx: Context, viewerId: number) {
   const me = await prisma.user.findUnique({ where: { id: viewerId } });
@@ -70,16 +71,16 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
       ? "🚀 شتاب‌دهی فعال"
       : null,
     candidate.isPro ? "🅿️ عضو پرو" : null,
+    !candidate.photoFileId ? "🖼️ عکس پیش‌فرض" : null,
   ]
     .filter(Boolean)
     .join("\n");
 
-  if (candidate.photoFileId) {
-    await ctx.replyWithPhoto(candidate.photoFileId, {
+  await ctx.replyWithPhoto(
+    profilePhotoInput(candidate.photoFileId, candidate.gender),
+    {
       caption: text,
       reply_markup: exploreKeyboard(candidate.id),
-    });
-  } else {
-    await ctx.reply(text, { reply_markup: exploreKeyboard(candidate.id) });
-  }
+    },
+  );
 }

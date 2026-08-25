@@ -21,6 +21,7 @@ import {
 import { tryQuickMatch, leaveQueueOrChat } from "../services/match.js";
 import { nextExploreProfile } from "../services/explore.js";
 import { prisma } from "../db/prisma.js";
+import { profilePhotoInput } from "../lib/avatars.js";
 
 export const menuHandler = new Composer();
 
@@ -38,23 +39,28 @@ menuHandler.hears(BTN.PROFILE, async (ctx) => {
       ? "همه"
       : genderLabel(user.lookingFor);
 
-  await ctx.reply(
-    [
-      "👤 پروفایل من",
-      "",
-      `نام: ${user.displayName ?? "—"}`,
-      `جنسیت: ${genderLabel(user.gender)}`,
-      `سن: ${user.age ?? "—"}`,
-      `علاقه: ${interest}`,
-      user.bio ? `بیو: ${user.bio}` : "بیو: —",
-      `الماس: ${formatNum(user.diamonds)} 💎`,
-      `شتاب‌دهی: ${boosted}`,
-      `پرو: ${user.isPro ? "فعال 🅿️" : "غیرفعال"}`,
-      "",
-      "برای ویرایش از دکمه زیر استفاده کن:",
-    ].join("\n"),
-    { reply_markup: profileEditKeyboard() },
-  );
+  const caption = [
+    "👤 پروفایل من",
+    "",
+    `نام: ${user.displayName ?? "—"}`,
+    `جنسیت: ${genderLabel(user.gender)}`,
+    `سن: ${user.age ?? "—"}`,
+    `علاقه: ${interest}`,
+    user.bio ? `بیو: ${user.bio}` : "بیو: —",
+    `الماس: ${formatNum(user.diamonds)} 💎`,
+    `شتاب‌دهی: ${boosted}`,
+    `پرو: ${user.isPro ? "فعال 🅿️" : "غیرفعال"}`,
+    !user.photoFileId ? "🖼️ فعلاً عکس پیش‌فرض داری" : null,
+    "",
+    "برای ویرایش از دکمه زیر استفاده کن:",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  await ctx.replyWithPhoto(profilePhotoInput(user.photoFileId, user.gender), {
+    caption,
+    reply_markup: profileEditKeyboard(),
+  });
 });
 
 menuHandler.hears(BTN.EXPLORE, async (ctx) => {
