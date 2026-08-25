@@ -80,10 +80,10 @@ startHandler.command("start", async (ctx) => {
   await patchUser(user.id, { state: "idle", pendingAnonTo: null });
   await ctx.reply(
     [
-      "منوی اصلی:",
+      "📋 منوی اصلی دوردوریا",
       "",
-      "دوردوریا 💞 — چت | دوستیابی",
-      "از دکمه‌های پایین یکی را انتخاب کن.",
+      "دوردوریا 💞 — چت | دوست‌یابی",
+      "از دکمه‌های پایین یا دکمه Menu کنار کادر پیام استفاده کن.",
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );

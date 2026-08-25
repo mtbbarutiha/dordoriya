@@ -144,18 +144,19 @@ export function moreKeyboard() {
 }
 
 /** پنل پروفایل منسجم شبیه DorDor */
-export function profilePanelKeyboard(isActive: boolean) {
-  return new InlineKeyboard()
-    .text("✏️ ویرایش", "prof:edit")
-    .text("💬 تعاملات", "prof:interactions")
+export function profilePanelKeyboard(isActive: boolean, faceVerified: boolean) {
+  const kb = new InlineKeyboard()
+    .text("ویرایش پروفایل 📝", "prof:edit")
+    .text("تکمیل پروفایل 🧾", "prof:complete")
     .row()
-    .text("📷 عکس پروفایل", "prof:photo")
-    .text("✅ احراز چهره", "prof:face")
+    .text("🔄 تعاملات", "prof:interactions")
     .row()
-    .text(isActive ? "⏸️ غیرفعال‌سازی" : "▶️ فعال‌سازی", "prof:toggle")
-    .text("🗑️ حذف حساب", "prof:delete")
-    .row()
-    .text("↩️ بستن", "prof:close");
+    .text("حذف/غیرفعال‌سازی ❌", "prof:manage")
+    .text(
+      faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۱ 💎)",
+      "prof:face",
+    );
+  return kb;
 }
 
 export function profileEditKeyboard() {
@@ -173,6 +174,15 @@ export function confirmDeleteKeyboard() {
   return new InlineKeyboard()
     .text("🗑️ بله، حذف شود", "prof:delete:yes")
     .text("❌ خیر", "prof:delete:no");
+}
+
+export function accountManageKeyboard(isActive: boolean) {
+  return new InlineKeyboard()
+    .text(isActive ? "⏸️ غیرفعال‌سازی" : "▶️ فعال‌سازی", "prof:toggle")
+    .row()
+    .text("🗑️ حذف حساب", "prof:delete")
+    .row()
+    .text("↩️ بازگشت", "prof:back");
 }
 
 export function adminPhotoKeyboard(userId: number) {

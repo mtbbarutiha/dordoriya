@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { createBot } from "./bot.js";
+import { setupBotMenu } from "./botMenu.js";
 import { prisma } from "./db/prisma.js";
 
 async function sleep(ms: number) {
@@ -18,11 +19,12 @@ async function main() {
   await prisma.$connect();
   console.log("Database connected.");
 
-  // چند بار تلاش برای جلوگیری از Conflict 409 وقتی پروسس قبلی هنوز آزاد نشده
   for (let attempt = 1; attempt <= 5; attempt++) {
     const bot = createBot(token);
     try {
       await bot.api.deleteWebhook({ drop_pending_updates: true });
+      await setupBotMenu(bot);
+      console.log("Bot menu commands registered.");
       await bot.start({
         drop_pending_updates: true,
         onStart: (info) => {

@@ -1,58 +1,63 @@
 import type { Api, Context } from "grammy";
 import { prisma } from "../db/prisma.js";
-import {
-  formatNum,
-  genderLabel,
-} from "../data/packages.js";
+import { formatNum } from "../data/packages.js";
 import {
   ownPhotoInput,
   photoStatusLabel,
 } from "../lib/avatars.js";
-import { profilePanelKeyboard } from "../keyboards/main.js";
+import {
+  profilePanelKeyboard,
+  adminPhotoKeyboard,
+  adminFaceKeyboard,
+} from "../keyboards/main.js";
 import { getAdminIds } from "../lib/admin.js";
-import { adminPhotoKeyboard, adminFaceKeyboard } from "../keyboards/main.js";
 import { formatAdminUserLine } from "./account.js";
 
 export async function sendProfileCard(ctx: Context, userId: number) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.deletedAt) return;
 
+  const genderEmoji =
+    user.gender === "female" ? "👩" : user.gender === "male" ? "🧔‍♂️" : "👤";
+  const lang = user.language === "en" ? "En" : "Fa";
   const interest =
-    user.lookingFor === "any" ? "همه" : genderLabel(user.lookingFor);
-  const boosted =
-    user.boostUntil && user.boostUntil > new Date()
-      ? `🚀 تا ${user.boostUntil.toLocaleString("fa-IR")}`
-      : "—";
-  const face =
-    user.faceVerified
-      ? "✅ تأیید شده"
-      : user.faceStatus === "pending"
-        ? "⏳ در انتظار"
-        : "❌ نشده";
+    user.lookingFor === "any"
+      ? "👫 دوست‌یابی"
+      : user.lookingFor === "female"
+        ? "👩‍❤️‍👨 دوست‌یابی"
+        : "👫 دوست‌یابی";
+  const locParts = [
+    user.city,
+    user.province,
+    user.country === "IR"
+      ? "Iran"
+      : user.country === "AF"
+        ? "Afghanistan"
+        : user.country === "TR"
+          ? "Turkey"
+          : user.country,
+  ].filter(Boolean);
 
   const box = [
-    "┏━━ 👤 پروفایل من ━━┓",
-    `┃ نام: ${user.displayName ?? "—"}`,
-    `┃ جنسیت: ${genderLabel(user.gender)} | سن: ${user.age ?? "—"}`,
-    `┃ علاقه: ${interest}`,
-    user.bio ? `┃ بیو: ${user.bio}` : "┃ بیو: —",
-    user.province || user.city
-      ? `┃ 📍 ${[user.province, user.city].filter(Boolean).join("، ")}`
-      : "┃ 📍 —",
-    `┃ الماس: ${formatNum(user.diamonds)} 💎`,
-    `┃ پرو: ${user.isPro ? "🅿️ فعال" : "غیرفعال"}`,
-    `┃ شتاب‌دهی: ${boosted}`,
-    `┃ عکس: ${photoStatusLabel(user.photoStatus)}`,
-    `┃ احراز چهره: ${face}`,
-    `┃ وضعیت حساب: ${user.isActive ? "🟢 فعال" : "⏸️ غیرفعال"}`,
-    "┗━━━━━━━━━━━━━━┛",
+    `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
+    locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
+    interest,
     "",
-    "از دکمه‌های زیر مدیریت کن:",
-  ].join("\n");
+    `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)} | ❤️ ${formatNum(user.likesCount)}`,
+    `عکس: ${photoStatusLabel(user.photoStatus)}`,
+    user.faceVerified
+      ? "✅ احراز چهره"
+      : user.faceStatus === "pending"
+        ? "⏳ احراز در انتظار"
+        : null,
+    !user.isActive ? "⏸️ حساب غیرفعال" : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   await ctx.replyWithPhoto(ownPhotoInput(user), {
     caption: box,
-    reply_markup: profilePanelKeyboard(user.isActive),
+    reply_markup: profilePanelKeyboard(user.isActive, user.faceVerified),
   });
 }
 

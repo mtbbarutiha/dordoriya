@@ -7,8 +7,9 @@ import {
   profileEditKeyboard,
   confirmDeleteKeyboard,
   cancelKeyboard,
+  accountManageKeyboard,
 } from "../keyboards/main.js";
-import { formatNum } from "../data/packages.js";
+import { formatNum, FACE_VERIFY_COST } from "../data/packages.js";
 import {
   sendProfileCard,
   notifyAdminsPhoto,
@@ -28,6 +29,50 @@ profileHandler.callbackQuery("prof:edit", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply("چه چیزی را ویرایش می‌کنی؟", {
     reply_markup: profileEditKeyboard(),
+  });
+});
+
+profileHandler.callbackQuery("prof:complete", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  const missing: string[] = [];
+  if (!user.bio) missing.push("بیو");
+  if (user.photoStatus !== "approved") missing.push("عکس تأییدشده");
+  if (!user.faceVerified) missing.push("احراز چهره");
+  if (!user.city) missing.push("شهر");
+
+  await ctx.reply(
+    [
+      "🧾 تکمیل پروفایل",
+      "",
+      missing.length
+        ? `موارد ناقص:\n• ${missing.join("\n• ")}`
+        : "✅ پروفایلت کامل است!",
+      "",
+      "از دکمه‌ها ادامه بده:",
+    ].join("\n"),
+    {
+      reply_markup: profileEditKeyboard()
+        .row()
+        .text("📷 ارسال عکس", "prof:photo")
+        .text("احراز چهره", "prof:face"),
+    },
+  );
+});
+
+profileHandler.callbackQuery("prof:manage", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply("مدیریت حساب:", {
+    reply_markup: accountManageKeyboard(user.isActive),
   });
 });
 
@@ -128,14 +173,21 @@ profileHandler.callbackQuery("prof:face", async (ctx) => {
     await ctx.reply("✅ احراز چهره تو قبلاً تأیید شده است.");
     return;
   }
+  if (user.diamonds < FACE_VERIFY_COST) {
+    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    await ctx.reply(
+      `احراز چهره ${formatNum(FACE_VERIFY_COST)} الماس می‌خواهد.\nموجودی: ${formatNum(user.diamonds)}`,
+    );
+    return;
+  }
   await patchUser(user.id, { state: "edit_face" });
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
       "✅ احراز چهره",
       "",
+      `هزینه پس از تأیید ادمین: ${formatNum(FACE_VERIFY_COST)} 💎`,
       "یک سلفی واضح بفرست (چهره‌ات مشخص باشد).",
-      "بعد از تأیید ادمین، نشان ✅ روی پروفایلت می‌آید.",
       user.faceStatus === "pending" ? "⏳ درخواست قبلی هنوز در بررسی است." : "",
     ]
       .filter(Boolean)
@@ -314,16 +366,26 @@ profileHandler.callbackQuery(/^adm:face:(ok|no):(\d+)$/, async (ctx) => {
   }
 
   if (ok) {
-    await patchUser(user.id, {
-      faceVerified: true,
-      faceStatus: "approved",
-      facePendingFileId: null,
-    });
+    const fresh = await prisma.user.findUnique({ where: { id: userId } });
+    if (fresh && fresh.diamonds >= FACE_VERIFY_COST) {
+      await patchUser(user.id, {
+        faceVerified: true,
+        faceStatus: "approved",
+        facePendingFileId: null,
+        diamonds: { decrement: FACE_VERIFY_COST },
+      });
+    } else {
+      await patchUser(user.id, {
+        faceVerified: true,
+        faceStatus: "approved",
+        facePendingFileId: null,
+      });
+    }
     await ctx.answerCallbackQuery({ text: "احراز شد" });
     await ctx.api
       .sendMessage(
         Number(user.telegramId),
-        "✅ احراز چهره‌ات تأیید شد. نشان تأیید روی پروفایلت فعال است.",
+        `✅ احراز چهره‌ات تأیید شد.\n${formatNum(FACE_VERIFY_COST)} الماس کم شد.`,
       )
       .catch(() => undefined);
   } else {
