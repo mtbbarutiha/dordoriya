@@ -1,68 +1,81 @@
 import { Composer } from "grammy";
-import { getByTelegramId, setState } from "../db/users.js";
+import { findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
-import { mainKeyboard } from "../keyboards/main.js";
-import { BTN } from "../keyboards/main.js";
+import { BTN, mainKeyboard } from "../keyboards/main.js";
 
 export const chatHandler = new Composer();
 
-const MENU_TEXTS = new Set<string>(Object.values(BTN));
+const MENU = new Set<string>(Object.values(BTN));
 
 chatHandler.on("message:text", async (ctx, next) => {
-  const text = ctx.message.text;
+  const text = ctx.message.text.trim();
   if (text.startsWith("/")) return next();
-  if (MENU_TEXTS.has(text)) return next();
+  if (MENU.has(text)) return next();
 
   const from = ctx.from;
   if (!from) return next();
-
-  const user = await getByTelegramId(from.id);
+  const user = await findByTelegram(from.id);
   if (!user) return next();
 
-  // پیام ناشناس به صندوق
+  // ویرایش پروفایل
+  if (user.state === "edit_name") {
+    if (text.length < 2 || text.length > 24) {
+      await ctx.reply("نام باید ۲ تا ۲۴ حرف باشد.");
+      return;
+    }
+    await patchUser(user.id, { displayName: text, state: "idle" });
+    await ctx.reply("نام به‌روز شد ✅", { reply_markup: mainKeyboard() });
+    return;
+  }
+  if (user.state === "edit_age") {
+    const age = Number(text.replace(/[^\d]/g, ""));
+    if (!Number.isFinite(age) || age < 13 || age > 80) {
+      await ctx.reply("سن معتبر نیست.");
+      return;
+    }
+    await patchUser(user.id, { age, state: "idle" });
+    await ctx.reply("سن به‌روز شد ✅", { reply_markup: mainKeyboard() });
+    return;
+  }
+  if (user.state === "edit_bio") {
+    if (text.length > 150) {
+      await ctx.reply("بیو حداکثر ۱۵۰ حرف.");
+      return;
+    }
+    await patchUser(user.id, { bio: text, state: "idle" });
+    await ctx.reply("بیو ذخیره شد ✅", { reply_markup: mainKeyboard() });
+    return;
+  }
+
   if (user.state === "await_anon_msg" && user.pendingAnonTo) {
     const target = await prisma.user.findUnique({
       where: { anonCode: user.pendingAnonTo },
     });
     if (!target) {
-      await setState(user.id, "idle", { pendingAnonTo: null });
-      await ctx.reply("صاحب صندوق پیدا نشد.", { reply_markup: mainKeyboard() });
+      await patchUser(user.id, { state: "idle", pendingAnonTo: null });
+      await ctx.reply("صاحب لینک پیدا نشد.", { reply_markup: mainKeyboard() });
       return;
     }
-
     await prisma.anonMessage.create({
-      data: {
-        toUserId: target.id,
-        fromUserId: user.id,
-        text,
-      },
+      data: { toUserId: target.id, fromUserId: user.id, text },
     });
-
     await ctx.api.sendMessage(
       Number(target.telegramId),
-      [
-        "🎭 پیام ناشناس جدید!",
-        "",
-        text,
-        "",
-        "برای ساخت لینک خودت: صندوق ناشناس من",
-      ].join("\n"),
+      ["🕵️‍♂️ پیام ناشناس جدید:", "", text].join("\n"),
     );
-
-    await setState(user.id, "idle", { pendingAnonTo: null });
-    await ctx.reply("پیامت ناشناس ارسال شد ✅", {
+    await patchUser(user.id, { state: "idle", pendingAnonTo: null });
+    await ctx.reply("پیام ناشناس ارسال شد ✅", {
       reply_markup: mainKeyboard(),
     });
     return;
   }
 
-  // رله چت ناشناس
   if (user.state === "chatting" && user.chatPartnerId) {
     const partner = await prisma.user.findUnique({
       where: { id: user.chatPartnerId },
     });
     if (!partner || partner.state !== "chatting") {
-      await setState(user.id, "idle", { chatPartnerId: null });
+      await patchUser(user.id, { state: "idle", chatPartnerId: null });
       await ctx.reply("چت قطع شده.", { reply_markup: mainKeyboard() });
       return;
     }

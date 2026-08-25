@@ -1,160 +1,384 @@
 import { Composer, InlineKeyboard } from "grammy";
-import { getByTelegramId, setState } from "../db/users.js";
-import { saveLocation, findNearby } from "../services/nearby.js";
+import { findByTelegram, patchUser } from "../db/users.js";
+import { requireRegistered } from "../services/register.js";
+import { prisma } from "../db/prisma.js";
 import {
   mainKeyboard,
-  nearbyUserKeyboard,
+  paymentKeyboard,
+  lookingForKeyboard,
+  cancelKeyboard,
+  locationKeyboard,
+  moreKeyboard,
 } from "../keyboards/main.js";
-import { connectSpecific, tryMatch } from "../services/match.js";
 import {
   createOrder,
   paymentUrl,
   markPaid,
   cancelOrder,
   findPackage,
-} from "../services/coins.js";
-import { formatCoins, formatToman } from "../data/packages.js";
-import { paymentKeyboard } from "../keyboards/main.js";
-import { prisma } from "../db/prisma.js";
+} from "../services/diamonds.js";
+import { formatNum, formatToman, REFERRAL_BONUS } from "../data/packages.js";
+import { nextExploreProfile } from "../services/explore.js";
+import { connectUsers } from "../services/match.js";
+import { saveLocation, findNearby } from "../services/nearby.js";
+import { nearbyUserKeyboard } from "../keyboards/nearby.js";
 
 export const featuresHandler = new Composer();
 
-featuresHandler.on("message:location", async (ctx) => {
-  const from = ctx.from;
-  if (!from) return;
-  const user = await getByTelegramId(from.id);
-  if (!user) {
-    await ctx.reply("اول /start بزن.");
-    return;
-  }
-
-  const { latitude, longitude } = ctx.message.location;
-  await saveLocation(user.id, latitude, longitude);
-
-  const nearby = await findNearby(user.id);
-  if (nearby.length === 0) {
-    await ctx.reply(
-      [
-        "📍 موقعیتت ذخیره شد.",
-        "",
-        "فعلاً کسی تو شعاع ۵۰ کیلومتری پیدا نشد.",
-        "بعداً دوباره «نزدیکای شهر» رو بزن، یا دوستات رو دعوت کن.",
-      ].join("\n"),
-      { reply_markup: mainKeyboard() },
-    );
-    return;
-  }
-
-  await ctx.reply(
-    `📍 ${nearby.length} نفر اطرافته (بدون لو رفتن لوکیشن دقیق):\n`,
-    { reply_markup: mainKeyboard() },
-  );
-
-  for (const item of nearby) {
-    const u = item.user;
-    const gender =
-      u.gender === "female" ? "خانم" : u.gender === "male" ? "آقا" : "ناشناس";
-    await ctx.reply(
-      [
-        `👤 ${gender}`,
-        `فاصله تقریبی: ${item.distanceLabel}`,
-        u.age ? `سن: ${u.age}` : "سن: —",
-      ].join("\n"),
-      { reply_markup: nearbyUserKeyboard(u.id) },
-    );
-  }
-});
-
 featuresHandler.callbackQuery(/^buy:(.+)$/, async (ctx) => {
-  const pkgId = ctx.match[1]!;
-  const from = ctx.from;
-  const user = await getByTelegramId(from.id);
+  const user = await requireRegistered(ctx);
   if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
+    await ctx.answerCallbackQuery();
     return;
   }
+  const pkgId = ctx.match[1]!;
   const pkg = findPackage(pkgId);
   if (!pkg) {
-    await ctx.answerCallbackQuery({ text: "پکیج نامعتبر" });
+    await ctx.answerCallbackQuery({ text: "بسته نامعتبر" });
     return;
   }
   const order = await createOrder(user.id, pkgId);
   if (!order) {
-    await ctx.answerCallbackQuery({ text: "خطا در ساخت سفارش" });
+    await ctx.answerCallbackQuery({ text: "خطا" });
     return;
   }
   const url = paymentUrl(order.paymentCode);
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
-      "💳 فاکتور سکه",
+      "💳 فاکتور الماس",
       "",
-      `پکیج: ${pkg.label}`,
+      `بسته: ${pkg.label}`,
       `مبلغ: ${formatToman(pkg.toman)}`,
-      `سکه: ${formatCoins(pkg.coins)}`,
+      `الماس: ${formatNum(pkg.diamonds)}`,
       "",
       "لینک پرداخت (دمو):",
       url,
       "",
-      "بعد از پرداخت فرضی، «پرداخت کردم» رو بزن تا سکه شارژ بشه.",
+      "بعد از پرداخت، «پرداخت کردم» را بزن.",
     ].join("\n"),
     { reply_markup: paymentKeyboard(order.id, url) },
   );
 });
 
 featuresHandler.callbackQuery(/^paid:(\d+)$/, async (ctx) => {
-  const orderId = Number(ctx.match[1]);
-  const user = await getByTelegramId(ctx.from.id);
+  const user = await requireRegistered(ctx);
   if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start" });
+    await ctx.answerCallbackQuery();
     return;
   }
+  const orderId = Number(ctx.match[1]);
   const order = await markPaid(orderId, user.id);
   if (!order) {
     await ctx.answerCallbackQuery({ text: "سفارش پیدا نشد" });
     return;
   }
-  const fresh = await getByTelegramId(ctx.from.id);
-  await ctx.answerCallbackQuery({ text: "شارژ شد ✅" });
+  const fresh = await findByTelegram(ctx.from.id);
+  await ctx.answerCallbackQuery({ text: "شارژ شد" });
   await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() });
   await ctx.reply(
-    `✅ ${formatCoins(order.coins)} سکه به کیف‌ت اضافه شد.\nموجودی: ${formatCoins(fresh?.coins ?? 0)}`,
+    `✅ ${formatNum(order.diamonds)} الماس اضافه شد.\nموجودی: ${formatNum(fresh?.diamonds ?? 0)} 💎`,
     { reply_markup: mainKeyboard() },
   );
 });
 
 featuresHandler.callbackQuery(/^cancel:(\d+)$/, async (ctx) => {
-  const orderId = Number(ctx.match[1]);
-  const user = await getByTelegramId(ctx.from.id);
+  const user = await requireRegistered(ctx);
   if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start" });
+    await ctx.answerCallbackQuery();
     return;
   }
-  await cancelOrder(orderId, user.id);
+  await cancelOrder(Number(ctx.match[1]), user.id);
   await ctx.answerCallbackQuery({ text: "لغو شد" });
   await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() });
   await ctx.reply("سفارش لغو شد.", { reply_markup: mainKeyboard() });
 });
 
-featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
-  const targetId = Number(ctx.match[1]);
-  const user = await getByTelegramId(ctx.from.id);
+featuresHandler.callbackQuery("pro:buy", async (ctx) => {
+  const user = await requireRegistered(ctx);
   if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start" });
+    await ctx.answerCallbackQuery();
     return;
   }
-  const result = await connectSpecific(ctx.api, user.id, targetId);
+  const cost = 200;
+  if (user.diamonds < cost) {
+    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    return;
+  }
+  await patchUser(user.id, {
+    diamonds: { decrement: cost },
+    isPro: true,
+  });
+  await ctx.answerCallbackQuery({ text: "پرو فعال شد" });
+  await ctx.reply("🅿️ اشتراک پرو فعال شد!", {
+    reply_markup: mainKeyboard(),
+  });
+});
+
+featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const targetId = Number(ctx.match[1]);
+  await patchUser(targetId, { likesCount: { increment: 1 } });
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (target && target.telegramId < 9000000000n) {
+    await ctx.api
+      .sendMessage(
+        Number(target.telegramId),
+        "❤️ یک نفر از اکسپلور لایک‌ات کرد!",
+      )
+      .catch(() => undefined);
+  }
+  await ctx.answerCallbackQuery({ text: "لایک شد" });
+  await nextExploreProfile(ctx, user.id);
+});
+
+featuresHandler.callbackQuery(/^exp:chat:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const targetId = Number(ctx.match[1]);
+  const result = await connectUsers(ctx.api, user.id, targetId);
   if (result === "demo") {
     await ctx.answerCallbackQuery({ text: "پروفایل نمونه" });
+    await ctx.reply("این پروفایل نمونه‌ است؛ با کاربر واقعی چت کن.");
     return;
   }
   if (result !== "ok") {
-    await ctx.answerCallbackQuery({
-      text: "الان نمی‌شه وصل شد (شاید طرف تو چته)",
-    });
+    await ctx.answerCallbackQuery({ text: "الان نمی‌شود وصل شد" });
     return;
   }
-  await ctx.answerCallbackQuery({ text: "وصل شدید ✅" });
+  await ctx.answerCallbackQuery({ text: "وصل شدید" });
+});
+
+featuresHandler.callbackQuery(/^exp:(next|skip)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await nextExploreProfile(ctx, user.id);
+});
+
+featuresHandler.callbackQuery("more:guide", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      "📖 راهنما",
+      "",
+      "• پروفایل من: مشاهده و ویرایش مشخصات",
+      "• اکسپلور: دیدن افراد و لایک / چت",
+      "• پیام ناشناس: لینک دریافت پیام مخفی",
+      "• چت سریع: وصل تصادفی ناشناس",
+      "• شتاب‌دهی: اولویت بیشتر با الماس",
+      "• الماس‌ها: خرید اعتبار",
+      "• اشتراک پرو: امکانات ویژه",
+      "• آمار: بازدید و لایک و چت‌ها",
+      "",
+      "قطع چت: /end",
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+featuresHandler.callbackQuery("more:ref", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  const me = await ctx.api.getMe();
+  const link = `https://t.me/${me.username}?start=ref_${user.referralCode}`;
+  await ctx.reply(
+    [
+      "🎁 دعوت دوستان",
+      "",
+      `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} الماس برای تو`,
+      "",
+      link,
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+featuresHandler.callbackQuery("more:nearby", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await patchUser(user.id, { state: "await_location" });
+  await ctx.reply(
+    [
+      "📍 نزدیک‌های شهر",
+      "",
+      "موقعیتت را بفرست تا افراد اطراف را ببینی.",
+      "مختصات دقیق به کسی نشان داده نمی‌شود.",
+    ].join("\n"),
+    { reply_markup: locationKeyboard() },
+  );
+});
+
+featuresHandler.callbackQuery("more:edit", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply("چه چیزی را می‌خواهی تغییر بدهی؟", {
+    reply_markup: new InlineKeyboard()
+      .text("نام", "edit:name")
+      .text("سن", "edit:age")
+      .row()
+      .text("بیو", "edit:bio")
+      .text("علاقه", "edit:looking")
+      .row()
+      .text("عکس پروفایل", "edit:photo"),
+  });
+});
+
+featuresHandler.callbackQuery("more:anonlink", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  const me = await ctx.api.getMe();
+  await ctx.reply(
+    `🔗 لینک پیام ناشناس تو:\nhttps://t.me/${me.username}?start=anon_${user.anonCode}`,
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+featuresHandler.callbackQuery("edit:name", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "edit_name" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply("نام نمایشی جدید را بفرست:", {
+    reply_markup: cancelKeyboard(),
+  });
+});
+
+featuresHandler.callbackQuery("edit:age", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "edit_age" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply("سن جدید را به عدد بفرست:", {
+    reply_markup: cancelKeyboard(),
+  });
+});
+
+featuresHandler.callbackQuery("edit:bio", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "edit_bio" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply("بیو جدید را بفرست (حداکثر ۱۵۰ حرف):", {
+    reply_markup: cancelKeyboard(),
+  });
+});
+
+featuresHandler.callbackQuery("edit:looking", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply("به دنبال چه کسی هستی؟", {
+    reply_markup: lookingForKeyboard(),
+  });
+});
+
+featuresHandler.callbackQuery("edit:photo", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "edit_photo" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply("یک عکس بفرست تا به‌عنوان پروفایل ذخیره شود:", {
+    reply_markup: cancelKeyboard(),
+  });
+});
+
+// وقتی از looking در حالت ویرایش/ثبت استفاده می‌شود برای کاربر ثبت‌شده
+featuresHandler.callbackQuery(/^reg:looking:(female|male|any)$/, async (ctx) => {
+  const user = await findByTelegram(ctx.from.id);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  if (!user.registered) return; // start handler handles reg
+  const lookingFor = ctx.match[1]!;
+  await patchUser(user.id, { lookingFor, state: "idle" });
+  await ctx.answerCallbackQuery({ text: "ذخیره شد" });
+  await ctx.reply("علاقه به‌روز شد.", { reply_markup: mainKeyboard() });
+});
+
+featuresHandler.on("message:location", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const { latitude, longitude } = ctx.message.location;
+  await saveLocation(user.id, latitude, longitude);
+  const nearby = await findNearby(user.id);
+  if (!nearby.length) {
+    await ctx.reply(
+      "موقعیت ذخیره شد.\nفعلاً کسی در اطراف پیدا نشد.",
+      { reply_markup: mainKeyboard() },
+    );
+    return;
+  }
+  await ctx.reply(`📍 ${nearby.length} نفر اطراف تو:`, {
+    reply_markup: mainKeyboard(),
+  });
+  for (const item of nearby) {
+    const u = item.user;
+    await ctx.reply(
+      [
+        `👤 ${u.displayName ?? "ناشناس"}`,
+        `فاصله تقریبی: ${item.distanceLabel}`,
+        `سن: ${u.age ?? "—"}`,
+      ].join("\n"),
+      { reply_markup: nearbyUserKeyboard(u.id) },
+    );
+  }
+});
+
+featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const result = await connectUsers(ctx.api, user.id, Number(ctx.match[1]));
+  if (result === "demo") {
+    await ctx.answerCallbackQuery({ text: "نمونه" });
+    await ctx.reply("پروفایل نمونه است.");
+    return;
+  }
+  if (result !== "ok") {
+    await ctx.answerCallbackQuery({ text: "وصل نشد" });
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "وصل شدید" });
 });
 
 featuresHandler.callbackQuery("nearby_skip", async (ctx) => {
@@ -162,42 +386,14 @@ featuresHandler.callbackQuery("nearby_skip", async (ctx) => {
   await ctx.deleteMessage().catch(() => undefined);
 });
 
-featuresHandler.callbackQuery(/^gender:(.+)$/, async (ctx) => {
-  const g = ctx.match[1]!;
-  const user = await getByTelegramId(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start" });
-    return;
-  }
-  if (g === "female" || g === "male") {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { gender: g },
-    });
-  }
-  await ctx.answerCallbackQuery({ text: "ثبت شد" });
-  await ctx.reply("فیلتر ثبت شد — می‌رم دنبال ناشناس…");
-  await tryMatch(ctx, user.id);
-});
-
-featuresHandler.callbackQuery(/^setgender:(.+)$/, async (ctx) => {
-  const g = ctx.match[1]!;
-  const user = await getByTelegramId(ctx.from.id);
-  if (!user) {
-    await ctx.answerCallbackQuery({ text: "اول /start" });
-    return;
-  }
-  if (g !== "female" && g !== "male") {
-    await ctx.answerCallbackQuery({ text: "نامعتبر" });
-    return;
-  }
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { gender: g },
-  });
-  await ctx.answerCallbackQuery({ text: "جنسیت ذخیره شد" });
-  await ctx.reply(
-    `جنسیت روی «${g === "female" ? "خانم" : "آقا"}» تنظیم شد.`,
-    { reply_markup: mainKeyboard() },
-  );
+featuresHandler.on("message:photo", async (ctx, next) => {
+  const from = ctx.from;
+  if (!from) return next();
+  const user = await findByTelegram(from.id);
+  if (!user || user.state !== "edit_photo") return next();
+  const photos = ctx.message.photo;
+  const best = photos[photos.length - 1];
+  if (!best) return;
+  await patchUser(user.id, { photoFileId: best.file_id, state: "idle" });
+  await ctx.reply("عکس پروفایل ذخیره شد ✅", { reply_markup: mainKeyboard() });
 });

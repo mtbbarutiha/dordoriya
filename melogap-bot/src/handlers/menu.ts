@@ -1,212 +1,235 @@
-import { Composer } from "grammy";
-import { getByTelegramId, setState } from "../db/users.js";
+import { Composer, InlineKeyboard } from "grammy";
+import { findByTelegram, patchUser } from "../db/users.js";
+import { requireRegistered } from "../services/register.js";
 import {
   BTN,
-  locationKeyboard,
   mainKeyboard,
-  coinPackagesKeyboard,
-  genderFilterKeyboard,
-  profileGenderKeyboard,
+  diamondPackagesKeyboard,
+  moreKeyboard,
+  profileEditKeyboard,
+  lookingForKeyboard,
+  locationKeyboard,
+  cancelKeyboard,
 } from "../keyboards/main.js";
-import { formatCoins, REFERRAL_BONUS } from "../data/packages.js";
-import { tryMatch, leaveQueueOrChat } from "../services/match.js";
+import {
+  formatNum,
+  genderLabel,
+  BOOST_COST,
+  BOOST_HOURS,
+  REFERRAL_BONUS,
+} from "../data/packages.js";
+import { tryQuickMatch, leaveQueueOrChat } from "../services/match.js";
+import { nextExploreProfile } from "../services/explore.js";
+import { prisma } from "../db/prisma.js";
 
 export const menuHandler = new Composer();
 
-async function requireUser(ctx: { from?: { id: number } | undefined }) {
-  if (!ctx.from) return null;
-  return getByTelegramId(ctx.from.id);
-}
+menuHandler.hears(BTN.PROFILE, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
 
-menuHandler.hears(
-  [BTN.CONNECT, "به یه ناشناس وصلم کن! 🙈"],
-  async (ctx) => {
-    const user = await requireUser(ctx);
-    if (!user) {
-      await ctx.reply("اول /start بزن.");
-      return;
-    }
-    if (user.state === "chatting") {
-      await ctx.reply("الان تو چتی. اول /end بزن.");
-      return;
-    }
-    await tryMatch(ctx, user.id);
-  },
-);
+  const boosted =
+    user.boostUntil && user.boostUntil > new Date()
+      ? `فعال تا ${user.boostUntil.toLocaleString("fa-IR")}`
+      : "غیرفعال";
 
-menuHandler.hears([BTN.NEARBY, "افراد نزدیک 📍🛰️"], async (ctx) => {
-  const user = await requireUser(ctx);
-  if (!user) {
-    await ctx.reply("اول /start بزن.");
-    return;
-  }
-  await setState(user.id, "await_location");
+  const interest =
+    user.lookingFor === "any"
+      ? "همه"
+      : genderLabel(user.lookingFor);
+
   await ctx.reply(
     [
-      "📍 رادار شهری",
+      "👤 پروفایل من",
       "",
-      "موقعیتت رو بفرست تا نزدیکات رو پیدا کنم.",
-      "لوکیشن خام به بقیه نشون داده نمی‌شه — فقط فاصله تقریبی.",
+      `نام: ${user.displayName ?? "—"}`,
+      `جنسیت: ${genderLabel(user.gender)}`,
+      `سن: ${user.age ?? "—"}`,
+      `علاقه: ${interest}`,
+      user.bio ? `بیو: ${user.bio}` : "بیو: —",
+      `الماس: ${formatNum(user.diamonds)} 💎`,
+      `شتاب‌دهی: ${boosted}`,
+      `پرو: ${user.isPro ? "فعال 🅿️" : "غیرفعال"}`,
       "",
-      "دکمه «ارسال موقعیت» رو بزن 👇",
+      "برای ویرایش از دکمه زیر استفاده کن:",
     ].join("\n"),
-    { reply_markup: locationKeyboard() },
+    { reply_markup: profileEditKeyboard() },
   );
 });
 
-menuHandler.hears([BTN.SEARCH, "جستجو کاربران 🔍🗨️"], async (ctx) => {
-  const user = await requireUser(ctx);
-  if (!user) {
-    await ctx.reply("اول /start بزن.");
+menuHandler.hears(BTN.EXPLORE, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  if (user.state === "chatting") {
+    await ctx.reply("اول چت فعلی را قطع کن (/end).");
     return;
   }
-  await setState(user.id, "await_gender");
-  await ctx.reply(
-    [
-      "🎯 فیلتر هوشمند",
-      "",
-      "می‌خوای با کدوم جنسیت وصل شی؟",
-      "(بعد از انتخاب می‌ری توی صف تونل شب)",
-    ].join("\n"),
-    { reply_markup: genderFilterKeyboard() },
-  );
+  await patchUser(user.id, { state: "explore" });
+  await nextExploreProfile(ctx, user.id);
 });
 
-menuHandler.hears([BTN.GUIDE, "راهنما 🤔"], async (ctx) => {
+menuHandler.hears(BTN.ANON, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const me = await ctx.api.getMe();
+  const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
   await ctx.reply(
     [
-      "📖 چطور کار می‌کنه؟",
+      "🕵️‍♂️ پیام ناشناس",
       "",
-      "۱) بزن بریم ناشناس → صف تونل شب و چت رندوم",
-      "۲) نزدیکای شهر → ارسال لوکیشن و دیدن افراد اطراف",
-      "۳) فیلتر هوشمند → انتخاب جنسیت برای مچ",
-      "۴) صندوق ناشناس → لینک برای پیام ناشناس از بیرون",
-      "۵) دعوت کن → سکه رایگان برای تو",
-      "۶) کیف سکه → خرید پکیج (فعلاً حالت دمو/تأیید دستی)",
+      "لینک شخصی خودت را بگذار در استوری یا بیو تا بقیه برایت ناشناس پیام بفرستند:",
       "",
-      "قطع چت: /end",
-      "قانون طلایی: توهین / اسپم = بلاک",
+      link,
+      "",
+      "اگر لینک کس دیگری را داری، همان را در تلگرام باز کن و پیام بفرست.",
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
 });
 
-menuHandler.hears([BTN.PROFILE, "پروفایل 👤"], async (ctx) => {
-  const user = await requireUser(ctx);
-  if (!user) {
-    await ctx.reply("اول /start بزن.", { reply_markup: mainKeyboard() });
+menuHandler.hears(BTN.QUICK_CHAT, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  if (user.state === "chatting") {
+    await ctx.reply("الان در چت هستی. اول قطع کن.");
     return;
   }
-  const genderLabel =
-    user.gender === "female"
-      ? "خانم"
-      : user.gender === "male"
-        ? "آقا"
-        : "ثبت نشده";
-  const loc = user.latitude
-    ? `ثبت شده (${user.locationAt?.toLocaleString("fa-IR") ?? "—"})`
-    : "ثبت نشده";
-
-  await ctx.reply(
-    [
-      "🪪 هویت من",
-      "",
-      "این هویت داخل دودوریاست — نه تلگرامت.",
-      "",
-      `نام: ${user.firstName ?? "—"}`,
-      `یوزرنیم: ${user.username ? `@${user.username}` : "—"}`,
-      `جنسیت: ${genderLabel}`,
-      `سکه: ${formatCoins(user.coins)}`,
-      `لوکیشن: ${loc}`,
-      `کد دعوت: ${user.referralCode}`,
-      `کد صندوق: ${user.anonCode}`,
-      "",
-      "جنسیت رو از دکمه‌های زیر تنظیم کن:",
-    ].join("\n"),
-    { reply_markup: profileGenderKeyboard() },
-  );
+  await tryQuickMatch(ctx, user.id);
 });
 
-menuHandler.hears([BTN.COINS, "سکه 💰"], async (ctx) => {
-  const user = await requireUser(ctx);
-  if (!user) {
-    await ctx.reply("اول /start بزن.");
+menuHandler.hears(BTN.BOOST, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+
+  if (user.boostUntil && user.boostUntil > new Date()) {
+    await ctx.reply(
+      `شتاب‌دهی‌ات هنوز فعال است تا ${user.boostUntil.toLocaleString("fa-IR")}`,
+      { reply_markup: mainKeyboard() },
+    );
     return;
   }
-  await ctx.reply(
-    [
-      "🪙 کیف سکه",
-      "",
-      `موجودی: ${formatCoins(user.coins)} سکه`,
-      "",
-      "سکه = بنزین قابلیت‌های خاص‌تر.",
-      "یکی از پکیج‌ها رو انتخاب کن (شبیه ملوگپ / هایپرگپ):",
-      "",
-      "⚠️ درگاه واقعی هنوز وصل نیست؛ بعد از انتخاب لینک دمو می‌گیری و با «پرداخت کردم» سکه دمو شارژ می‌شه.",
-    ].join("\n"),
-    { reply_markup: coinPackagesKeyboard() },
-  );
-});
 
-menuHandler.hears(
-  [BTN.REFERRAL, "معرفی به دوستان (سکه رایگان) 🔗"],
-  async (ctx) => {
-    const user = await requireUser(ctx);
-    if (!user) {
-      await ctx.reply("اول /start بزن.", { reply_markup: mainKeyboard() });
-      return;
-    }
-    const me = await ctx.api.getMe();
-    const link = `https://t.me/${me.username}?start=ref_${user.referralCode}`;
+  if (user.diamonds < BOOST_COST) {
     await ctx.reply(
       [
-        "🎁 دعوت کن، سکه بگیر",
+        "🚀 شتاب‌دهی",
         "",
-        `هر دوست جدید با لینک تو: +${REFERRAL_BONUS} سکه برای تو`,
-        "به علاوه ۲۰ سکه هدیه ورود برای خودش.",
+        `هزینه: ${formatNum(BOOST_COST)} الماس برای ${BOOST_HOURS} ساعت`,
+        `موجودی تو: ${formatNum(user.diamonds)} الماس`,
         "",
-        "لینک دعوتت:",
-        link,
+        "الماس کافی نداری. از بخش «الماس‌ها» خرید کن.",
       ].join("\n"),
       { reply_markup: mainKeyboard() },
     );
-  },
-);
-
-menuHandler.hears([BTN.ANON_LINK, "لینک ناشناس من 🎭"], async (ctx) => {
-  const user = await requireUser(ctx);
-  if (!user) {
-    await ctx.reply("اول /start بزن.", { reply_markup: mainKeyboard() });
     return;
   }
-  const me = await ctx.api.getMe();
-  const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
+
+  const until = new Date(Date.now() + BOOST_HOURS * 3600_000);
+  await patchUser(user.id, {
+    diamonds: { decrement: BOOST_COST },
+    boostUntil: until,
+  });
   await ctx.reply(
     [
-      "🎭 صندوق ناشناس من",
+      "🚀 شتاب‌دهی فعال شد!",
       "",
-      "این لینک رو بذار توی بایو / استوری.",
-      "بقیه بدون دیدن اسمت برات پیام می‌فرستن.",
+      `تا ${until.toLocaleString("fa-IR")} در اکسپلور و چت سریع جلوتری.`,
+      `${formatNum(BOOST_COST)} الماس کم شد.`,
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+menuHandler.hears(BTN.DIAMONDS, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  await ctx.reply(
+    [
+      "💎 الماس‌ها",
       "",
-      link,
+      `موجودی: ${formatNum(user.diamonds)} الماس`,
+      "",
+      "یکی از بسته‌ها را انتخاب کن:",
+      "(درگاه فعلاً دمو است؛ با «پرداخت کردم» شارژ می‌شود)",
+    ].join("\n"),
+    { reply_markup: diamondPackagesKeyboard() },
+  );
+});
+
+menuHandler.hears(BTN.PRO, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+
+  if (user.isPro) {
+    await ctx.reply("اشتراک پرو تو فعال است 🅿️", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+
+  const cost = 200;
+  await ctx.reply(
+    [
+      "🅿️ اشتراک پرو",
+      "",
+      "مزایا:",
+      "• دیده شدن بیشتر در اکسپلور",
+      "• نشان پرو روی پروفایل",
+      "• اولویت در چت سریع",
+      "",
+      `هزینه فعال‌سازی: ${formatNum(cost)} الماس`,
+      `موجودی: ${formatNum(user.diamonds)}`,
+    ].join("\n"),
+    {
+      reply_markup: new InlineKeyboard().text(
+        `فعال‌سازی پرو (${formatNum(cost)}💎)`,
+        "pro:buy",
+      ),
+    },
+  );
+});
+
+menuHandler.hears(BTN.MORE, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  await ctx.reply("📋 بیشتر — یک گزینه را انتخاب کن:", {
+    reply_markup: moreKeyboard(),
+  });
+});
+
+menuHandler.hears(BTN.STATS, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const totalUsers = await prisma.user.count({ where: { registered: true } });
+  await ctx.reply(
+    [
+      "📊 آمار",
+      "",
+      "آمار تو:",
+      `• بازدید پروفایل: ${formatNum(user.viewsCount)}`,
+      `• لایک دریافتی: ${formatNum(user.likesCount)}`,
+      `• چت‌ها: ${formatNum(user.chatsCount)}`,
+      `• الماس: ${formatNum(user.diamonds)}`,
+      "",
+      `کاربران فعال دوردوریا: ${formatNum(totalUsers)}`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
 });
 
 menuHandler.hears(BTN.CANCEL_WAIT, async (ctx) => {
-  const user = await requireUser(ctx);
+  const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
   await leaveQueueOrChat(ctx.api, user, false);
-  await setState(user.id, "idle");
+  await patchUser(user.id, { state: "idle" });
   await ctx.reply("جستجو لغو شد.", { reply_markup: mainKeyboard() });
 });
 
 menuHandler.hears(BTN.END_CHAT, async (ctx) => {
-  const user = await requireUser(ctx);
+  const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
   if (user.state !== "chatting") {
-    await ctx.reply("الان تو چت نیستی.", { reply_markup: mainKeyboard() });
+    await ctx.reply("الان در چت نیستی.", { reply_markup: mainKeyboard() });
     return;
   }
   await leaveQueueOrChat(ctx.api, user, true);
@@ -214,15 +237,17 @@ menuHandler.hears(BTN.END_CHAT, async (ctx) => {
 });
 
 menuHandler.hears(BTN.BACK, async (ctx) => {
-  const user = await requireUser(ctx);
+  const user = await findByTelegram(ctx.from!.id);
   if (user && user.state !== "chatting") {
-    await setState(user.id, "idle", { pendingAnonTo: null });
+    await patchUser(user.id, { state: user.registered ? "idle" : user.state });
   }
-  await ctx.reply("برگشتی به منوی اصلی.", { reply_markup: mainKeyboard() });
+  if (user?.registered) {
+    await ctx.reply("منوی اصلی:", { reply_markup: mainKeyboard() });
+  }
 });
 
 menuHandler.hears(BTN.SEND_LOCATION, async (ctx) => {
-  await ctx.reply("از دکمه تلگرام، موقعیتت رو Share Location کن 📍", {
+  await ctx.reply("از دکمه تلگرام موقعیت را Share کن 📍", {
     reply_markup: locationKeyboard(),
   });
 });

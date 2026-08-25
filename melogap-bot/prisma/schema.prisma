@@ -8,41 +8,66 @@ datasource db {
 }
 
 model User {
-  id            Int       @id @default(autoincrement())
-  telegramId    BigInt    @unique
-  username      String?
-  firstName     String?
-  coins         Int       @default(0)
-  referralCode  String    @unique
-  anonCode      String    @unique
-  referredById  Int?
-  referredBy    User?     @relation("Referrals", fields: [referredById], references: [id])
-  referrals     User[]    @relation("Referrals")
-  latitude      Float?
-  longitude     Float?
-  locationAt    DateTime?
-  gender        String?
-  age           Int?
-  city          String?
-  /// idle | waiting | chatting | await_location | await_anon_msg | await_gender
-  state         String    @default("idle")
-  /// هدف پیام ناشناس (anonCode صاحب صندوق)
-  pendingAnonTo String?
-  chatPartnerId Int?
-  lastActiveAt  DateTime  @default(now())
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  coinOrders    CoinOrder[]
-  anonInbox     AnonMessage[] @relation("AnonTo")
-  anonSent      AnonMessage[] @relation("AnonFrom")
+  id             Int       @id @default(autoincrement())
+  telegramId     BigInt    @unique
+  username       String?
+  firstName      String?
+  /// نام نمایشی داخل دوردوریا
+  displayName    String?
+  bio            String?
+  diamonds       Int       @default(0)
+  referralCode   String    @unique
+  anonCode       String    @unique
+  referredById   Int?
+  referredBy     User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals      User[]    @relation("Referrals")
+  latitude       Float?
+  longitude      Float?
+  locationAt     DateTime?
+  /// female | male
+  gender         String?
+  /// female | male | any
+  lookingFor     String?
+  age            Int?
+  city           String?
+  photoFileId    String?
+  /// آیا ثبت‌نام کامل شده
+  registered     Boolean   @default(false)
+  /// gender | age | name | looking | done | idle | waiting | chatting | await_anon_msg | await_location | explore
+  state          String    @default("gender")
+  pendingAnonTo  String?
+  chatPartnerId  Int?
+  boostUntil     DateTime?
+  isPro          Boolean   @default(false)
+  viewsCount     Int       @default(0)
+  likesCount     Int       @default(0)
+  chatsCount     Int       @default(0)
+  lastActiveAt   DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  diamondOrders  DiamondOrder[]
+  anonInbox      AnonMessage[]  @relation("AnonTo")
+  anonSent       AnonMessage[]  @relation("AnonFrom")
+  exploreSeen    ExploreSeen[]  @relation("Viewer")
+  exploreShown   ExploreSeen[]  @relation("Shown")
 }
 
-model CoinOrder {
+model ExploreSeen {
+  id         Int  @id @default(autoincrement())
+  viewerId   Int
+  shownId    Int
+  viewer     User @relation("Viewer", fields: [viewerId], references: [id])
+  shown      User @relation("Shown", fields: [shownId], references: [id])
+
+  @@unique([viewerId, shownId])
+}
+
+model DiamondOrder {
   id          Int      @id @default(autoincrement())
   userId      Int
   user        User     @relation(fields: [userId], references: [id])
   packageId   String
-  coins       Int
+  diamonds    Int
   amountToman Int
   status      String   @default("pending")
   paymentCode String   @unique
