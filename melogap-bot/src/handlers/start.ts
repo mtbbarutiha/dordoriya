@@ -5,6 +5,7 @@ import { mainKeyboard } from "../keyboards/main.js";
 import {
   beginRegistration,
   finishRegistration,
+  resumeRegistration,
 } from "../services/register.js";
 import { leaveQueueOrChat } from "../services/match.js";
 import {
@@ -72,7 +73,7 @@ startHandler.command("start", async (ctx) => {
   });
 
   if (!user.registered) {
-    await beginRegistration(ctx, user.id);
+    await resumeRegistration(ctx, user);
     return;
   }
 
