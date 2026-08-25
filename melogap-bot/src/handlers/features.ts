@@ -38,7 +38,18 @@ import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
 
 export const featuresHandler = new Composer();
 
-/** پنل جستجو شبیه ملوگپ */
+featuresHandler.callbackQuery(/^open:(.+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const code = ctx.match[1]!;
+  await ctx.answerCallbackQuery();
+  const { showProfileByUserCode } = await import("../services/explore.js");
+  await showProfileByUserCode(ctx, user.id, code);
+});
+
 featuresHandler.callbackQuery("search:province", async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {
@@ -737,27 +748,45 @@ featuresHandler.on("message:location", async (ctx, next) => {
   }
 
   const { ensureUserCode } = await import("../db/users.js");
-  const lines: string[] = [
-    "کی را نشون بدم؟ انتخاب کن 👇",
-    `📍 ${nearby.length} نفر نزدیک تو:`,
-    "",
-  ];
+  const { listThumbWithBadge } = await import("../lib/faceBadgePhoto.js");
+  await ctx.reply(
+    [
+      "کی را نشون بدم؟ انتخاب کن 👇",
+      `📍 ${nearby.length} نفر نزدیک تو:`,
+      "",
+      "روی عکس یا /user_ بزن.",
+    ].join("\n"),
+  );
   for (const item of nearby) {
     const u = item.user;
     if (!u.userCode) await ensureUserCode(u.id, u.userCode);
     const code = u.userCode ?? (await ensureUserCode(u.id, null));
+    const online =
+      Date.now() - u.lastActiveAt.getTime() <= 15 * 60_000 ? "🟢 " : "";
+    const special = u.faceVerified ? " ⭐" : "";
     const place = [u.city, u.province ? `(${u.province})` : null]
       .filter(Boolean)
       .join("");
-    lines.push(
-      `/user_${code} ${u.displayName ?? "ناشناس"} ${u.age ?? "—"}`,
-      `${place || "—"} (🏁 ${item.distanceLabel}) (❤️ ${formatNum(u.likesCount)})`,
-      "",
-    );
+    try {
+      const thumb = await listThumbWithBadge(ctx.api, u);
+      await ctx.replyWithPhoto(thumb, {
+        caption: [
+          `${online}${u.displayName ?? "ناشناس"} ${u.age ?? "—"}${special}`,
+          `/user_${code}`,
+          `${place || "—"} (🏁 ${item.distanceLabel}) (❤️ ${formatNum(u.likesCount)})`,
+        ].join("\n"),
+        reply_markup: new InlineKeyboard().text(
+          "👤 مشاهده پروفایل",
+          `open:${code}`,
+        ),
+      });
+    } catch {
+      await ctx.reply(
+        `${online}${u.displayName ?? "ناشناس"} ${u.age ?? "—"}\n/user_${code}`,
+      );
+    }
   }
-  await ctx.reply(lines.join("\n").trimEnd(), {
-    reply_markup: mainKeyboard(),
-  });
+  await ctx.reply("⬆️ لیست بالا", { reply_markup: mainKeyboard() });
 });
 
 featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {

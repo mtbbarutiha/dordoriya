@@ -18,11 +18,11 @@ type PhotoUser = {
   faceStatus?: string | null;
 };
 
-/** بج کوچک و نیمه‌شفاف گوشه بالا-راست */
+/** بج کوچک و نیمه‌شفاف گوشه بالا-راست — ویژه = سبز شفاف */
 function badgeSvg(kind: FaceBadgeKind, width: number, height: number): string {
   const colors =
     kind === "verified"
-      ? { a: "#f59e0b", b: "#d97706", fg: "#fff7ed" }
+      ? { a: "#22c55e", b: "#15803d", fg: "#ecfdf5" }
       : kind === "pending"
         ? { a: "#94a3b8", b: "#64748b", fg: "#f8fafc" }
         : { a: "#64748b", b: "#475569", fg: "#f1f5f9" };
@@ -37,8 +37,8 @@ function badgeSvg(kind: FaceBadgeKind, width: number, height: number): string {
   const cx = Math.round(width * 0.14);
   const cy = Math.round(height * 0.5);
   const r = Math.round(height * 0.28);
+  const pillOpacity = kind === "verified" ? "0.42" : "0.52";
 
-  // ⭐ ستاره برای ویژه | 🕶 عینک برای ناشناس | ⏳ نقطه برای انتظار
   const icon =
     kind === "verified"
       ? `<polygon points="${cx},${cy - r * 0.85} ${cx + r * 0.25},${cy - r * 0.2} ${cx + r * 0.9},${cy - r * 0.2} ${cx + r * 0.35},${cy + r * 0.2} ${cx + r * 0.55},${cy + r * 0.85} ${cx},${cy + r * 0.4} ${cx - r * 0.55},${cy + r * 0.85} ${cx - r * 0.35},${cy + r * 0.2} ${cx - r * 0.9},${cy - r * 0.2} ${cx - r * 0.25},${cy - r * 0.2}" fill="${colors.a}"/>`
@@ -61,7 +61,7 @@ function badgeSvg(kind: FaceBadgeKind, width: number, height: number): string {
     </linearGradient>
   </defs>
   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="${height / 2}"
-    fill="url(#g)" opacity="0.52"/>
+    fill="url(#g)" opacity="${pillOpacity}"/>
   <circle cx="${cx}" cy="${cy}" r="${r}" fill="white" opacity="0.72"/>
   ${icon}
   <text x="${Math.round(width * 0.58)}" y="${Math.round(height * 0.66)}" text-anchor="middle"
@@ -82,6 +82,15 @@ export function faceBadgeKind(
   return "unverified";
 }
 
+/** لایه سبز شفاف روی کل عکس برای کاربر ویژه */
+function greenWashSvg(w: number, h: number): Buffer {
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${w}" height="${h}" fill="#22c55e" opacity="0.22"/>
+</svg>`;
+  return Buffer.from(svg);
+}
+
 export async function overlayFaceBadge(
   image: Buffer,
   kind: FaceBadgeKind,
@@ -89,7 +98,6 @@ export async function overlayFaceBadge(
   const meta = await sharp(image).rotate().metadata();
   const w = meta.width ?? 512;
   const h = meta.height ?? 512;
-  // کوچک‌تر از قبل (~۶٫۵٪ ارتفاع)
   const badgeH = Math.max(22, Math.round(Math.min(w, h) * 0.065));
   const badgeW = Math.round(badgeH * 4.6);
   const margin = Math.max(6, Math.round(Math.min(w, h) * 0.028));
@@ -99,18 +107,45 @@ export async function overlayFaceBadge(
     .png()
     .toBuffer();
 
+  const layers: { input: Buffer; top: number; left: number; blend: "over" }[] =
+    [];
+  if (kind === "verified") {
+    layers.push({
+      input: await sharp(greenWashSvg(w, h)).png().toBuffer(),
+      top: 0,
+      left: 0,
+      blend: "over",
+    });
+  }
+  layers.push({
+    input: badge,
+    top: margin,
+    left: Math.max(0, w - badgeW - margin),
+    blend: "over",
+  });
+
   return sharp(image)
     .rotate()
-    .composite([
-      {
-        input: badge,
-        top: margin,
-        left: Math.max(0, w - badgeW - margin),
-        blend: "over",
-      },
-    ])
-    .jpeg({ quality: 90 })
+    .composite(layers)
+    .jpeg({ quality: 88 })
     .toBuffer();
+}
+
+/** تصویر فشرده برای لیست سرچ */
+export async function listThumbWithBadge(
+  api: Api,
+  user: PhotoUser,
+  size = 360,
+): Promise<InputFile> {
+  const raw = await loadUserPhotoBuffer(api, user, "public");
+  const kind = faceBadgeKind(user, false);
+  const squared = await sharp(raw)
+    .rotate()
+    .resize(size, size, { fit: "cover", position: "centre" })
+    .jpeg({ quality: 82 })
+    .toBuffer();
+  const out = await overlayFaceBadge(squared, kind);
+  return new InputFile(out, "list.jpg");
 }
 
 async function downloadTelegramFile(api: Api, fileId: string): Promise<Buffer> {

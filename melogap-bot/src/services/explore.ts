@@ -1,10 +1,13 @@
 import { prisma } from "../db/prisma.js";
 import { patchUser, ensureUserCode } from "../db/users.js";
 import { genderLabel, formatNum } from "../data/packages.js";
-import type { Context } from "grammy";
+import { InlineKeyboard, type Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
-import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
+import {
+  publicPhotoWithBadge,
+  listThumbWithBadge,
+} from "../lib/faceBadgePhoto.js";
 import { haversineKm, formatDistance } from "../lib/geo.js";
 
 export type ExploreMode =
@@ -101,6 +104,10 @@ function orderFor(opts: ExploreOpts): Prisma.UserOrderByWithRelationInput[] {
   return [{ boostUntil: "desc" }, { lastActiveAt: "desc" }];
 }
 
+function isOnlineNow(lastActiveAt: Date): boolean {
+  return Date.now() - lastActiveAt.getTime() <= 15 * 60_000;
+}
+
 function onlineStatus(u: {
   lastActiveAt: Date;
   state: string;
@@ -117,7 +124,7 @@ function onlineStatus(u: {
   return "آخرین بازدید چند روز پیش";
 }
 
-function formatListEntry(
+function listCaption(
   u: {
     userCode: string | null;
     displayName: string | null;
@@ -130,10 +137,13 @@ function formatListEntry(
     chatPartnerId: number | null;
     latitude: number | null;
     longitude: number | null;
+    faceVerified: boolean;
   },
   me: { latitude: number | null; longitude: number | null },
 ): string {
   const code = u.userCode ?? "????";
+  const online = isOnlineNow(u.lastActiveAt) ? "🟢 " : "";
+  const special = u.faceVerified ? " ⭐" : "";
   const name = u.displayName ?? "بدون‌نام";
   const age = u.age ?? "—";
   const place = [u.city, u.province ? `(${u.province})` : null]
@@ -149,18 +159,20 @@ function formatListEntry(
     const km = haversineKm(me.latitude, me.longitude, u.latitude, u.longitude);
     dist = ` (🏁 ${formatDistance(km)})`;
   }
-  const line1 = `/user_${code} ${name} ${age}`;
-  const line2 = `${place || "—"}${dist} (❤️ ${formatNum(u.likesCount)})`;
-  const line3 = onlineStatus(u);
-  return `${line1}\n${line2}\n${line3}`;
+  return [
+    `${online}${name} ${age}${special}`,
+    `/user_${code}`,
+    `${place || "—"}${dist} (❤️ ${formatNum(u.likesCount)})`,
+    onlineStatus(u),
+  ].join("\n");
 }
 
-/** لیست سرچ شبیه ملوگپ — با لینک /user_CODE */
+/** لیست سرچ با عکس کنار هر نفر */
 export async function sendSearchList(
   ctx: Context,
   viewerId: number,
   opts: ExploreOpts = {},
-  limit = 15,
+  limit = 12,
 ) {
   const me = await prisma.user.findUnique({ where: { id: viewerId } });
   if (!me) return;
@@ -186,7 +198,6 @@ export async function sendSearchList(
     return;
   }
 
-  // مطمئن شو همه userCode دارند
   for (const u of list) {
     if (!u.userCode) await ensureUserCode(u.id, u.userCode);
   }
@@ -198,31 +209,39 @@ export async function sendSearchList(
 
   await patchUser(viewerId, { state: exploreStateFromOpts(opts) });
 
-  const blocks = ordered.map((u) =>
-    formatListEntry(u, {
-      latitude: me.latitude,
-      longitude: me.longitude,
-    }),
+  await ctx.reply(
+    ["کی را نشون بدم؟ انتخاب کن 👇", listIntro(opts), "", "روی عکس یا /user_ بزن."].join(
+      "\n",
+    ),
   );
 
-  const header = [
-    "کی را نشون بدم؟ انتخاب کن 👇",
-    listIntro(opts),
-    "",
-  ].join("\n");
-
-  // تلگرام محدودیت طول پیام دارد — چند پیام اگر لازم
-  let msg = header;
-  for (const block of blocks) {
-    const next = `${msg}${block}\n\n`;
-    if (next.length > 3500) {
-      await ctx.reply(msg.trimEnd(), { reply_markup: mainKeyboard() });
-      msg = `${block}\n\n`;
-    } else {
-      msg = next;
+  for (const u of ordered) {
+    try {
+      const thumb = await listThumbWithBadge(ctx.api, u);
+      await ctx.replyWithPhoto(thumb, {
+        caption: listCaption(u, {
+          latitude: me.latitude,
+          longitude: me.longitude,
+        }),
+        reply_markup: new InlineKeyboard().text(
+          "👤 مشاهده پروفایل",
+          `open:${u.userCode}`,
+        ),
+      });
+    } catch (err) {
+      console.error("list photo failed", u.id, err);
+      await ctx.reply(
+        listCaption(u, {
+          latitude: me.latitude,
+          longitude: me.longitude,
+        }),
+      );
     }
   }
-  await ctx.reply(msg.trimEnd(), { reply_markup: mainKeyboard() });
+
+  await ctx.reply("⬆️ لیست بالا — یکی را انتخاب کن.", {
+    reply_markup: mainKeyboard(),
+  });
 }
 
 /** باز کردن پروفایل با /user_CODE */
@@ -276,11 +295,12 @@ export async function showProfileByUserCode(
     distanceLine = `🏁 فاصله از شما: ${formatDistance(km)}`;
   }
 
+  const online = isOnlineNow(candidate.lastActiveAt) ? "🟢 " : "";
   const text = [
     `❤️ ${formatNum(candidate.likesCount)} لایک`,
     "",
     `آیدی: /user_${candidate.userCode}`,
-    `👤 ${candidate.displayName ?? "بدون نام"} (${candidate.age ?? "—"})`,
+    `${online}👤 ${candidate.displayName ?? "بدون نام"} (${candidate.age ?? "—"})`,
     `┃ ${genderLabel(candidate.gender)}`,
     loc ? `┃ 📍 ${loc}` : null,
     candidate.bio ? `┃ ${candidate.bio}` : null,
