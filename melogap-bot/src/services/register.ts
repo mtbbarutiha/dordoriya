@@ -8,7 +8,7 @@ import {
   provinceReplyKeyboard,
   cityReplyKeyboard,
   genderReplyKeyboard,
-  ageReplyKeyboard,
+  ageRangeReplyKeyboard,
   lookingReplyKeyboard,
 } from "../keyboards/main.js";
 import { WELCOME_DIAMONDS } from "../data/packages.js";
@@ -47,9 +47,14 @@ export async function resumeRegistration(
       });
       break;
     case "province":
-      await ctx.reply("۳/۸ — استان را انتخاب کن:", {
-        reply_markup: provinceReplyKeyboard(user.country ?? "IR"),
-      });
+      await ctx.reply(
+        (user.country ?? "IR") === "IR"
+          ? "۳/۸ — منطقه را انتخاب کن:"
+          : "۳/۸ — استان را انتخاب کن:",
+        {
+          reply_markup: provinceReplyKeyboard(user.country ?? "IR"),
+        },
+      );
       break;
     case "city":
       if (!user.country || !user.province) {
@@ -66,8 +71,8 @@ export async function resumeRegistration(
       });
       break;
     case "age":
-      await ctx.reply("۶/۸ — سن را انتخاب کن (دکمه‌های بزرگ پایین):", {
-        reply_markup: ageReplyKeyboard(),
+      await ctx.reply("۶/۸ — بازه سن را انتخاب کن:", {
+        reply_markup: ageRangeReplyKeyboard(),
       });
       break;
     case "name":

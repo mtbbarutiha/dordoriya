@@ -1,7 +1,19 @@
 import { Composer } from "grammy";
 import { ensureUser, findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
-import { mainKeyboard, REG } from "../keyboards/main.js";
+import {
+  mainKeyboard,
+  REG,
+  lookingReplyKeyboard,
+  genderReplyKeyboard,
+  ageReplyKeyboard,
+  ageRangeReplyKeyboard,
+  parseAgeRange,
+  languageReplyKeyboard,
+  countryReplyKeyboard,
+  provinceReplyKeyboard,
+  cityReplyKeyboard,
+} from "../keyboards/main.js";
 import {
   beginRegistration,
   finishRegistration,
@@ -9,18 +21,10 @@ import {
 } from "../services/register.js";
 import { leaveQueueOrChat } from "../services/match.js";
 import {
-  lookingReplyKeyboard,
-  genderReplyKeyboard,
-  ageReplyKeyboard,
-  languageReplyKeyboard,
-  countryReplyKeyboard,
-  provinceReplyKeyboard,
-  cityReplyKeyboard,
-} from "../keyboards/main.js";
-import {
   COUNTRIES,
   provincesForCountry,
   citiesFor,
+  provincesInRegion,
 } from "../data/locations.js";
 
 export const startHandler = new Composer();
@@ -162,9 +166,14 @@ registerHandler.on("message:text", async (ctx, next) => {
         city: null,
         state: "province",
       });
-      await ctx.reply("۳/۸ — استان را انتخاب کن:", {
-        reply_markup: provinceReplyKeyboard(found.id),
-      });
+      await ctx.reply(
+        found.id === "IR"
+          ? "۳/۸ — منطقه را انتخاب کن:"
+          : "۳/۸ — استان را انتخاب کن:",
+        {
+          reply_markup: provinceReplyKeyboard(found.id),
+        },
+      );
       return;
     }
 
@@ -173,11 +182,31 @@ registerHandler.on("message:text", async (ctx, next) => {
         await resumeRegistration(ctx, user);
         return;
       }
-      const list = provincesForCountry(user.country);
-      if (!list.includes(text)) {
-        await ctx.reply("از دکمه‌های پایین استان را انتخاب کن:", {
+      if (text === REG.REGION_BACK) {
+        await ctx.reply("منطقه را انتخاب کن:", {
           reply_markup: provinceReplyKeyboard(user.country),
         });
+        return;
+      }
+      if (user.country === "IR") {
+        const regionProvinces = provincesInRegion(text);
+        if (regionProvinces) {
+          await ctx.reply(`استان در «${text}» را بزن:`, {
+            reply_markup: provinceReplyKeyboard(user.country, text),
+          });
+          return;
+        }
+      }
+      const list = provincesForCountry(user.country);
+      if (!list.includes(text)) {
+        await ctx.reply(
+          user.country === "IR"
+            ? "اول منطقه، بعد استان را از دکمه‌ها بزن:"
+            : "از دکمه‌های پایین استان را انتخاب کن:",
+          {
+            reply_markup: provinceReplyKeyboard(user.country),
+          },
+        );
         return;
       }
       await patchUser(user.id, { province: text, city: null, state: "city" });
@@ -216,17 +245,30 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { gender, state: "age" });
-      await ctx.reply("۶/۸ — سنت را انتخاب کن (همه سن‌ها پایین صفحه):", {
-        reply_markup: ageReplyKeyboard(),
+      await ctx.reply("۶/۸ — بازه سنت را بزن (دکمه‌های بزرگ پایین):", {
+        reply_markup: ageRangeReplyKeyboard(),
       });
       return;
     }
 
     if (user.state === "age") {
+      if (text === REG.AGE_BACK) {
+        await ctx.reply("بازه سن را انتخاب کن:", {
+          reply_markup: ageRangeReplyKeyboard(),
+        });
+        return;
+      }
+      const range = parseAgeRange(text);
+      if (range) {
+        await ctx.reply(`سنت چند سال است؟ (${range.label})`, {
+          reply_markup: ageReplyKeyboard(range.from, range.to),
+        });
+        return;
+      }
       const age = Number(text);
       if (!Number.isFinite(age) || age < 18 || age > 60) {
-        await ctx.reply("از دکمه‌های پایین سن را انتخاب کن:", {
-          reply_markup: ageReplyKeyboard(),
+        await ctx.reply("اول بازه، بعد سن دقیق را از دکمه‌ها بزن:", {
+          reply_markup: ageRangeReplyKeyboard(),
         });
         return;
       }
@@ -280,10 +322,23 @@ registerHandler.on("message:text", async (ctx, next) => {
 
   // --- ویرایش سن بعد از ثبت‌نام ---
   if (user.state === "edit_age") {
+    if (text === REG.AGE_BACK) {
+      await ctx.reply("بازه سن را انتخاب کن:", {
+        reply_markup: ageRangeReplyKeyboard(),
+      });
+      return;
+    }
+    const range = parseAgeRange(text);
+    if (range) {
+      await ctx.reply(`سن دقیق (${range.label}):`, {
+        reply_markup: ageReplyKeyboard(range.from, range.to),
+      });
+      return;
+    }
     const age = Number(text);
     if (!Number.isFinite(age) || age < 18 || age > 60) {
-      await ctx.reply("از دکمه‌های پایین سن را انتخاب کن:", {
-        reply_markup: ageReplyKeyboard(),
+      await ctx.reply("اول بازه، بعد سن را از دکمه‌ها بزن:", {
+        reply_markup: ageRangeReplyKeyboard(),
       });
       return;
     }

@@ -6,7 +6,7 @@ import {
   mainKeyboard,
   paymentKeyboard,
   lookingReplyKeyboard,
-  ageReplyKeyboard,
+  ageRangeReplyKeyboard,
   cancelKeyboard,
   locationKeyboard,
   moreKeyboard,
@@ -301,8 +301,8 @@ featuresHandler.callbackQuery("edit:age", async (ctx) => {
   }
   await patchUser(user.id, { state: "edit_age" });
   await ctx.answerCallbackQuery();
-  await ctx.reply("سن جدید را از دکمه‌های بزرگ پایین انتخاب کن:", {
-    reply_markup: ageReplyKeyboard(),
+  await ctx.reply("بازه سن را بزن، بعد سن دقیق:", {
+    reply_markup: ageRangeReplyKeyboard(),
   });
 });
 

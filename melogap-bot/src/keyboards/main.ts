@@ -5,6 +5,8 @@ import {
   COUNTRIES,
   provincesForCountry,
   citiesFor,
+  iranRegions,
+  provincesInRegion,
 } from "../data/locations.js";
 
 export const BTN = {
@@ -28,10 +30,22 @@ export const REG = {
   LANG_EN: "🇬🇧 English",
   GENDER_F: "👩 خانم",
   GENDER_M: "👨 آقا",
-  LOOK_F: "👩 دنبال خانم",
-  LOOK_M: "👨 دنبال آقا",
-  LOOK_ANY: "🎲 فرقی ندارد",
+  LOOK_F: "👩 خانم",
+  LOOK_M: "👨 آقا",
+  LOOK_ANY: "🎲 هردو",
+  AGE_BACK: "↩️ بازه سن",
+  REGION_BACK: "↩️ مناطق",
 } as const;
+
+/** بازه‌های سن — دکمه‌های درشت، بعد انتخاب سن دقیق */
+export const AGE_RANGES: { label: string; from: number; to: number }[] = [
+  { label: "۱۸ تا ۲۴", from: 18, to: 24 },
+  { label: "۲۵ تا ۳۱", from: 25, to: 31 },
+  { label: "۳۲ تا ۳۸", from: 32, to: 38 },
+  { label: "۳۹ تا ۴۵", from: 39, to: 45 },
+  { label: "۴۶ تا ۵۲", from: 46, to: 52 },
+  { label: "۵۳ تا ۶۰", from: 53, to: 60 },
+];
 
 export function mainKeyboard() {
   return new Keyboard()
@@ -77,15 +91,19 @@ export function locationKeyboard() {
     .oneTime();
 }
 
-/** ReplyKeyboard — دکمه‌های بزرگ موبایل، ستون زیاد = اسکرول کمتر */
-function gridReply(labels: string[], cols: number) {
+/**
+ * ReplyKeyboard ثبت‌نام: ستون زیاد = اسکرول کمتر،
+ * oneTime = بعد از انتخاب کیبورد جمع می‌شود تا مرحله بعد فول‌صفحه باشد.
+ */
+function gridReply(labels: string[], cols: number, oneTime = true) {
   const kb = new Keyboard();
   labels.forEach((label, i) => {
     kb.text(label);
     if ((i + 1) % cols === 0) kb.row();
   });
   if (labels.length % cols !== 0) kb.row();
-  return kb.resized().persistent();
+  const built = kb.resized();
+  return oneTime ? built.oneTime() : built.persistent();
 }
 
 export function languageReplyKeyboard() {
@@ -93,21 +111,34 @@ export function languageReplyKeyboard() {
 }
 
 export function countryReplyKeyboard() {
+  // ۴ کشور در ۲×۲ — دکمه‌های پهن
   return gridReply(
     COUNTRIES.map((c) => c.label),
     2,
   );
 }
 
-export function provinceReplyKeyboard(country: string) {
+export function provinceReplyKeyboard(country: string, region?: string) {
+  if (country === "IR" && !region) {
+    // مرحله منطقه: ۶ دکمه درشت در ۲ ستون
+    return gridReply(iranRegions(), 2);
+  }
+  if (country === "IR" && region) {
+    const list = provincesInRegion(region) ?? [];
+    const cols = list.length <= 4 ? 2 : 3;
+    const kb = gridReply(list, cols);
+    kb.row().text(REG.REGION_BACK);
+    return kb;
+  }
   const list = provincesForCountry(country);
-  // ۳ ستون تا روی گوشی جا شود و اسکرول کمتر باشد
-  return gridReply(list, 3);
+  const cols = list.length <= 6 ? 2 : 3;
+  return gridReply(list, cols);
 }
 
 export function cityReplyKeyboard(country: string, province: string) {
   const list = citiesFor(country, province);
-  return gridReply(list, 3);
+  const cols = list.length <= 4 ? 2 : list.length <= 9 ? 3 : 4;
+  return gridReply(list, cols);
 }
 
 export function genderReplyKeyboard() {
@@ -115,14 +146,33 @@ export function genderReplyKeyboard() {
 }
 
 export function lookingReplyKeyboard() {
-  return gridReply([REG.LOOK_F, REG.LOOK_M, REG.LOOK_ANY], 1);
+  // هر سه در یک سطر — دکمه‌های پهن، بدون اسکرول
+  return gridReply([REG.LOOK_F, REG.LOOK_M, REG.LOOK_ANY], 3);
 }
 
-/** سن ۱۸–۶۰ در ۷ ستون — دکمه‌های بزرگ ReplyKeyboard */
-export function ageReplyKeyboard() {
+/** مرحله ۱ سن: فقط ۶ بازه بزرگ */
+export function ageRangeReplyKeyboard() {
+  return gridReply(
+    AGE_RANGES.map((r) => r.label),
+    2,
+  );
+}
+
+/** مرحله ۲ سن: فقط سن‌های همان بازه — دکمه‌های درشت */
+export function ageReplyKeyboard(from = 18, to = 60) {
   const ages: string[] = [];
-  for (let a = 18; a <= 60; a++) ages.push(String(a));
-  return gridReply(ages, 7);
+  for (let a = from; a <= to; a++) ages.push(String(a));
+  const cols = ages.length <= 4 ? 2 : ages.length <= 8 ? 4 : 5;
+  const kb = gridReply(ages, cols);
+  // اگر بازه کامل نیست، دکمه برگشت به بازه‌ها
+  if (from > 18 || to < 60) {
+    kb.row().text(REG.AGE_BACK);
+  }
+  return kb;
+}
+
+export function parseAgeRange(text: string) {
+  return AGE_RANGES.find((r) => r.label === text) ?? null;
 }
 
 // --- سازگاری با کدهای قبلی (ویرایش پروفایل / ادمین) ---
@@ -135,7 +185,7 @@ export function lookingForKeyboard() {
 }
 
 export function agePickerKeyboard(_page = 0, _prefix = "reg") {
-  return ageReplyKeyboard();
+  return ageRangeReplyKeyboard();
 }
 
 export function languageKeyboard() {
