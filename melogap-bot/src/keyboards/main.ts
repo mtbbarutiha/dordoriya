@@ -70,12 +70,14 @@ export function locationKeyboard() {
 export function registerGenderKeyboard() {
   return new InlineKeyboard()
     .text("👩 خانم", "reg:gender:female")
+    .row()
     .text("👨 آقا", "reg:gender:male");
 }
 
 export function lookingForKeyboard() {
   return new InlineKeyboard()
     .text("👩 خانم", "reg:looking:female")
+    .row()
     .text("👨 آقا", "reg:looking:male")
     .row()
     .text("🎲 فرقی ندارد", "reg:looking:any");
@@ -84,26 +86,17 @@ export function lookingForKeyboard() {
 export function agePickerKeyboard(page = 0, prefix = "reg") {
   const minAge = 18;
   const maxAge = 60;
-  const perPage = 12;
+  // همه سن‌ها در یک صفحه — ۵ ستون (۴۳ دکمه)
   const ages: number[] = [];
   for (let a = minAge; a <= maxAge; a++) ages.push(a);
 
-  const totalPages = Math.ceil(ages.length / perPage);
-  const safePage = Math.max(0, Math.min(page, totalPages - 1));
-  const slice = ages.slice(safePage * perPage, safePage * perPage + perPage);
-
   const kb = new InlineKeyboard();
-  slice.forEach((age, i) => {
-    kb.text(String(age), `${prefix}:age:${age}`);
-    if ((i + 1) % 4 === 0) kb.row();
+  ages.forEach((age, i) => {
+    kb.text(`${age}`, `${prefix}:age:${age}`);
+    if ((i + 1) % 5 === 0) kb.row();
   });
-  if (slice.length % 4 !== 0) kb.row();
-
-  if (safePage > 0) kb.text("◀️ قبلی", `${prefix}:agepage:${safePage - 1}`);
-  kb.text(`${safePage + 1}/${totalPages}`, `${prefix}:agenoop`);
-  if (safePage < totalPages - 1) {
-    kb.text("بعدی ▶️", `${prefix}:agepage:${safePage + 1}`);
-  }
+  if (ages.length % 5 !== 0) kb.row();
+  kb.text("— سن خودت را انتخاب کن —", `${prefix}:agenoop`);
   return kb;
 }
 
@@ -200,59 +193,52 @@ export function adminFaceKeyboard(userId: number) {
 export function languageKeyboard() {
   const kb = new InlineKeyboard();
   for (const l of LANGUAGES) {
-    kb.text(l.label, `reg:lang:${l.id}`);
+    kb.text(l.label, `reg:lang:${l.id}`).row();
   }
   return kb;
 }
 
 export function countryKeyboard() {
   const kb = new InlineKeyboard();
-  COUNTRIES.forEach((c, i) => {
-    kb.text(c.label, `reg:country:${c.id}`);
-    if ((i + 1) % 2 === 0) kb.row();
-  });
+  for (const c of COUNTRIES) {
+    kb.text(c.label, `reg:country:${c.id}`).row();
+  }
   return kb;
 }
 
 export function provinceKeyboard(country: string, page = 0) {
   const list = provincesForCountry(country);
-  const perPage = 8;
+  const perPage = 16; // صفحه شلوغ‌تر
   const totalPages = Math.max(1, Math.ceil(list.length / perPage));
   const safePage = Math.max(0, Math.min(page, totalPages - 1));
   const slice = list.slice(safePage * perPage, safePage * perPage + perPage);
 
   const kb = new InlineKeyboard();
   slice.forEach((name, i) => {
-    // index-based callback to avoid long Persian in callback_data limits
     const idx = safePage * perPage + i;
     kb.text(name, `reg:prov:${idx}`);
     if ((i + 1) % 2 === 0) kb.row();
   });
   if (slice.length % 2 !== 0) kb.row();
 
-  if (safePage > 0) kb.text("◀️ قبلی", `reg:provpage:${safePage - 1}`);
-  kb.text(`${safePage + 1}/${totalPages}`, "reg:noop");
-  if (safePage < totalPages - 1) kb.text("بعدی ▶️", `reg:provpage:${safePage + 1}`);
+  if (totalPages > 1) {
+    if (safePage > 0) kb.text("◀️ قبلی", `reg:provpage:${safePage - 1}`);
+    kb.text(`${safePage + 1}/${totalPages}`, "reg:noop");
+    if (safePage < totalPages - 1) {
+      kb.text("بعدی ▶️", `reg:provpage:${safePage + 1}`);
+    }
+  }
   return kb;
 }
 
 export function cityKeyboard(country: string, province: string, page = 0) {
   const list = citiesFor(country, province);
-  const perPage = 8;
-  const totalPages = Math.max(1, Math.ceil(list.length / perPage));
-  const safePage = Math.max(0, Math.min(page, totalPages - 1));
-  const slice = list.slice(safePage * perPage, safePage * perPage + perPage);
-
+  // معمولاً کم‌تعدادند — همه در یک صفحه، ۳ ستون
   const kb = new InlineKeyboard();
-  slice.forEach((name, i) => {
-    const idx = safePage * perPage + i;
-    kb.text(name, `reg:city:${idx}`);
-    if ((i + 1) % 2 === 0) kb.row();
+  list.forEach((name, i) => {
+    kb.text(name, `reg:city:${i}`);
+    if ((i + 1) % 3 === 0) kb.row();
   });
-  if (slice.length % 2 !== 0) kb.row();
-
-  if (safePage > 0) kb.text("◀️ قبلی", `reg:citypage:${safePage - 1}`);
-  kb.text(`${safePage + 1}/${totalPages}`, "reg:noop");
-  if (safePage < totalPages - 1) kb.text("بعدی ▶️", `reg:citypage:${safePage + 1}`);
+  if (list.length % 3 !== 0) kb.row();
   return kb;
 }

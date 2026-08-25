@@ -9,6 +9,7 @@ export const BOT_COMMANDS = [
   { command: "anon", description: "🕵️ پیام ناشناس" },
   { command: "diamonds", description: "💎 الماس‌ها" },
   { command: "stats", description: "📊 آمار" },
+  { command: "admin", description: "🛠 پنل ادمین" },
   { command: "start", description: "🔄 شروع / ثبت‌نام" },
   { command: "end", description: "🔚 قطع چت" },
 ] as const;
