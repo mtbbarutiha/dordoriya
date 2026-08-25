@@ -87,9 +87,9 @@ commandsHandler.command("diamonds", async (ctx) => {
   if (!user) return;
   await ctx.reply(
     [
-      "💎 الماس‌ها",
+      "🪙 سکه‌ها",
       "",
-      `موجودی: ${formatNum(user.diamonds)} الماس`,
+      `موجودی: ${formatNum(user.diamonds)} سکه`,
       "",
       "یکی از بسته‌ها را انتخاب کن:",
     ].join("\n"),
@@ -108,7 +108,7 @@ commandsHandler.command("stats", async (ctx) => {
       `👁 بازدید: ${formatNum(user.viewsCount)}`,
       `❤️ لایک: ${formatNum(user.likesCount)}`,
       `💬 چت: ${formatNum(user.chatsCount)}`,
-      `💎 الماس: ${formatNum(user.diamonds)}`,
+      `🪙 سکه: ${formatNum(user.diamonds)}`,
       "",
       `کاربران فعال: ${formatNum(totalUsers)}`,
     ].join("\n"),

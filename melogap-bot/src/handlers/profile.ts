@@ -223,7 +223,7 @@ profileHandler.callbackQuery("face:ok", async (ctx) => {
       "چهره‌ات باید با عکس پروفایل بالا یکی باشد.",
       "می‌توانی ویدیو معمولی هم بفرستی.",
       "",
-      `🎁 جایزه تأیید: ${formatNum(FACE_VERIFY_REWARD)} الماس`,
+      `🎁 جایزه تأیید: ${formatNum(FACE_VERIFY_REWARD)} سکه`,
     ].join("\n"),
     { reply_markup: cancelKeyboard() },
   );
@@ -390,7 +390,7 @@ async function acceptFaceVideo(
     [
       "✅ ویدیو احراز دریافت شد و برای ادمین ارسال شد.",
       "اگر چهره‌ات با عکس پروفایل یکی باشد، احراز تأیید می‌شود.",
-      `🎁 جایزه در صورت تأیید: ${formatNum(FACE_VERIFY_REWARD)} الماس`,
+      `🎁 جایزه در صورت تأیید: ${formatNum(FACE_VERIFY_REWARD)} سکه`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
@@ -484,14 +484,14 @@ profileHandler.callbackQuery(/^adm:face:(ok|no):(\d+)$/, async (ctx) => {
       diamonds: { increment: FACE_VERIFY_REWARD },
     });
     const fresh = await prisma.user.findUnique({ where: { id: user.id } });
-    await ctx.answerCallbackQuery({ text: "احراز شد +۱۰۰💎" });
+    await ctx.answerCallbackQuery({ text: "احراز شد +۱۰۰🪙" });
     await ctx.api
       .sendMessage(
         Number(user.telegramId),
         [
           "✅ احراز چهره‌ات تأیید شد!",
-          `🎁 جایزه: ${formatNum(FACE_VERIFY_REWARD)} الماس به حسابت اضافه شد.`,
-          `موجودی: ${formatNum(fresh?.diamonds ?? 0)} 💎`,
+          `🎁 جایزه: ${formatNum(FACE_VERIFY_REWARD)} سکه به حسابت اضافه شد.`,
+          `موجودی: ${formatNum(fresh?.diamonds ?? 0)} 🪙`,
         ].join("\n"),
       )
       .catch(() => undefined);

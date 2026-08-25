@@ -56,11 +56,11 @@ featuresHandler.callbackQuery(/^buy:(.+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
-      "💳 فاکتور الماس",
+      "💳 فاکتور سکه",
       "",
       `بسته: ${pkg.label}`,
       `مبلغ: ${formatToman(pkg.toman)}`,
-      `الماس: ${formatNum(pkg.diamonds)}`,
+      `سکه: ${formatNum(pkg.diamonds)}`,
       "",
       "لینک پرداخت (دمو):",
       url,
@@ -87,7 +87,7 @@ featuresHandler.callbackQuery(/^paid:(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery({ text: "شارژ شد" });
   await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() });
   await ctx.reply(
-    `✅ ${formatNum(order.diamonds)} الماس اضافه شد.\nموجودی: ${formatNum(fresh?.diamonds ?? 0)} 💎`,
+    `✅ ${formatNum(order.diamonds)} سکه اضافه شد.\nموجودی: ${formatNum(fresh?.diamonds ?? 0)} 🪙`,
     { reply_markup: mainKeyboard() },
   );
 });
@@ -112,7 +112,7 @@ featuresHandler.callbackQuery("pro:buy", async (ctx) => {
   }
   const cost = 200;
   if (user.diamonds < cost) {
-    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    await ctx.answerCallbackQuery({ text: "سکه کافی نیست" });
     return;
   }
   await patchUser(user.id, {
@@ -161,9 +161,9 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
   }
 
   if (user.diamonds < LIKE_GIFT_DIAMONDS) {
-    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    await ctx.answerCallbackQuery({ text: "سکه کافی نیست" });
     await ctx.reply(
-      `برای لایک به ${formatNum(LIKE_GIFT_DIAMONDS)} الماس نیاز داری.\nموجودی: ${formatNum(user.diamonds)} 💎`,
+      `برای لایک به ${formatNum(LIKE_GIFT_DIAMONDS)} سکه نیاز داری.\nموجودی: ${formatNum(user.diamonds)} 🪙`,
     );
     return;
   }
@@ -193,7 +193,7 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
         [
           "❤️ یک لایک جدید گرفتی!",
           `از طرف: ${fromName}`,
-          `🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} الماس به حسابت هدیه شد.`,
+          `🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} سکه به حسابت هدیه شد.`,
           "",
           "جزئیات در پروفایل ← تعاملات",
         ].join("\n"),
@@ -201,9 +201,9 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
       .catch(() => undefined);
   }
 
-  await ctx.answerCallbackQuery({ text: "لایک + هدیه الماس ارسال شد" });
+  await ctx.answerCallbackQuery({ text: "لایک + هدیه سکه ارسال شد" });
   await ctx.reply(
-    `❤️ لایک ثبت شد.\n🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} الماس برای «${target.displayName ?? "کاربر"}» هدیه شد.`,
+    `❤️ لایک ثبت شد.\n🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} سکه برای «${target.displayName ?? "کاربر"}» هدیه شد.`,
   );
   await nextExploreProfile(ctx, user.id, {
     sameProvince: user.state === "explore_province",
@@ -225,9 +225,9 @@ featuresHandler.callbackQuery(/^gift:menu:(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
-      `🎁 خرید الماس برای «${target.displayName ?? "کاربر"}»`,
+      `🎁 خرید سکه برای «${target.displayName ?? "کاربر"}»`,
       "",
-      `موجودی تو: ${formatNum(user.diamonds)} 💎`,
+      `موجودی تو: ${formatNum(user.diamonds)} 🪙`,
       "مقدار هدیه را انتخاب کن (از موجودی خودت کم می‌شود):",
     ].join("\n"),
     { reply_markup: giftDiamondsKeyboard(targetId) },
@@ -270,7 +270,7 @@ featuresHandler.callbackQuery(/^gift:send:(\d+):(\d+)$/, async (ctx) => {
     return;
   }
   if (fresh.diamonds < amount) {
-    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    await ctx.answerCallbackQuery({ text: "سکه کافی نیست" });
     await ctx.reply(
       `موجودی‌ات کافی نیست.\nنیاز: ${formatNum(amount)} | موجودی: ${formatNum(fresh.diamonds)}`,
     );
@@ -294,9 +294,9 @@ featuresHandler.callbackQuery(/^gift:send:(\d+):(\d+)$/, async (ctx) => {
       .sendMessage(
         Number(target.telegramId),
         [
-          "🎁 یک هدیه الماس گرفتی!",
+          "🎁 یک هدیه سکه گرفتی!",
           `از طرف: ${fromName}`,
-          `💎 ${formatNum(amount)} الماس به حسابت اضافه شد.`,
+          `🪙 ${formatNum(amount)} سکه به حسابت اضافه شد.`,
         ].join("\n"),
       )
       .catch(() => undefined);
@@ -304,7 +304,7 @@ featuresHandler.callbackQuery(/^gift:send:(\d+):(\d+)$/, async (ctx) => {
 
   await ctx.answerCallbackQuery({ text: "هدیه ارسال شد" });
   await ctx.reply(
-    `✅ ${formatNum(amount)} الماس برای «${target.displayName ?? "کاربر"}» ارسال شد.`,
+    `✅ ${formatNum(amount)} سکه برای «${target.displayName ?? "کاربر"}» ارسال شد.`,
     { reply_markup: mainKeyboard() },
   );
 });
@@ -367,8 +367,8 @@ featuresHandler.callbackQuery("more:guide", async (ctx) => {
       "• اکسپلور: دیدن افراد و لایک / چت",
       "• پیام ناشناس: لینک دریافت پیام مخفی",
       "• چت سریع: وصل تصادفی ناشناس",
-      "• شتاب‌دهی: اولویت بیشتر با الماس",
-      "• الماس‌ها: خرید اعتبار",
+      "• شتاب‌دهی: اولویت بیشتر با سکه",
+      "• سکه‌ها: خرید اعتبار",
       "• اشتراک پرو: امکانات ویژه",
       "• آمار: بازدید و لایک و چت‌ها",
       "",
@@ -391,7 +391,7 @@ featuresHandler.callbackQuery("more:ref", async (ctx) => {
     [
       "🎁 دعوت دوستان",
       "",
-      `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} الماس برای تو`,
+      `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} سکه برای تو`,
       "",
       link,
     ].join("\n"),

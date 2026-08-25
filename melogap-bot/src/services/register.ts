@@ -138,7 +138,7 @@ export async function finishRegistration(ctx: Context, userId: number) {
       loc ? `🏘 ${loc}` : null,
       hasGps ? "📍 موقعیت برای نزدیک‌ها ذخیره شد" : null,
       "",
-      `هدیه ورود: ${WELCOME_DIAMONDS} الماس 💎`,
+      `هدیه ورود: ${WELCOME_DIAMONDS} سکه 🪙`,
       "",
       "منوی اصلی:",
     ]

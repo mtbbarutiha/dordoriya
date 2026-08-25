@@ -20,7 +20,7 @@ export const BTN = {
   ANON: "🕵️ پیام ناشناس",
   QUICK_CHAT: "⚡ چت سریع",
   BOOST: "🚀 شتاب‌دهی",
-  DIAMONDS: "💎 الماس‌ها",
+  DIAMONDS: "🪙 سکه‌ها",
   PRO: "🅿️ اشتراک پرو",
   MORE: "📋 بیشتر",
   STATS: "📊 آمار",
@@ -230,7 +230,7 @@ export function cityKeyboard(country: string, province: string, _page = 0) {
 export function diamondPackagesKeyboard() {
   const kb = new InlineKeyboard();
   for (const p of DIAMOND_PACKAGES) {
-    kb.text(`💎 ${p.label} — ${formatToman(p.toman)}`, `buy:${p.id}`).row();
+    kb.text(`🪙 ${p.label} — ${formatToman(p.toman)}`, `buy:${p.id}`).row();
   }
   return kb;
 }
@@ -247,20 +247,20 @@ export function exploreKeyboard(targetId: number, likesCount: number) {
   return new InlineKeyboard()
     .text(`❤️ ${formatNum(likesCount)}`, `exp:likes:${targetId}`)
     .row()
-    .text("🎁 خرید الماس برای کاربر", `gift:menu:${targetId}`)
+    .text("🎁 خرید سکه برای کاربر", `gift:menu:${targetId}`)
     .row()
-    .text(`❤️ لایک (+۱💎)`, `exp:like:${targetId}`)
+    .text(`❤️ لایک (+۱🪙)`, `exp:like:${targetId}`)
     .text("💬 درخواست چت", `exp:chat:${targetId}`)
     .row()
     .text("⏭️ بعدی", "exp:next")
     .text("✖️ رد", "exp:skip");
 }
 
-/** انتخاب مقدار هدیه الماس به کاربر دیگر */
+/** انتخاب مقدار هدیه سکه به کاربر دیگر */
 export function giftDiamondsKeyboard(targetId: number) {
   const kb = new InlineKeyboard();
   for (const n of GIFT_AMOUNTS) {
-    kb.text(`🎁 ${formatNum(n)} الماس`, `gift:send:${targetId}:${n}`).row();
+    kb.text(`🎁 ${formatNum(n)} سکه`, `gift:send:${targetId}:${n}`).row();
   }
   kb.text("↩️ بازگشت", `gift:back:${targetId}`);
   return kb;
@@ -290,7 +290,7 @@ export function profilePanelKeyboard(
     .row()
     .text("🔄 تعاملات", "prof:interactions")
     .text(
-      faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۰۰ 💎)",
+      faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۰۰ 🪙)",
       "prof:face",
     )
     .row()

@@ -47,7 +47,7 @@ export async function sendProfileCard(ctx: Context, userId: number) {
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
     interest,
     "",
-    `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)}`,
+    `🪙 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,
     hasGps ? "📍 موقعیت: ثبت‌شده (قابل ویرایش)" : "📍 موقعیت: ثبت نشده",
     !user.isActive ? "⏸️ حساب غیرفعال" : null,
@@ -96,7 +96,7 @@ export async function sendFaceVerifyIntro(
       "⚠️ توجه مهم",
       "ویدیو مسیج ارسالی برای احراز چهره باید با عکس ۱ پروفایل شما که در بالا نمایش داده شده، تطابق چهره داشته باشد.",
       "",
-      `🎁 جایزه پس از تأیید ادمین: ${formatNum(FACE_VERIFY_REWARD)} الماس`,
+      `🎁 جایزه پس از تأیید ادمین: ${formatNum(FACE_VERIFY_REWARD)} سکه`,
       pendingNote,
     ]
       .filter(Boolean)

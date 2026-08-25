@@ -86,10 +86,10 @@ menuHandler.hears(BTN.BOOST, async (ctx) => {
       [
         "🚀 شتاب‌دهی",
         "",
-        `هزینه: ${formatNum(BOOST_COST)} الماس برای ${BOOST_HOURS} ساعت`,
-        `موجودی تو: ${formatNum(user.diamonds)} الماس`,
+        `هزینه: ${formatNum(BOOST_COST)} سکه برای ${BOOST_HOURS} ساعت`,
+        `موجودی تو: ${formatNum(user.diamonds)} سکه`,
         "",
-        "الماس کافی نداری. از بخش «الماس‌ها» خرید کن.",
+        "سکه کافی نداری. از بخش «سکه‌ها» خرید کن.",
       ].join("\n"),
       { reply_markup: mainKeyboard() },
     );
@@ -106,7 +106,7 @@ menuHandler.hears(BTN.BOOST, async (ctx) => {
       "🚀 شتاب‌دهی فعال شد!",
       "",
       `تا ${until.toLocaleString("fa-IR")} در اکسپلور و چت سریع جلوتری.`,
-      `${formatNum(BOOST_COST)} الماس کم شد.`,
+      `${formatNum(BOOST_COST)} سکه کم شد.`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
@@ -117,9 +117,9 @@ menuHandler.hears(BTN.DIAMONDS, async (ctx) => {
   if (!user) return;
   await ctx.reply(
     [
-      "💎 الماس‌ها",
+      "🪙 سکه‌ها",
       "",
-      `موجودی: ${formatNum(user.diamonds)} الماس`,
+      `موجودی: ${formatNum(user.diamonds)} سکه`,
       "",
       "یکی از بسته‌ها را انتخاب کن:",
       "(درگاه فعلاً دمو است؛ با «پرداخت کردم» شارژ می‌شود)",
@@ -149,12 +149,12 @@ menuHandler.hears(BTN.PRO, async (ctx) => {
       "• نشان پرو روی پروفایل",
       "• اولویت در چت سریع",
       "",
-      `هزینه فعال‌سازی: ${formatNum(cost)} الماس`,
+      `هزینه فعال‌سازی: ${formatNum(cost)} سکه`,
       `موجودی: ${formatNum(user.diamonds)}`,
     ].join("\n"),
     {
       reply_markup: new InlineKeyboard().text(
-        `فعال‌سازی پرو (${formatNum(cost)}💎)`,
+        `فعال‌سازی پرو (${formatNum(cost)}🪙)`,
         "pro:buy",
       ),
     },
@@ -181,7 +181,7 @@ menuHandler.hears(BTN.STATS, async (ctx) => {
       `• بازدید پروفایل: ${formatNum(user.viewsCount)}`,
       `• لایک دریافتی: ${formatNum(user.likesCount)}`,
       `• چت‌ها: ${formatNum(user.chatsCount)}`,
-      `• الماس: ${formatNum(user.diamonds)}`,
+      `• سکه: ${formatNum(user.diamonds)}`,
       "",
       `کاربران فعال دوردوریا: ${formatNum(totalUsers)}`,
     ].join("\n"),

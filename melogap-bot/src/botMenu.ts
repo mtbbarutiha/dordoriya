@@ -7,7 +7,7 @@ export const BOT_COMMANDS = [
   { command: "explore", description: "🎡 اکسپلور" },
   { command: "chat", description: "⚡ چت سریع" },
   { command: "anon", description: "🕵️ پیام ناشناس" },
-  { command: "diamonds", description: "💎 الماس‌ها" },
+  { command: "diamonds", description: "🪙 سکه‌ها" },
   { command: "stats", description: "📊 آمار" },
   { command: "admin", description: "🛠 پنل ادمین" },
   { command: "start", description: "🔄 شروع / ثبت‌نام" },
