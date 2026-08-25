@@ -6,14 +6,12 @@ import {
   mainKeyboard,
   diamondPackagesKeyboard,
   moreKeyboard,
-  profileEditKeyboard,
   lookingForKeyboard,
   locationKeyboard,
   cancelKeyboard,
 } from "../keyboards/main.js";
 import {
   formatNum,
-  genderLabel,
   BOOST_COST,
   BOOST_HOURS,
   REFERRAL_BONUS,
@@ -21,46 +19,14 @@ import {
 import { tryQuickMatch, leaveQueueOrChat } from "../services/match.js";
 import { nextExploreProfile } from "../services/explore.js";
 import { prisma } from "../db/prisma.js";
-import { profilePhotoInput } from "../lib/avatars.js";
 
 export const menuHandler = new Composer();
 
 menuHandler.hears(BTN.PROFILE, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
-
-  const boosted =
-    user.boostUntil && user.boostUntil > new Date()
-      ? `فعال تا ${user.boostUntil.toLocaleString("fa-IR")}`
-      : "غیرفعال";
-
-  const interest =
-    user.lookingFor === "any"
-      ? "همه"
-      : genderLabel(user.lookingFor);
-
-  const caption = [
-    "👤 پروفایل من",
-    "",
-    `نام: ${user.displayName ?? "—"}`,
-    `جنسیت: ${genderLabel(user.gender)}`,
-    `سن: ${user.age ?? "—"}`,
-    `علاقه: ${interest}`,
-    user.bio ? `بیو: ${user.bio}` : "بیو: —",
-    `الماس: ${formatNum(user.diamonds)} 💎`,
-    `شتاب‌دهی: ${boosted}`,
-    `پرو: ${user.isPro ? "فعال 🅿️" : "غیرفعال"}`,
-    !user.photoFileId ? "🖼️ فعلاً عکس پیش‌فرض داری" : null,
-    "",
-    "برای ویرایش از دکمه زیر استفاده کن:",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  await ctx.replyWithPhoto(profilePhotoInput(user.photoFileId, user.gender), {
-    caption,
-    reply_markup: profileEditKeyboard(),
-  });
+  const { sendProfileCard } = await import("../services/profile.js");
+  await sendProfileCard(ctx, user.id);
 });
 
 menuHandler.hears(BTN.EXPLORE, async (ctx) => {

@@ -27,6 +27,8 @@ export async function findNearby(userId: number) {
     where: {
       id: { not: userId },
       registered: true,
+      isActive: true,
+      deletedAt: null,
       latitude: { not: null },
       longitude: { not: null },
     },

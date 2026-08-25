@@ -23,7 +23,7 @@ import { nextExploreProfile } from "../services/explore.js";
 import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
 import { nearbyUserKeyboard } from "../keyboards/nearby.js";
-import { profilePhotoInput } from "../lib/avatars.js";
+import { publicPhotoInput } from "../lib/avatars.js";
 
 export const featuresHandler = new Composer();
 
@@ -124,13 +124,16 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
     return;
   }
   const targetId = Number(ctx.match[1]);
+  await prisma.interaction.create({
+    data: { type: "like", fromUserId: user.id, toUserId: targetId },
+  });
   await patchUser(targetId, { likesCount: { increment: 1 } });
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (target && target.telegramId < 9000000000n) {
     await ctx.api
       .sendMessage(
         Number(target.telegramId),
-        "❤️ یک نفر از اکسپلور لایک‌ات کرد!",
+        "❤️ یک نفر از اکسپلور لایک‌ات کرد!\nجزئیات در پروفایل ← تعاملات",
       )
       .catch(() => undefined);
   }
@@ -350,9 +353,10 @@ featuresHandler.callbackQuery("edit:photo", async (ctx) => {
   }
   await patchUser(user.id, { state: "edit_photo" });
   await ctx.answerCallbackQuery();
-  await ctx.reply("یک عکس بفرست تا به‌عنوان پروفایل ذخیره شود:", {
-    reply_markup: cancelKeyboard(),
-  });
+  await ctx.reply(
+    "یک عکس واضح بفرست.\nتا تأیید ادمین با عکس پیش‌فرض دیده می‌شوی.",
+    { reply_markup: cancelKeyboard() },
+  );
 });
 
 // وقتی از looking در حالت ویرایش/ثبت استفاده می‌شود برای کاربر ثبت‌شده
@@ -387,12 +391,12 @@ featuresHandler.on("message:location", async (ctx) => {
   });
   for (const item of nearby) {
     const u = item.user;
-    await ctx.replyWithPhoto(profilePhotoInput(u.photoFileId, u.gender), {
+    await ctx.replyWithPhoto(publicPhotoInput(u), {
       caption: [
         `👤 ${u.displayName ?? "ناشناس"}`,
         `فاصله تقریبی: ${item.distanceLabel}`,
         `سن: ${u.age ?? "—"}`,
-        !u.photoFileId ? "🖼️ عکس پیش‌فرض" : null,
+        u.photoStatus !== "approved" ? "🖼️ عکس پیش‌فرض" : null,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -423,16 +427,4 @@ featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
 featuresHandler.callbackQuery("nearby_skip", async (ctx) => {
   await ctx.answerCallbackQuery({ text: "رد شد" });
   await ctx.deleteMessage().catch(() => undefined);
-});
-
-featuresHandler.on("message:photo", async (ctx, next) => {
-  const from = ctx.from;
-  if (!from) return next();
-  const user = await findByTelegram(from.id);
-  if (!user || user.state !== "edit_photo") return next();
-  const photos = ctx.message.photo;
-  const best = photos[photos.length - 1];
-  if (!best) return;
-  await patchUser(user.id, { photoFileId: best.file_id, state: "idle" });
-  await ctx.reply("عکس پروفایل ذخیره شد ✅", { reply_markup: mainKeyboard() });
 });

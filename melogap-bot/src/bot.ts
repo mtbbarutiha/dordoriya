@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { startHandler, registerHandler } from "./handlers/start.js";
 import { menuHandler } from "./handlers/menu.js";
 import { featuresHandler } from "./handlers/features.js";
+import { profileHandler } from "./handlers/profile.js";
 import { chatHandler } from "./handlers/chat.js";
 import { fallbackHandler } from "./handlers/fallback.js";
 
@@ -10,6 +11,7 @@ export function createBot(token: string) {
 
   bot.use(startHandler);
   bot.use(registerHandler);
+  bot.use(profileHandler);
   bot.use(featuresHandler);
   bot.use(menuHandler);
   bot.use(chatHandler);

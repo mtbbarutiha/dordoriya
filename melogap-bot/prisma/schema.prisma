@@ -8,56 +8,80 @@ datasource db {
 }
 
 model User {
-  id             Int       @id @default(autoincrement())
-  telegramId     BigInt    @unique
-  username       String?
-  firstName      String?
-  /// نام نمایشی داخل دوردوریا
-  displayName    String?
-  bio            String?
-  diamonds       Int       @default(0)
-  referralCode   String    @unique
-  anonCode       String    @unique
-  referredById   Int?
-  referredBy     User?     @relation("Referrals", fields: [referredById], references: [id])
-  referrals      User[]    @relation("Referrals")
-  latitude       Float?
-  longitude      Float?
-  locationAt     DateTime?
-  /// female | male
-  gender         String?
-  /// female | male | any
-  lookingFor     String?
-  age            Int?
-  city           String?
-  photoFileId    String?
-  /// آیا ثبت‌نام کامل شده
-  registered     Boolean   @default(false)
-  /// gender | age | name | looking | done | idle | waiting | chatting | await_anon_msg | await_location | explore
-  state          String    @default("gender")
-  pendingAnonTo  String?
-  chatPartnerId  Int?
-  boostUntil     DateTime?
-  isPro          Boolean   @default(false)
-  viewsCount     Int       @default(0)
-  likesCount     Int       @default(0)
-  chatsCount     Int       @default(0)
-  lastActiveAt   DateTime  @default(now())
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  diamondOrders  DiamondOrder[]
-  anonInbox      AnonMessage[]  @relation("AnonTo")
-  anonSent       AnonMessage[]  @relation("AnonFrom")
-  exploreSeen    ExploreSeen[]  @relation("Viewer")
-  exploreShown   ExploreSeen[]  @relation("Shown")
+  id                Int       @id @default(autoincrement())
+  telegramId        BigInt    @unique
+  username          String?
+  firstName         String?
+  displayName       String?
+  bio               String?
+  diamonds          Int       @default(0)
+  referralCode      String    @unique
+  anonCode          String    @unique
+  referredById      Int?
+  referredBy        User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]    @relation("Referrals")
+  latitude          Float?
+  longitude         Float?
+  locationAt        DateTime?
+  gender            String?
+  lookingFor        String?
+  age               Int?
+  city              String?
+  /// عکس تأییدشده (عمومی)
+  photoFileId       String?
+  /// عکس در انتظار تأیید ادمین
+  photoPendingFileId String?
+  /// none | pending | approved | rejected
+  photoStatus       String    @default("none")
+  /// احراز چهره
+  faceVerified      Boolean   @default(false)
+  facePendingFileId String?
+  /// none | pending | approved | rejected
+  faceStatus        String    @default("none")
+  registered        Boolean   @default(false)
+  /// حساب فعال برای اکسپلور/چت
+  isActive          Boolean   @default(true)
+  deletedAt         DateTime?
+  state             String    @default("gender")
+  pendingAnonTo     String?
+  chatPartnerId     Int?
+  boostUntil        DateTime?
+  isPro             Boolean   @default(false)
+  viewsCount        Int       @default(0)
+  likesCount        Int       @default(0)
+  chatsCount        Int       @default(0)
+  lastActiveAt      DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  diamondOrders     DiamondOrder[]
+  anonInbox         AnonMessage[]  @relation("AnonTo")
+  anonSent          AnonMessage[]  @relation("AnonFrom")
+  exploreSeen       ExploreSeen[]  @relation("Viewer")
+  exploreShown      ExploreSeen[]  @relation("Shown")
+  likesGiven        Interaction[]  @relation("LikesGiven")
+  likesReceived     Interaction[]  @relation("LikesReceived")
+}
+
+model Interaction {
+  id        Int      @id @default(autoincrement())
+  /// like | view
+  type      String
+  fromUserId Int
+  toUserId   Int
+  fromUser  User     @relation("LikesGiven", fields: [fromUserId], references: [id])
+  toUser    User     @relation("LikesReceived", fields: [toUserId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([toUserId, type])
+  @@index([fromUserId, type])
 }
 
 model ExploreSeen {
-  id         Int  @id @default(autoincrement())
-  viewerId   Int
-  shownId    Int
-  viewer     User @relation("Viewer", fields: [viewerId], references: [id])
-  shown      User @relation("Shown", fields: [shownId], references: [id])
+  id       Int  @id @default(autoincrement())
+  viewerId Int
+  shownId  Int
+  viewer   User @relation("Viewer", fields: [viewerId], references: [id])
+  shown    User @relation("Shown", fields: [shownId], references: [id])
 
   @@unique([viewerId, shownId])
 }

@@ -53,6 +53,12 @@ export async function requireRegistered(ctx: Context) {
     }
     return null;
   }
+
+  if (user.deletedAt) {
+    await ctx.reply("این حساب حذف شده. برای ساخت حساب جدید /start بزن.");
+    return null;
+  }
+
   return user;
 }
 

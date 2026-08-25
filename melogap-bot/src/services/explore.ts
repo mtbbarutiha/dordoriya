@@ -4,7 +4,7 @@ import { genderLabel, formatNum } from "../data/packages.js";
 import type { Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
-import { profilePhotoInput } from "../lib/avatars.js";
+import { publicPhotoInput } from "../lib/avatars.js";
 
 export async function nextExploreProfile(ctx: Context, viewerId: number) {
   const me = await prisma.user.findUnique({ where: { id: viewerId } });
@@ -18,6 +18,8 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
 
   const where: Prisma.UserWhereInput = {
     registered: true,
+    isActive: true,
+    deletedAt: null,
     id: { not: viewerId, ...(seenIds.length ? { notIn: seenIds } : {}) },
   };
   if (me.lookingFor && me.lookingFor !== "any") {
@@ -33,6 +35,8 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
     await prisma.exploreSeen.deleteMany({ where: { viewerId } });
     const where2: Prisma.UserWhereInput = {
       registered: true,
+      isActive: true,
+      deletedAt: null,
       id: { not: viewerId },
     };
     if (me.lookingFor && me.lookingFor !== "any") {
@@ -58,29 +62,30 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
     update: {},
   });
   await patchUser(candidate.id, { viewsCount: { increment: 1 } });
+  await prisma.interaction.create({
+    data: { type: "view", fromUserId: viewerId, toUserId: candidate.id },
+  });
 
   const text = [
-    "🎡 اکسپلور",
-    "",
-    `👤 ${candidate.displayName ?? "بدون نام"}`,
-    `جنسیت: ${genderLabel(candidate.gender)} | سن: ${candidate.age ?? "—"}`,
-    candidate.city ? `شهر: ${candidate.city}` : null,
-    candidate.bio ? `بیو: ${candidate.bio}` : null,
-    `بازدید: ${formatNum(candidate.viewsCount + 1)} | لایک: ${formatNum(candidate.likesCount)}`,
+    "┏━━ 🎡 اکسپلور ━━┓",
+    `┃ 👤 ${candidate.displayName ?? "بدون نام"}`,
+    `┃ ${genderLabel(candidate.gender)} | ${candidate.age ?? "—"} سال`,
+    candidate.city ? `┃ 📍 ${candidate.city}` : null,
+    candidate.bio ? `┃ ${candidate.bio}` : null,
+    `┃ 👁 ${formatNum(candidate.viewsCount + 1)} | ❤️ ${formatNum(candidate.likesCount)}`,
+    candidate.faceVerified ? "┃ ✅ احراز چهره" : null,
     candidate.boostUntil && candidate.boostUntil > new Date()
-      ? "🚀 شتاب‌دهی فعال"
+      ? "┃ 🚀 شتاب‌دهی"
       : null,
-    candidate.isPro ? "🅿️ عضو پرو" : null,
-    !candidate.photoFileId ? "🖼️ عکس پیش‌فرض" : null,
+    candidate.isPro ? "┃ 🅿️ پرو" : null,
+    candidate.photoStatus !== "approved" ? "┃ 🖼️ عکس پیش‌فرض" : null,
+    "┗━━━━━━━━━━━━┛",
   ]
     .filter(Boolean)
     .join("\n");
 
-  await ctx.replyWithPhoto(
-    profilePhotoInput(candidate.photoFileId, candidate.gender),
-    {
-      caption: text,
-      reply_markup: exploreKeyboard(candidate.id),
-    },
-  );
+  await ctx.replyWithPhoto(publicPhotoInput(candidate), {
+    caption: text,
+    reply_markup: exploreKeyboard(candidate.id),
+  });
 }
