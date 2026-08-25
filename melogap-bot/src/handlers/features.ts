@@ -11,6 +11,7 @@ import {
   locationKeyboard,
   editLocationKeyboard,
   moreKeyboard,
+  giftDiamondsKeyboard,
 } from "../keyboards/main.js";
 import {
   createOrder,
@@ -19,7 +20,13 @@ import {
   cancelOrder,
   findPackage,
 } from "../services/diamonds.js";
-import { formatNum, formatToman, REFERRAL_BONUS } from "../data/packages.js";
+import {
+  formatNum,
+  formatToman,
+  REFERRAL_BONUS,
+  LIKE_GIFT_DIAMONDS,
+  GIFT_AMOUNTS,
+} from "../data/packages.js";
 import { nextExploreProfile } from "../services/explore.js";
 import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
@@ -118,6 +125,15 @@ featuresHandler.callbackQuery("pro:buy", async (ctx) => {
   });
 });
 
+featuresHandler.callbackQuery(/^exp:likes:(\d+)$/, async (ctx) => {
+  const targetId = Number(ctx.match[1]);
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  await ctx.answerCallbackQuery({
+    text: `❤️ ${formatNum(target?.likesCount ?? 0)} لایک`,
+    show_alert: true,
+  });
+});
+
 featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {
@@ -125,23 +141,172 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
     return;
   }
   const targetId = Number(ctx.match[1]);
-  await prisma.interaction.create({
-    data: { type: "like", fromUserId: user.id, toUserId: targetId },
-  });
-  await patchUser(targetId, { likesCount: { increment: 1 } });
+  if (targetId === user.id) {
+    await ctx.answerCallbackQuery({ text: "خودت را نمی‌توانی لایک کنی" });
+    return;
+  }
+
   const target = await prisma.user.findUnique({ where: { id: targetId } });
-  if (target && target.telegramId < 9000000000n) {
+  if (!target || target.deletedAt) {
+    await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد" });
+    return;
+  }
+
+  const already = await prisma.interaction.findFirst({
+    where: { type: "like", fromUserId: user.id, toUserId: targetId },
+  });
+  if (already) {
+    await ctx.answerCallbackQuery({ text: "قبلاً لایک کردی" });
+    return;
+  }
+
+  if (user.diamonds < LIKE_GIFT_DIAMONDS) {
+    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    await ctx.reply(
+      `برای لایک به ${formatNum(LIKE_GIFT_DIAMONDS)} الماس نیاز داری.\nموجودی: ${formatNum(user.diamonds)} 💎`,
+    );
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.interaction.create({
+      data: { type: "like", fromUserId: user.id, toUserId: targetId },
+    }),
+    prisma.user.update({
+      where: { id: user.id },
+      data: { diamonds: { decrement: LIKE_GIFT_DIAMONDS } },
+    }),
+    prisma.user.update({
+      where: { id: targetId },
+      data: {
+        likesCount: { increment: 1 },
+        diamonds: { increment: LIKE_GIFT_DIAMONDS },
+      },
+    }),
+  ]);
+
+  const fromName = user.displayName ?? "یک کاربر";
+  if (target.telegramId < 9000000000n) {
     await ctx.api
       .sendMessage(
         Number(target.telegramId),
-        "❤️ یک نفر از اکسپلور لایک‌ات کرد!\nجزئیات در پروفایل ← تعاملات",
+        [
+          "❤️ یک لایک جدید گرفتی!",
+          `از طرف: ${fromName}`,
+          `🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} الماس به حسابت هدیه شد.`,
+          "",
+          "جزئیات در پروفایل ← تعاملات",
+        ].join("\n"),
       )
       .catch(() => undefined);
   }
-  await ctx.answerCallbackQuery({ text: "لایک شد" });
+
+  await ctx.answerCallbackQuery({ text: "لایک + هدیه الماس ارسال شد" });
+  await ctx.reply(
+    `❤️ لایک ثبت شد.\n🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} الماس برای «${target.displayName ?? "کاربر"}» هدیه شد.`,
+  );
   await nextExploreProfile(ctx, user.id, {
     sameProvince: user.state === "explore_province",
   });
+});
+
+featuresHandler.callbackQuery(/^gift:menu:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const targetId = Number(ctx.match[1]);
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (!target) {
+    await ctx.answerCallbackQuery({ text: "کاربر نیست" });
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      `🎁 خرید الماس برای «${target.displayName ?? "کاربر"}»`,
+      "",
+      `موجودی تو: ${formatNum(user.diamonds)} 💎`,
+      "مقدار هدیه را انتخاب کن (از موجودی خودت کم می‌شود):",
+    ].join("\n"),
+    { reply_markup: giftDiamondsKeyboard(targetId) },
+  );
+});
+
+featuresHandler.callbackQuery(/^gift:back:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await nextExploreProfile(ctx, user.id, {
+    sameProvince: user.state === "explore_province",
+  });
+});
+
+featuresHandler.callbackQuery(/^gift:send:(\d+):(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const targetId = Number(ctx.match[1]);
+  const amount = Number(ctx.match[2]);
+  if (!(GIFT_AMOUNTS as readonly number[]).includes(amount)) {
+    await ctx.answerCallbackQuery({ text: "مقدار نامعتبر" });
+    return;
+  }
+  if (targetId === user.id) {
+    await ctx.answerCallbackQuery({ text: "به خودت نمی‌شود هدیه داد" });
+    return;
+  }
+
+  const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (!fresh || !target || target.deletedAt) {
+    await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد" });
+    return;
+  }
+  if (fresh.diamonds < amount) {
+    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
+    await ctx.reply(
+      `موجودی‌ات کافی نیست.\nنیاز: ${formatNum(amount)} | موجودی: ${formatNum(fresh.diamonds)}`,
+    );
+    return;
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: fresh.id },
+      data: { diamonds: { decrement: amount } },
+    }),
+    prisma.user.update({
+      where: { id: targetId },
+      data: { diamonds: { increment: amount } },
+    }),
+  ]);
+
+  const fromName = fresh.displayName ?? "یک کاربر";
+  if (target.telegramId < 9000000000n) {
+    await ctx.api
+      .sendMessage(
+        Number(target.telegramId),
+        [
+          "🎁 یک هدیه الماس گرفتی!",
+          `از طرف: ${fromName}`,
+          `💎 ${formatNum(amount)} الماس به حسابت اضافه شد.`,
+        ].join("\n"),
+      )
+      .catch(() => undefined);
+  }
+
+  await ctx.answerCallbackQuery({ text: "هدیه ارسال شد" });
+  await ctx.reply(
+    `✅ ${formatNum(amount)} الماس برای «${target.displayName ?? "کاربر"}» ارسال شد.`,
+    { reply_markup: mainKeyboard() },
+  );
 });
 
 featuresHandler.callbackQuery(/^exp:chat:(\d+)$/, async (ctx) => {
@@ -415,6 +580,8 @@ featuresHandler.on("message:location", async (ctx, next) => {
     const u = item.user;
     await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, u), {
       caption: [
+        `❤️ ${formatNum(u.likesCount)} لایک`,
+        "",
         `👤 ${u.displayName ?? "ناشناس"}`,
         `فاصله تقریبی: ${item.distanceLabel}`,
         `سن: ${u.age ?? "—"}`,
@@ -422,7 +589,7 @@ featuresHandler.on("message:location", async (ctx, next) => {
       ]
         .filter(Boolean)
         .join("\n"),
-      reply_markup: nearbyUserKeyboard(u.id),
+      reply_markup: nearbyUserKeyboard(u.id, u.likesCount),
     });
   }
 });

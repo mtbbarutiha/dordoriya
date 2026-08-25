@@ -1,5 +1,10 @@
 import { Keyboard, InlineKeyboard } from "grammy";
-import { DIAMOND_PACKAGES, formatToman } from "../data/packages.js";
+import {
+  DIAMOND_PACKAGES,
+  GIFT_AMOUNTS,
+  formatToman,
+  formatNum,
+} from "../data/packages.js";
 import {
   LANGUAGES,
   COUNTRIES,
@@ -238,13 +243,27 @@ export function paymentKeyboard(orderId: number, payUrl: string) {
     .text("❌ انصراف", `cancel:${orderId}`);
 }
 
-export function exploreKeyboard(targetId: number) {
+export function exploreKeyboard(targetId: number, likesCount: number) {
   return new InlineKeyboard()
-    .text("❤️ لایک", `exp:like:${targetId}`)
-    .text("⚡ چت", `exp:chat:${targetId}`)
+    .text(`❤️ ${formatNum(likesCount)}`, `exp:likes:${targetId}`)
+    .row()
+    .text("🎁 خرید الماس برای کاربر", `gift:menu:${targetId}`)
+    .row()
+    .text(`❤️ لایک (+۱💎)`, `exp:like:${targetId}`)
+    .text("💬 درخواست چت", `exp:chat:${targetId}`)
     .row()
     .text("⏭️ بعدی", "exp:next")
     .text("✖️ رد", "exp:skip");
+}
+
+/** انتخاب مقدار هدیه الماس به کاربر دیگر */
+export function giftDiamondsKeyboard(targetId: number) {
+  const kb = new InlineKeyboard();
+  for (const n of GIFT_AMOUNTS) {
+    kb.text(`🎁 ${formatNum(n)} الماس`, `gift:send:${targetId}:${n}`).row();
+  }
+  kb.text("↩️ بازگشت", `gift:back:${targetId}`);
+  return kb;
 }
 
 export function moreKeyboard() {
@@ -258,18 +277,31 @@ export function moreKeyboard() {
     .text("🔗 لینک ناشناس من", "more:anonlink");
 }
 
-export function profilePanelKeyboard(isActive: boolean, faceVerified: boolean) {
+export function profilePanelKeyboard(
+  isActive: boolean,
+  faceVerified: boolean,
+  likesCount: number,
+) {
   return new InlineKeyboard()
+    .text(`❤️ ${formatNum(likesCount)}`, "prof:likes")
+    .row()
     .text("ویرایش پروفایل 📝", "prof:edit")
     .text("تکمیل پروفایل 🧾", "prof:complete")
     .row()
     .text("🔄 تعاملات", "prof:interactions")
-    .row()
-    .text("حذف/غیرفعال‌سازی ❌", "prof:manage")
     .text(
       faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۰۰ 💎)",
       "prof:face",
-    );
+    )
+    .row()
+    .text(
+      isActive
+        ? "🔴⏸  غیرفعال‌سازی حساب  ⏸🔴"
+        : "🟢▶️  فعال‌سازی حساب  ▶️🟢",
+      "prof:toggle",
+    )
+    .row()
+    .text("🔴🗑  حذف دائمی حساب  🗑🔴", "prof:delete");
 }
 
 /** مقدمه احراز چهره — مثل دوردور */
@@ -298,15 +330,21 @@ export function profileEditKeyboard() {
 
 export function confirmDeleteKeyboard() {
   return new InlineKeyboard()
-    .text("🗑️ بله، حذف شود", "prof:delete:yes")
-    .text("❌ خیر", "prof:delete:no");
+    .text("🔴🗑 بله، حسابم حذف شود", "prof:delete:yes")
+    .row()
+    .text("❌ خیر، منصرف شدم", "prof:delete:no");
 }
 
 export function accountManageKeyboard(isActive: boolean) {
   return new InlineKeyboard()
-    .text(isActive ? "⏸️ غیرفعال‌سازی" : "▶️ فعال‌سازی", "prof:toggle")
+    .text(
+      isActive
+        ? "🔴⏸  غیرفعال‌سازی حساب  ⏸🔴"
+        : "🟢▶️  فعال‌سازی حساب  ▶️🟢",
+      "prof:toggle",
+    )
     .row()
-    .text("🗑️ حذف حساب", "prof:delete")
+    .text("🔴🗑  حذف دائمی حساب  🗑🔴", "prof:delete")
     .row()
     .text("↩️ بازگشت", "prof:back");
 }

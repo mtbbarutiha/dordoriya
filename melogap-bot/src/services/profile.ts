@@ -41,11 +41,13 @@ export async function sendProfileCard(ctx: Context, userId: number) {
 
   const hasGps = user.latitude != null && user.longitude != null;
   const box = [
+    `❤️ ${formatNum(user.likesCount)} لایک`,
+    "",
     `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
     interest,
     "",
-    `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)} | ❤️ ${formatNum(user.likesCount)}`,
+    `💎 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,
     hasGps ? "📍 موقعیت: ثبت‌شده (قابل ویرایش)" : "📍 موقعیت: ثبت نشده",
     !user.isActive ? "⏸️ حساب غیرفعال" : null,
@@ -55,7 +57,11 @@ export async function sendProfileCard(ctx: Context, userId: number) {
 
   await ctx.replyWithPhoto(await ownPhotoWithBadge(ctx.api, user), {
     caption: box,
-    reply_markup: profilePanelKeyboard(user.isActive, user.faceVerified),
+    reply_markup: profilePanelKeyboard(
+      user.isActive,
+      user.faceVerified,
+      user.likesCount,
+    ),
   });
 }
 

@@ -21,6 +21,10 @@ export const BOOST_COST = 40;
 export const BOOST_HOURS = 12;
 /** جایزه تأیید احراز چهره (ویدیو مطابق عکس پروفایل) */
 export const FACE_VERIFY_REWARD = 100;
+/** هر لایک: ۱ الماس از لایک‌کننده → هدیه به طرف مقابل */
+export const LIKE_GIFT_DIAMONDS = 1;
+/** بسته‌های هدیه الماس به کاربر دیگر (از موجودی خودت) */
+export const GIFT_AMOUNTS = [10, 50, 100, 200] as const;
 export const NEARBY_RADIUS_KM = 80;
 export const EXPLORE_LIMIT = 1;
 

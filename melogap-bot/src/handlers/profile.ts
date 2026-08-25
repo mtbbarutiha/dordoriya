@@ -68,6 +68,18 @@ profileHandler.callbackQuery("prof:complete", async (ctx) => {
   );
 });
 
+profileHandler.callbackQuery("prof:likes", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery({
+    text: `❤️ تا الان ${formatNum(user.likesCount)} لایک گرفتی`,
+    show_alert: true,
+  });
+});
+
 profileHandler.callbackQuery("prof:manage", async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {

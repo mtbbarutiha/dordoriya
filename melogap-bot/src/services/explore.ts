@@ -5,6 +5,7 @@ import type { Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
 import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
+import { haversineKm, formatDistance } from "../lib/geo.js";
 
 export async function nextExploreProfile(
   ctx: Context,
@@ -82,13 +83,34 @@ export async function nextExploreProfile(
 
   const loc = [candidate.province, candidate.city].filter(Boolean).join("، ");
   const title = opts.sameProvince ? "🏘 هم‌استانی" : "🎡 اکسپلور";
+  let distanceLine: string;
+  if (
+    me.latitude != null &&
+    me.longitude != null &&
+    candidate.latitude != null &&
+    candidate.longitude != null
+  ) {
+    const km = haversineKm(
+      me.latitude,
+      me.longitude,
+      candidate.latitude,
+      candidate.longitude,
+    );
+    distanceLine = `🏁 فاصله از شما: ${formatDistance(km)}`;
+  } else {
+    distanceLine = "🏁 فاصله از شما: نامعلوم";
+  }
+
   const text = [
+    `❤️ ${formatNum(candidate.likesCount)} لایک`,
+    "",
     `┏━━ ${title} ━━┓`,
     `┃ 👤 ${candidate.displayName ?? "بدون نام"}`,
     `┃ ${genderLabel(candidate.gender)} | ${candidate.age ?? "—"} سال`,
     loc ? `┃ 📍 ${loc}` : null,
     candidate.bio ? `┃ ${candidate.bio}` : null,
-    `┃ 👁 ${formatNum(candidate.viewsCount + 1)} | ❤️ ${formatNum(candidate.likesCount)}`,
+    `┃ 👁 ${formatNum(candidate.viewsCount + 1)}`,
+    `┃ ${distanceLine}`,
     candidate.boostUntil && candidate.boostUntil > new Date()
       ? "┃ 🚀 شتاب‌دهی"
       : null,
@@ -99,13 +121,12 @@ export async function nextExploreProfile(
     .filter(Boolean)
     .join("\n");
 
-  // برای دکمه‌های بعدی، حالت را نگه می‌داریم
   await patchUser(viewerId, {
     state: opts.sameProvince ? "explore_province" : "explore",
   });
 
   await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, candidate), {
     caption: text,
-    reply_markup: exploreKeyboard(candidate.id),
+    reply_markup: exploreKeyboard(candidate.id, candidate.likesCount),
   });
 }
