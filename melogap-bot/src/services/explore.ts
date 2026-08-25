@@ -6,7 +6,11 @@ import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
 import type { Prisma } from "@prisma/client";
 import { publicPhotoInput } from "../lib/avatars.js";
 
-export async function nextExploreProfile(ctx: Context, viewerId: number) {
+export async function nextExploreProfile(
+  ctx: Context,
+  viewerId: number,
+  opts: { sameProvince?: boolean } = {},
+) {
   const me = await prisma.user.findUnique({ where: { id: viewerId } });
   if (!me) return;
 
@@ -25,6 +29,10 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
   if (me.lookingFor && me.lookingFor !== "any") {
     where.gender = me.lookingFor;
   }
+  if (opts.sameProvince && me.province) {
+    where.province = me.province;
+    if (me.country) where.country = me.country;
+  }
 
   let candidate = await prisma.user.findFirst({
     where,
@@ -42,6 +50,10 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
     if (me.lookingFor && me.lookingFor !== "any") {
       where2.gender = me.lookingFor;
     }
+    if (opts.sameProvince && me.province) {
+      where2.province = me.province;
+      if (me.country) where2.country = me.country;
+    }
     candidate = await prisma.user.findFirst({
       where: where2,
       orderBy: [{ boostUntil: "desc" }, { lastActiveAt: "desc" }],
@@ -50,7 +62,9 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
 
   if (!candidate) {
     await ctx.reply(
-      "فعلاً پروفایل جدیدی برای اکسپلور نیست.\nبعداً دوباره امتحان کن یا دوستانت را دعوت کن.",
+      opts.sameProvince
+        ? "فعلاً هم‌استانی جدیدی پیدا نشد.\nبعداً دوباره امتحان کن."
+        : "فعلاً پروفایل جدیدی برای اکسپلور نیست.\nبعداً دوباره امتحان کن یا دوستانت را دعوت کن.",
       { reply_markup: mainKeyboard() },
     );
     return;
@@ -66,11 +80,13 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
     data: { type: "view", fromUserId: viewerId, toUserId: candidate.id },
   });
 
+  const loc = [candidate.province, candidate.city].filter(Boolean).join("، ");
+  const title = opts.sameProvince ? "🏘 هم‌استانی" : "🎡 اکسپلور";
   const text = [
-    "┏━━ 🎡 اکسپلور ━━┓",
+    `┏━━ ${title} ━━┓`,
     `┃ 👤 ${candidate.displayName ?? "بدون نام"}`,
     `┃ ${genderLabel(candidate.gender)} | ${candidate.age ?? "—"} سال`,
-    candidate.city ? `┃ 📍 ${candidate.city}` : null,
+    loc ? `┃ 📍 ${loc}` : null,
     candidate.bio ? `┃ ${candidate.bio}` : null,
     `┃ 👁 ${formatNum(candidate.viewsCount + 1)} | ❤️ ${formatNum(candidate.likesCount)}`,
     candidate.faceVerified ? "┃ ✅ احراز چهره" : null,
@@ -83,6 +99,11 @@ export async function nextExploreProfile(ctx: Context, viewerId: number) {
   ]
     .filter(Boolean)
     .join("\n");
+
+  // برای دکمه‌های بعدی، حالت را نگه می‌داریم
+  await patchUser(viewerId, {
+    state: opts.sameProvince ? "explore_province" : "explore",
+  });
 
   await ctx.replyWithPhoto(publicPhotoInput(candidate), {
     caption: text,

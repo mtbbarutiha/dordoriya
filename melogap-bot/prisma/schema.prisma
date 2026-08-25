@@ -26,6 +26,9 @@ model User {
   gender            String?
   lookingFor        String?
   age               Int?
+  language          String?
+  country           String?
+  province          String?
   city              String?
   /// عکس تأییدشده (عمومی)
   photoFileId       String?
@@ -42,7 +45,7 @@ model User {
   /// حساب فعال برای اکسپلور/چت
   isActive          Boolean   @default(true)
   deletedAt         DateTime?
-  state             String    @default("gender")
+  state             String    @default("language")
   pendingAnonTo     String?
   chatPartnerId     Int?
   boostUntil        DateTime?

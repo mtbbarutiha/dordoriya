@@ -138,7 +138,9 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
       .catch(() => undefined);
   }
   await ctx.answerCallbackQuery({ text: "لایک شد" });
-  await nextExploreProfile(ctx, user.id);
+  await nextExploreProfile(ctx, user.id, {
+    sameProvince: user.state === "explore_province",
+  });
 });
 
 featuresHandler.callbackQuery(/^exp:chat:(\d+)$/, async (ctx) => {
@@ -168,7 +170,25 @@ featuresHandler.callbackQuery(/^exp:(next|skip)$/, async (ctx) => {
     return;
   }
   await ctx.answerCallbackQuery();
-  await nextExploreProfile(ctx, user.id);
+  await nextExploreProfile(ctx, user.id, {
+    sameProvince: user.state === "explore_province",
+  });
+});
+
+featuresHandler.callbackQuery("more:province", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  if (!user.province) {
+    await ctx.answerCallbackQuery({ text: "استان ثبت نشده" });
+    await ctx.reply("اول در ثبت‌نام استان را مشخص کن.");
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply(`🏘 هم‌استانی‌های «${user.province}»:`);
+  await nextExploreProfile(ctx, user.id, { sameProvince: true });
 });
 
 featuresHandler.callbackQuery("more:guide", async (ctx) => {

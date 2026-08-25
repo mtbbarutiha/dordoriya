@@ -35,6 +35,9 @@ export async function sendProfileCard(ctx: Context, userId: number) {
     `┃ جنسیت: ${genderLabel(user.gender)} | سن: ${user.age ?? "—"}`,
     `┃ علاقه: ${interest}`,
     user.bio ? `┃ بیو: ${user.bio}` : "┃ بیو: —",
+    user.province || user.city
+      ? `┃ 📍 ${[user.province, user.city].filter(Boolean).join("، ")}`
+      : "┃ 📍 —",
     `┃ الماس: ${formatNum(user.diamonds)} 💎`,
     `┃ پرو: ${user.isPro ? "🅿️ فعال" : "غیرفعال"}`,
     `┃ شتاب‌دهی: ${boosted}`,

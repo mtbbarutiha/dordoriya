@@ -192,7 +192,7 @@ profileHandler.callbackQuery("prof:delete:yes", async (ctx) => {
     deletedAt: new Date(),
     isActive: false,
     registered: false,
-    state: "gender",
+    state: "language",
     chatPartnerId: null,
     photoFileId: null,
     photoPendingFileId: null,

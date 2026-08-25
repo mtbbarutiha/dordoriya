@@ -59,7 +59,7 @@ export async function ensureUser(params: {
       referredById,
       diamonds: WELCOME_DIAMONDS,
       registered: false,
-      state: "gender",
+      state: "language",
     },
   });
 

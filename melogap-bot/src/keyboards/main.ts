@@ -1,5 +1,11 @@
 import { Keyboard, InlineKeyboard } from "grammy";
 import { DIAMOND_PACKAGES, formatToman } from "../data/packages.js";
+import {
+  LANGUAGES,
+  COUNTRIES,
+  provincesForCountry,
+  citiesFor,
+} from "../data/locations.js";
 
 export const BTN = {
   PROFILE: "👤 پروفایل من",
@@ -131,7 +137,9 @@ export function moreKeyboard() {
     .text("📖 راهنما", "more:guide")
     .text("🎁 دعوت دوستان", "more:ref")
     .row()
+    .text("🏘 هم‌استانی‌ها", "more:province")
     .text("📍 نزدیک‌های شهر", "more:nearby")
+    .row()
     .text("🔗 لینک ناشناس من", "more:anonlink");
 }
 
@@ -177,4 +185,64 @@ export function adminFaceKeyboard(userId: number) {
   return new InlineKeyboard()
     .text("✅ تأیید احراز", `adm:face:ok:${userId}`)
     .text("❌ رد احراز", `adm:face:no:${userId}`);
+}
+
+export function languageKeyboard() {
+  const kb = new InlineKeyboard();
+  for (const l of LANGUAGES) {
+    kb.text(l.label, `reg:lang:${l.id}`);
+  }
+  return kb;
+}
+
+export function countryKeyboard() {
+  const kb = new InlineKeyboard();
+  COUNTRIES.forEach((c, i) => {
+    kb.text(c.label, `reg:country:${c.id}`);
+    if ((i + 1) % 2 === 0) kb.row();
+  });
+  return kb;
+}
+
+export function provinceKeyboard(country: string, page = 0) {
+  const list = provincesForCountry(country);
+  const perPage = 8;
+  const totalPages = Math.max(1, Math.ceil(list.length / perPage));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = list.slice(safePage * perPage, safePage * perPage + perPage);
+
+  const kb = new InlineKeyboard();
+  slice.forEach((name, i) => {
+    // index-based callback to avoid long Persian in callback_data limits
+    const idx = safePage * perPage + i;
+    kb.text(name, `reg:prov:${idx}`);
+    if ((i + 1) % 2 === 0) kb.row();
+  });
+  if (slice.length % 2 !== 0) kb.row();
+
+  if (safePage > 0) kb.text("◀️ قبلی", `reg:provpage:${safePage - 1}`);
+  kb.text(`${safePage + 1}/${totalPages}`, "reg:noop");
+  if (safePage < totalPages - 1) kb.text("بعدی ▶️", `reg:provpage:${safePage + 1}`);
+  return kb;
+}
+
+export function cityKeyboard(country: string, province: string, page = 0) {
+  const list = citiesFor(country, province);
+  const perPage = 8;
+  const totalPages = Math.max(1, Math.ceil(list.length / perPage));
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = list.slice(safePage * perPage, safePage * perPage + perPage);
+
+  const kb = new InlineKeyboard();
+  slice.forEach((name, i) => {
+    const idx = safePage * perPage + i;
+    kb.text(name, `reg:city:${idx}`);
+    if ((i + 1) % 2 === 0) kb.row();
+  });
+  if (slice.length % 2 !== 0) kb.row();
+
+  if (safePage > 0) kb.text("◀️ قبلی", `reg:citypage:${safePage - 1}`);
+  kb.text(`${safePage + 1}/${totalPages}`, "reg:noop");
+  if (safePage < totalPages - 1) kb.text("بعدی ▶️", `reg:citypage:${safePage + 1}`);
+  return kb;
 }
