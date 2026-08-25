@@ -65,6 +65,25 @@ model User {
   likesReceived     Interaction[]  @relation("LikesReceived")
 }
 
+/// آرشیو حساب‌های حذف‌شده — برای نمایش شناسه قدیمی به ادمین
+model DeletedAccount {
+  id              Int      @id @default(autoincrement())
+  originalUserId  Int
+  telegramId      BigInt
+  username        String?
+  displayName     String?
+  gender          String?
+  age             Int?
+  province        String?
+  city            String?
+  deletedAt       DateTime @default(now())
+  /// اگر بعداً دوباره ثبت‌نام کرد
+  reRegisteredUserId Int?
+
+  @@index([telegramId])
+  @@index([originalUserId])
+}
+
 model Interaction {
   id        Int      @id @default(autoincrement())
   /// like | view

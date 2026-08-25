@@ -11,6 +11,7 @@ import {
 import { profilePanelKeyboard } from "../keyboards/main.js";
 import { getAdminIds } from "../lib/admin.js";
 import { adminPhotoKeyboard, adminFaceKeyboard } from "../keyboards/main.js";
+import { formatAdminUserLine } from "./account.js";
 
 export async function sendProfileCard(ctx: Context, userId: number) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -57,18 +58,20 @@ export async function sendProfileCard(ctx: Context, userId: number) {
 
 export async function notifyAdminsPhoto(
   api: Api,
-  user: { id: number; telegramId: bigint; displayName: string | null },
+  user: {
+    id: number;
+    telegramId: bigint;
+    displayName: string | null;
+    username?: string | null;
+  },
   fileId: string,
 ) {
   const admins = getAdminIds();
+  const info = await formatAdminUserLine(user);
   for (const adminId of admins) {
     await api
       .sendPhoto(adminId, fileId, {
-        caption: [
-          "📷 عکس پروفایل جدید برای تأیید",
-          `کاربر: ${user.displayName ?? "—"}`,
-          `id: ${user.id} | tg: ${user.telegramId}`,
-        ].join("\n"),
+        caption: ["📷 عکس پروفایل جدید برای تأیید", info].join("\n"),
         reply_markup: adminPhotoKeyboard(user.id),
       })
       .catch(() => undefined);
@@ -77,18 +80,20 @@ export async function notifyAdminsPhoto(
 
 export async function notifyAdminsFace(
   api: Api,
-  user: { id: number; telegramId: bigint; displayName: string | null },
+  user: {
+    id: number;
+    telegramId: bigint;
+    displayName: string | null;
+    username?: string | null;
+  },
   fileId: string,
 ) {
   const admins = getAdminIds();
+  const info = await formatAdminUserLine(user);
   for (const adminId of admins) {
     await api
       .sendPhoto(adminId, fileId, {
-        caption: [
-          "✅ درخواست احراز چهره",
-          `کاربر: ${user.displayName ?? "—"}`,
-          `id: ${user.id} | tg: ${user.telegramId}`,
-        ].join("\n"),
+        caption: ["✅ درخواست احراز چهره", info].join("\n"),
         reply_markup: adminFaceKeyboard(user.id),
       })
       .catch(() => undefined);

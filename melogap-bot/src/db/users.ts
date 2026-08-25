@@ -27,6 +27,9 @@ export async function ensureUser(params: {
   firstName?: string;
   referralCodeFromStart?: string;
 }) {
+  const { releaseIfSoftDeleted } = await import("../services/account.js");
+  await releaseIfSoftDeleted(params.telegramId);
+
   const existing = await findByTelegram(params.telegramId);
   if (existing) {
     return prisma.user.update({
@@ -62,6 +65,22 @@ export async function ensureUser(params: {
       state: "language",
     },
   });
+
+  const prev = await prisma.deletedAccount.findMany({
+    where: {
+      telegramId: BigInt(params.telegramId),
+      reRegisteredUserId: null,
+    },
+  });
+  if (prev.length) {
+    await prisma.deletedAccount.updateMany({
+      where: {
+        telegramId: BigInt(params.telegramId),
+        reRegisteredUserId: null,
+      },
+      data: { reRegisteredUserId: user.id },
+    });
+  }
 
   if (referredById) {
     await prisma.user.update({

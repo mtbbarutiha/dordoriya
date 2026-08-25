@@ -188,22 +188,20 @@ profileHandler.callbackQuery("prof:delete:yes", async (ctx) => {
     await ctx.answerCallbackQuery();
     return;
   }
-  await patchUser(user.id, {
-    deletedAt: new Date(),
-    isActive: false,
-    registered: false,
-    state: "language",
-    chatPartnerId: null,
-    photoFileId: null,
-    photoPendingFileId: null,
-    photoStatus: "none",
-    faceVerified: false,
-    facePendingFileId: null,
-    faceStatus: "none",
-  });
+  const { deleteAccountPermanently } = await import("../services/account.js");
+  const { leaveQueueOrChat } = await import("../services/match.js");
+  await leaveQueueOrChat(ctx.api, user, true);
+  const oldId = user.id;
+  await deleteAccountPermanently(user);
   await ctx.answerCallbackQuery({ text: "حذف شد" });
   await ctx.reply(
-    "🗑️ حسابت حذف شد.\nبرای شروع دوباره /start بزن.",
+    [
+      "🗑️ حسابت حذف شد.",
+      `شناسهٔ قبلی تو: #${oldId}`,
+      "",
+      "با /start می‌توانی حساب کاملاً جدید بسازی.",
+      "(شناسهٔ قدیمی برای ادمین قابل مشاهده می‌ماند)",
+    ].join("\n"),
   );
 });
 
