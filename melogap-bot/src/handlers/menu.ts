@@ -4,7 +4,20 @@ import { BTN, mainKeyboard } from "../keyboards/main.js";
 
 export const menuHandler = new Composer();
 
-menuHandler.hears(BTN.CONNECT, async (ctx) => {
+/** متن دکمه جدید + دکمه‌های قدیمی تا کیبورد قبلی هم جواب بده */
+const CONNECT = [BTN.CONNECT, "به یه ناشناس وصلم کن! 🙈"] as const;
+const NEARBY = [BTN.NEARBY, "افراد نزدیک 📍🛰️"] as const;
+const SEARCH = [BTN.SEARCH, "جستجو کاربران 🔍🗨️"] as const;
+const GUIDE = [BTN.GUIDE, "راهنما 🤔"] as const;
+const PROFILE = [BTN.PROFILE, "پروفایل 👤"] as const;
+const COINS = [BTN.COINS, "سکه 💰"] as const;
+const REFERRAL = [
+  BTN.REFERRAL,
+  "معرفی به دوستان (سکه رایگان) 🔗",
+] as const;
+const ANON_LINK = [BTN.ANON_LINK, "لینک ناشناس من 🎭"] as const;
+
+menuHandler.hears([...CONNECT], async (ctx) => {
   await ctx.reply(
     [
       "⚡ تونل شب",
@@ -20,7 +33,7 @@ menuHandler.hears(BTN.CONNECT, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.NEARBY, async (ctx) => {
+menuHandler.hears([...NEARBY], async (ctx) => {
   await ctx.reply(
     [
       "📍 رادار شهری",
@@ -32,7 +45,7 @@ menuHandler.hears(BTN.NEARBY, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.SEARCH, async (ctx) => {
+menuHandler.hears([...SEARCH], async (ctx) => {
   await ctx.reply(
     [
       "🎯 فیلتر هوشمند",
@@ -44,7 +57,7 @@ menuHandler.hears(BTN.SEARCH, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.GUIDE, async (ctx) => {
+menuHandler.hears([...GUIDE], async (ctx) => {
   await ctx.reply(
     [
       "📖 چطور کار می‌کنه؟",
@@ -61,7 +74,7 @@ menuHandler.hears(BTN.GUIDE, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.PROFILE, async (ctx) => {
+menuHandler.hears([...PROFILE], async (ctx) => {
   const from = ctx.from;
   if (!from) return;
 
@@ -91,7 +104,7 @@ menuHandler.hears(BTN.PROFILE, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.COINS, async (ctx) => {
+menuHandler.hears([...COINS], async (ctx) => {
   const from = ctx.from;
   if (!from) return;
 
@@ -113,7 +126,7 @@ menuHandler.hears(BTN.COINS, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.REFERRAL, async (ctx) => {
+menuHandler.hears([...REFERRAL], async (ctx) => {
   const from = ctx.from;
   if (!from) return;
 
@@ -146,7 +159,7 @@ menuHandler.hears(BTN.REFERRAL, async (ctx) => {
   );
 });
 
-menuHandler.hears(BTN.ANON_LINK, async (ctx) => {
+menuHandler.hears([...ANON_LINK], async (ctx) => {
   await ctx.reply(
     [
       "🎭 صندوق ناشناس من",
@@ -156,6 +169,15 @@ menuHandler.hears(BTN.ANON_LINK, async (ctx) => {
       "",
       "لینک شخصی‌ات در مرحله بعد ساخته می‌شه.",
     ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+/** هر پیام متنی ناشناخته → منوی جدید */
+menuHandler.on("message:text", async (ctx) => {
+  if (ctx.message.text.startsWith("/")) return;
+  await ctx.reply(
+    "منوی دودوریا اینجاست 👇\nیکی از دکمه‌ها رو بزن یا /start بزن.",
     { reply_markup: mainKeyboard() },
   );
 });

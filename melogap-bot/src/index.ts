@@ -2,6 +2,10 @@ import "dotenv/config";
 import { createBot } from "./bot.js";
 import { prisma } from "./db/prisma.js";
 
+async function sleep(ms: number) {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
 async function main() {
   const token = process.env.BOT_TOKEN;
   if (!token || token === "your_telegram_bot_token_here") {
@@ -11,16 +15,30 @@ async function main() {
     process.exit(1);
   }
 
-  const bot = createBot(token);
-
   await prisma.$connect();
   console.log("Database connected.");
 
-  await bot.start({
-    onStart: (info) => {
-      console.log(`Bot @${info.username} is running.`);
-    },
-  });
+  // چند بار تلاش برای جلوگیری از Conflict 409 وقتی پروسس قبلی هنوز آزاد نشده
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const bot = createBot(token);
+    try {
+      await bot.api.deleteWebhook({ drop_pending_updates: true });
+      await bot.start({
+        drop_pending_updates: true,
+        onStart: (info) => {
+          console.log(`Bot @${info.username} is running. (attempt ${attempt})`);
+        },
+      });
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`Start failed (attempt ${attempt}):`, msg);
+      if (attempt === 5) throw err;
+      const wait = attempt * 5000;
+      console.log(`Waiting ${wait / 1000}s before retry...`);
+      await sleep(wait);
+    }
+  }
 }
 
 main().catch(async (err) => {
@@ -29,5 +47,11 @@ main().catch(async (err) => {
   process.exit(1);
 });
 
-process.once("SIGINT", () => prisma.$disconnect());
-process.once("SIGTERM", () => prisma.$disconnect());
+process.once("SIGINT", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
+process.once("SIGTERM", async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
