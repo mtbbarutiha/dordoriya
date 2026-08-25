@@ -10,6 +10,7 @@ import { leaveQueueOrChat } from "../services/match.js";
 import {
   lookingForKeyboard,
   registerGenderKeyboard,
+  agePickerKeyboard,
 } from "../keyboards/main.js";
 
 export const startHandler = new Composer();
@@ -120,24 +121,58 @@ registerHandler.callbackQuery(/^reg:gender:(female|male)$/, async (ctx) => {
   }
   await patchUser(user.id, { gender, state: "age" });
   await ctx.answerCallbackQuery({ text: "ثبت شد" });
+  await ctx.reply("عالی ✅\n\nسنت را از دکمه‌ها انتخاب کن:", {
+    reply_markup: agePickerKeyboard(0, "reg"),
+  });
+});
+
+registerHandler.callbackQuery(/^reg:agepage:(\d+)$/, async (ctx) => {
+  const page = Number(ctx.match[1]);
+  const user = await findByTelegram(ctx.from.id);
+  if (!user || user.state !== "age") {
+    await ctx.answerCallbackQuery({ text: "منقضی شده" });
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup({
+    reply_markup: agePickerKeyboard(page, "reg"),
+  });
+});
+
+registerHandler.callbackQuery(/^reg:agenoop$/, async (ctx) => {
+  await ctx.answerCallbackQuery({ text: "صفحه سن" });
+});
+
+registerHandler.callbackQuery(/^reg:age:(\d+)$/, async (ctx) => {
+  const age = Number(ctx.match[1]);
+  const user = await findByTelegram(ctx.from.id);
+  if (!user) {
+    await ctx.answerCallbackQuery({ text: "اول /start بزن" });
+    return;
+  }
+  if (age < 18 || age > 60) {
+    await ctx.answerCallbackQuery({ text: "سن نامعتبر" });
+    return;
+  }
+  await patchUser(user.id, { age, state: "name" });
+  await ctx.answerCallbackQuery({ text: `سن ${age} ثبت شد` });
   await ctx.reply(
     [
-      "عالی ✅",
+      `سن ${age} ثبت شد ✅`,
       "",
-      "سنت چند سال است؟",
-      "فقط عدد بفرست (بین ۱۳ تا ۸۰)",
+      "حالا یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
     ].join("\n"),
   );
 });
 
-registerHandler.callbackQuery(/^reg:looking:(female|male|any)$/, async (ctx) => {
+registerHandler.callbackQuery(/^reg:looking:(female|male|any)$/, async (ctx, next) => {
   const lookingFor = ctx.match[1]!;
   const user = await findByTelegram(ctx.from.id);
   if (!user) {
     await ctx.answerCallbackQuery({ text: "اول /start بزن" });
     return;
   }
-  if (user.registered) return; // ویرایش از featuresHandler
+  if (user.registered) return next();
   await patchUser(user.id, { lookingFor, state: "done" });
   await ctx.answerCallbackQuery({ text: "ثبت شد" });
   await finishRegistration(ctx, user.id);
@@ -153,19 +188,9 @@ registerHandler.on("message:text", async (ctx, next) => {
   if (!user || user.registered) return next();
 
   if (user.state === "age") {
-    const age = Number(text.replace(/[^\d]/g, ""));
-    if (!Number.isFinite(age) || age < 13 || age > 80) {
-      await ctx.reply("سن معتبر نیست. یک عدد بین ۱۳ تا ۸۰ بفرست.");
-      return;
-    }
-    await patchUser(user.id, { age, state: "name" });
-    await ctx.reply(
-      [
-        "سن ثبت شد ✅",
-        "",
-        "حالا یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
-      ].join("\n"),
-    );
+    await ctx.reply("سنت را از دکمه‌ها انتخاب کن 👇", {
+      reply_markup: agePickerKeyboard(0, "reg"),
+    });
     return;
   }
 

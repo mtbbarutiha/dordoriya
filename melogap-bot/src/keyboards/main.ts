@@ -75,6 +75,33 @@ export function lookingForKeyboard() {
     .text("فرقی ندارد 🎲", "reg:looking:any");
 }
 
+/** انتخاب سن با دکمه — صفحه به صفحه */
+export function agePickerKeyboard(page = 0, prefix = "reg") {
+  const minAge = 18;
+  const maxAge = 60;
+  const perPage = 12; // 3 ردیف × 4 دکمه
+  const ages: number[] = [];
+  for (let a = minAge; a <= maxAge; a++) ages.push(a);
+
+  const totalPages = Math.ceil(ages.length / perPage);
+  const safePage = Math.max(0, Math.min(page, totalPages - 1));
+  const slice = ages.slice(safePage * perPage, safePage * perPage + perPage);
+
+  const kb = new InlineKeyboard();
+  slice.forEach((age, i) => {
+    kb.text(String(age), `${prefix}:age:${age}`);
+    if ((i + 1) % 4 === 0) kb.row();
+  });
+  if (slice.length % 4 !== 0) kb.row();
+
+  if (safePage > 0) kb.text("◀️ قبلی", `${prefix}:agepage:${safePage - 1}`);
+  kb.text(`${safePage + 1}/${totalPages}`, `${prefix}:agenoop`);
+  if (safePage < totalPages - 1) {
+    kb.text("بعدی ▶️", `${prefix}:agepage:${safePage + 1}`);
+  }
+  return kb;
+}
+
 export function diamondPackagesKeyboard() {
   const kb = new InlineKeyboard();
   for (const p of DIAMOND_PACKAGES) {

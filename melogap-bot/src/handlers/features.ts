@@ -9,6 +9,7 @@ import {
   cancelKeyboard,
   locationKeyboard,
   moreKeyboard,
+  agePickerKeyboard,
 } from "../keyboards/main.js";
 import {
   createOrder,
@@ -276,8 +277,42 @@ featuresHandler.callbackQuery("edit:age", async (ctx) => {
   }
   await patchUser(user.id, { state: "edit_age" });
   await ctx.answerCallbackQuery();
-  await ctx.reply("سن جدید را به عدد بفرست:", {
-    reply_markup: cancelKeyboard(),
+  await ctx.reply("سن جدید را انتخاب کن:", {
+    reply_markup: agePickerKeyboard(0, "edit"),
+  });
+});
+
+featuresHandler.callbackQuery(/^edit:agepage:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user || user.state !== "edit_age") {
+    await ctx.answerCallbackQuery({ text: "منقضی شده" });
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.editMessageReplyMarkup({
+    reply_markup: agePickerKeyboard(Number(ctx.match[1]), "edit"),
+  });
+});
+
+featuresHandler.callbackQuery(/^edit:agenoop$/, async (ctx) => {
+  await ctx.answerCallbackQuery({ text: "صفحه سن" });
+});
+
+featuresHandler.callbackQuery(/^edit:age:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const age = Number(ctx.match[1]);
+  if (age < 18 || age > 60) {
+    await ctx.answerCallbackQuery({ text: "سن نامعتبر" });
+    return;
+  }
+  await patchUser(user.id, { age, state: "idle" });
+  await ctx.answerCallbackQuery({ text: "ذخیره شد" });
+  await ctx.reply(`سن روی ${age} به‌روز شد ✅`, {
+    reply_markup: mainKeyboard(),
   });
 });
 

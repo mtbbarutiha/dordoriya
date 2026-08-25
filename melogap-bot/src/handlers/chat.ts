@@ -28,13 +28,7 @@ chatHandler.on("message:text", async (ctx, next) => {
     return;
   }
   if (user.state === "edit_age") {
-    const age = Number(text.replace(/[^\d]/g, ""));
-    if (!Number.isFinite(age) || age < 13 || age > 80) {
-      await ctx.reply("سن معتبر نیست.");
-      return;
-    }
-    await patchUser(user.id, { age, state: "idle" });
-    await ctx.reply("سن به‌روز شد ✅", { reply_markup: mainKeyboard() });
+    await ctx.reply("سن را از دکمه‌ها انتخاب کن 👇");
     return;
   }
   if (user.state === "edit_bio") {

@@ -4,6 +4,7 @@ import {
   mainKeyboard,
   registerGenderKeyboard,
   lookingForKeyboard,
+  agePickerKeyboard,
 } from "../keyboards/main.js";
 import { WELCOME_DIAMONDS } from "../data/packages.js";
 
@@ -38,7 +39,9 @@ export async function requireRegistered(ctx: Context) {
     if (user.state === "gender" || !user.gender) {
       await beginRegistration(ctx, user.id);
     } else if (user.state === "age") {
-      await ctx.reply("سنت را به عدد بفرست (مثلاً ۲۳):");
+      await ctx.reply("سنت را از دکمه‌ها انتخاب کن:", {
+        reply_markup: agePickerKeyboard(0, "reg"),
+      });
     } else if (user.state === "name") {
       await ctx.reply("یک نام نمایشی برای پروفایلت بفرست:");
     } else if (user.state === "looking") {
