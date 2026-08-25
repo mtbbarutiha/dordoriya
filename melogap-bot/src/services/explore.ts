@@ -1,5 +1,5 @@
 import { prisma } from "../db/prisma.js";
-import { patchUser } from "../db/users.js";
+import { patchUser, ensureUserCode } from "../db/users.js";
 import { genderLabel, formatNum } from "../data/packages.js";
 import type { Context } from "grammy";
 import { exploreKeyboard, mainKeyboard } from "../keyboards/main.js";
@@ -49,13 +49,15 @@ export function exploreStateFromOpts(opts: ExploreOpts): ExploreMode {
   return "explore";
 }
 
-function titleFor(opts: ExploreOpts): string {
-  if (opts.sameProvince) return "🏘 هم‌استانی";
-  if (opts.sameAge) return "👤 هم‌سن";
-  if (opts.newUsers) return "✨ کاربران جدید";
-  if (opts.noChats) return "🚶 بدون چت";
-  if (opts.popular) return "❤️ محبوب‌ها";
-  return "🔍 جستجو";
+function listIntro(opts: ExploreOpts): string {
+  if (opts.sameProvince) {
+    return "لیست افراد هم‌استانی که ۳ روز اخیر آنلاین بودند.";
+  }
+  if (opts.sameAge) return "لیست هم‌سن‌هایی که اخیراً آنلاین بودند.";
+  if (opts.newUsers) return "لیست کاربران جدید:";
+  if (opts.noChats) return "لیست کاربرانی که هنوز چت نکرده‌اند:";
+  if (opts.popular) return "لیست محبوب‌ترین‌ها بر اساس لایک:";
+  return "لیست کاربران مطابق فیلتر تو:";
 }
 
 function applyFilters(
@@ -81,6 +83,12 @@ function applyFilters(
   if (opts.noChats) {
     where.chatsCount = 0;
   }
+  // فعال در ۳ روز اخیر برای لیست‌های مکانی/سنی
+  if (opts.sameProvince || opts.sameAge) {
+    where.lastActiveAt = {
+      gte: new Date(Date.now() - 3 * 24 * 3600_000),
+    };
+  }
 }
 
 function orderFor(opts: ExploreOpts): Prisma.UserOrderByWithRelationInput[] {
@@ -93,6 +101,206 @@ function orderFor(opts: ExploreOpts): Prisma.UserOrderByWithRelationInput[] {
   return [{ boostUntil: "desc" }, { lastActiveAt: "desc" }];
 }
 
+function onlineStatus(u: {
+  lastActiveAt: Date;
+  state: string;
+  chatPartnerId: number | null;
+}): string {
+  const mins = (Date.now() - u.lastActiveAt.getTime()) / 60_000;
+  const chatting = u.state === "chatting" || u.chatPartnerId != null;
+  if (mins <= 15) {
+    return chatting
+      ? "هم‌اکنون 👀 آنلاین (درحال چت 🗣️)"
+      : "هم‌اکنون 👀 آنلاین";
+  }
+  if (mins <= 60 * 24) return "امروز آنلاین بوده";
+  return "آخرین بازدید چند روز پیش";
+}
+
+function formatListEntry(
+  u: {
+    userCode: string | null;
+    displayName: string | null;
+    age: number | null;
+    city: string | null;
+    province: string | null;
+    likesCount: number;
+    lastActiveAt: Date;
+    state: string;
+    chatPartnerId: number | null;
+    latitude: number | null;
+    longitude: number | null;
+  },
+  me: { latitude: number | null; longitude: number | null },
+): string {
+  const code = u.userCode ?? "????";
+  const name = u.displayName ?? "بدون‌نام";
+  const age = u.age ?? "—";
+  const place = [u.city, u.province ? `(${u.province})` : null]
+    .filter(Boolean)
+    .join("");
+  let dist = "";
+  if (
+    me.latitude != null &&
+    me.longitude != null &&
+    u.latitude != null &&
+    u.longitude != null
+  ) {
+    const km = haversineKm(me.latitude, me.longitude, u.latitude, u.longitude);
+    dist = ` (🏁 ${formatDistance(km)})`;
+  }
+  const line1 = `/user_${code} ${name} ${age}`;
+  const line2 = `${place || "—"}${dist} (❤️ ${formatNum(u.likesCount)})`;
+  const line3 = onlineStatus(u);
+  return `${line1}\n${line2}\n${line3}`;
+}
+
+/** لیست سرچ شبیه ملوگپ — با لینک /user_CODE */
+export async function sendSearchList(
+  ctx: Context,
+  viewerId: number,
+  opts: ExploreOpts = {},
+  limit = 15,
+) {
+  const me = await prisma.user.findUnique({ where: { id: viewerId } });
+  if (!me) return;
+
+  const where: Prisma.UserWhereInput = {
+    registered: true,
+    isActive: true,
+    deletedAt: null,
+    id: { not: viewerId },
+  };
+  applyFilters(where, me, opts);
+
+  const list = await prisma.user.findMany({
+    where,
+    orderBy: orderFor(opts),
+    take: limit,
+  });
+
+  if (!list.length) {
+    await ctx.reply("فعلاً کسی با این فیلتر پیدا نشد.", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+
+  // مطمئن شو همه userCode دارند
+  for (const u of list) {
+    if (!u.userCode) await ensureUserCode(u.id, u.userCode);
+  }
+  const refreshed = await prisma.user.findMany({
+    where: { id: { in: list.map((x) => x.id) } },
+  });
+  const byId = new Map(refreshed.map((u) => [u.id, u]));
+  const ordered = list.map((u) => byId.get(u.id)!).filter(Boolean);
+
+  await patchUser(viewerId, { state: exploreStateFromOpts(opts) });
+
+  const blocks = ordered.map((u) =>
+    formatListEntry(u, {
+      latitude: me.latitude,
+      longitude: me.longitude,
+    }),
+  );
+
+  const header = [
+    "کی را نشون بدم؟ انتخاب کن 👇",
+    listIntro(opts),
+    "",
+  ].join("\n");
+
+  // تلگرام محدودیت طول پیام دارد — چند پیام اگر لازم
+  let msg = header;
+  for (const block of blocks) {
+    const next = `${msg}${block}\n\n`;
+    if (next.length > 3500) {
+      await ctx.reply(msg.trimEnd(), { reply_markup: mainKeyboard() });
+      msg = `${block}\n\n`;
+    } else {
+      msg = next;
+    }
+  }
+  await ctx.reply(msg.trimEnd(), { reply_markup: mainKeyboard() });
+}
+
+/** باز کردن پروفایل با /user_CODE */
+export async function showProfileByUserCode(
+  ctx: Context,
+  viewerId: number,
+  userCode: string,
+) {
+  const me = await prisma.user.findUnique({ where: { id: viewerId } });
+  if (!me) return;
+
+  const candidate = await prisma.user.findUnique({ where: { userCode } });
+  if (!candidate || candidate.deletedAt || !candidate.registered) {
+    await ctx.reply("این کاربر پیدا نشد یا غیرفعال است.");
+    return;
+  }
+  if (candidate.id === viewerId) {
+    const { sendProfileCard } = await import("./profile.js");
+    await sendProfileCard(ctx, viewerId);
+    return;
+  }
+  if (!candidate.isActive) {
+    await ctx.reply("این حساب فعلاً غیرفعال است.");
+    return;
+  }
+
+  await prisma.exploreSeen.upsert({
+    where: { viewerId_shownId: { viewerId, shownId: candidate.id } },
+    create: { viewerId, shownId: candidate.id },
+    update: {},
+  });
+  await patchUser(candidate.id, { viewsCount: { increment: 1 } });
+  await prisma.interaction.create({
+    data: { type: "view", fromUserId: viewerId, toUserId: candidate.id },
+  });
+
+  const loc = [candidate.city, candidate.province].filter(Boolean).join(" - ");
+  let distanceLine = "🏁 فاصله از شما: نامعلوم";
+  if (
+    me.latitude != null &&
+    me.longitude != null &&
+    candidate.latitude != null &&
+    candidate.longitude != null
+  ) {
+    const km = haversineKm(
+      me.latitude,
+      me.longitude,
+      candidate.latitude,
+      candidate.longitude,
+    );
+    distanceLine = `🏁 فاصله از شما: ${formatDistance(km)}`;
+  }
+
+  const text = [
+    `❤️ ${formatNum(candidate.likesCount)} لایک`,
+    "",
+    `آیدی: /user_${candidate.userCode}`,
+    `👤 ${candidate.displayName ?? "بدون نام"} (${candidate.age ?? "—"})`,
+    `┃ ${genderLabel(candidate.gender)}`,
+    loc ? `┃ 📍 ${loc}` : null,
+    candidate.bio ? `┃ ${candidate.bio}` : null,
+    `┃ 👁 ${formatNum(candidate.viewsCount + 1)}`,
+    `┃ ${distanceLine}`,
+    `┃ ${onlineStatus(candidate)}`,
+    candidate.faceVerified ? "┃ ⭐ کاربر ویژه" : "┃ 🕶 کاربر ناشناس",
+    candidate.isPro ? "┃ 🅿️ پرو" : null,
+    "┗━━━━━━━━━━━━┛",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, candidate), {
+    caption: text,
+    reply_markup: exploreKeyboard(candidate.id, candidate.likesCount),
+  });
+}
+
+/** بعدی/رد — یک پروفایل تصادفی با همان فیلتر */
 export async function nextExploreProfile(
   ctx: Context,
   viewerId: number,
@@ -136,66 +344,20 @@ export async function nextExploreProfile(
   }
 
   if (!candidate) {
-    await ctx.reply(
-      `فعلاً کسی با این فیلتر پیدا نشد.\nاز «${"جستجو کاربران 🔍🗨️"}» فیلتر دیگری بزن.`,
-      { reply_markup: mainKeyboard() },
-    );
+    await ctx.reply("پروفایل دیگری در این فیلتر نیست.", {
+      reply_markup: mainKeyboard(),
+    });
     return;
   }
 
-  await prisma.exploreSeen.upsert({
-    where: { viewerId_shownId: { viewerId, shownId: candidate.id } },
-    create: { viewerId, shownId: candidate.id },
-    update: {},
-  });
-  await patchUser(candidate.id, { viewsCount: { increment: 1 } });
-  await prisma.interaction.create({
-    data: { type: "view", fromUserId: viewerId, toUserId: candidate.id },
-  });
-
-  const loc = [candidate.province, candidate.city].filter(Boolean).join("، ");
-  let distanceLine: string;
-  if (
-    me.latitude != null &&
-    me.longitude != null &&
-    candidate.latitude != null &&
-    candidate.longitude != null
-  ) {
-    const km = haversineKm(
-      me.latitude,
-      me.longitude,
-      candidate.latitude,
-      candidate.longitude,
-    );
-    distanceLine = `🏁 فاصله از شما: ${formatDistance(km)}`;
+  if (!candidate.userCode) {
+    await ensureUserCode(candidate.id, candidate.userCode);
+    const again = await prisma.user.findUnique({ where: { id: candidate.id } });
+    if (again?.userCode) {
+      await showProfileByUserCode(ctx, viewerId, again.userCode);
+      return;
+    }
   } else {
-    distanceLine = "🏁 فاصله از شما: نامعلوم";
+    await showProfileByUserCode(ctx, viewerId, candidate.userCode);
   }
-
-  const text = [
-    `❤️ ${formatNum(candidate.likesCount)} لایک`,
-    "",
-    `┏━━ ${titleFor(opts)} ━━┓`,
-    `┃ 👤 ${candidate.displayName ?? "بدون نام"}`,
-    `┃ ${genderLabel(candidate.gender)} | ${candidate.age ?? "—"} سال`,
-    loc ? `┃ 📍 ${loc}` : null,
-    candidate.bio ? `┃ ${candidate.bio}` : null,
-    `┃ 👁 ${formatNum(candidate.viewsCount + 1)}`,
-    `┃ ${distanceLine}`,
-    candidate.boostUntil && candidate.boostUntil > new Date()
-      ? "┃ 🚀 شتاب‌دهی"
-      : null,
-    candidate.isPro ? "┃ 🅿️ پرو" : null,
-    candidate.photoStatus !== "approved" ? "┃ 🖼️ عکس پیش‌فرض" : null,
-    "┗━━━━━━━━━━━━┛",
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  await patchUser(viewerId, { state: exploreStateFromOpts(opts) });
-
-  await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, candidate), {
-    caption: text,
-    reply_markup: exploreKeyboard(candidate.id, candidate.likesCount),
-  });
 }

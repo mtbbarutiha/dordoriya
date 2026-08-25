@@ -29,6 +29,7 @@ import {
 import {
   nextExploreProfile,
   exploreOptsFromState,
+  sendSearchList,
 } from "../services/explore.js";
 import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
@@ -50,7 +51,7 @@ featuresHandler.callbackQuery("search:province", async (ctx) => {
   }
   await ctx.answerCallbackQuery();
   await ctx.reply(`🏘 هم‌استانی‌های «${user.province}»:`);
-  await nextExploreProfile(ctx, user.id, { sameProvince: true });
+  await sendSearchList(ctx, user.id, { sameProvince: true });
 });
 
 featuresHandler.callbackQuery("search:age", async (ctx) => {
@@ -65,7 +66,7 @@ featuresHandler.callbackQuery("search:age", async (ctx) => {
   }
   await ctx.answerCallbackQuery();
   await ctx.reply(`👤 هم‌سن‌های حدود ${user.age} سال:`);
-  await nextExploreProfile(ctx, user.id, { sameAge: true });
+  await sendSearchList(ctx, user.id, { sameAge: true });
 });
 
 featuresHandler.callbackQuery("search:new", async (ctx) => {
@@ -75,8 +76,7 @@ featuresHandler.callbackQuery("search:new", async (ctx) => {
     return;
   }
   await ctx.answerCallbackQuery();
-  await ctx.reply("✨ کاربران جدید:");
-  await nextExploreProfile(ctx, user.id, { newUsers: true });
+  await sendSearchList(ctx, user.id, { newUsers: true });
 });
 
 featuresHandler.callbackQuery("search:nochats", async (ctx) => {
@@ -86,8 +86,7 @@ featuresHandler.callbackQuery("search:nochats", async (ctx) => {
     return;
   }
   await ctx.answerCallbackQuery();
-  await ctx.reply("🚶 کاربرانی که هنوز چت نکرده‌اند:");
-  await nextExploreProfile(ctx, user.id, { noChats: true });
+  await sendSearchList(ctx, user.id, { noChats: true });
 });
 
 featuresHandler.callbackQuery("search:popular", async (ctx) => {
@@ -97,8 +96,7 @@ featuresHandler.callbackQuery("search:popular", async (ctx) => {
     return;
   }
   await ctx.answerCallbackQuery();
-  await ctx.reply("❤️ محبوب‌ترین‌ها بر اساس لایک:");
-  await nextExploreProfile(ctx, user.id, { popular: true });
+  await sendSearchList(ctx, user.id, { popular: true });
 });
 
 featuresHandler.callbackQuery("search:gps", async (ctx) => {
@@ -160,8 +158,7 @@ featuresHandler.callbackQuery(/^search:adv:(female|male|any)$/, async (ctx) => {
   const looking = ctx.match[1]!;
   await patchUser(user.id, { lookingFor: looking });
   await ctx.answerCallbackQuery({ text: "فیلتر ذخیره شد" });
-  await ctx.reply("جستجو با فیلتر جدید شروع شد:");
-  await nextExploreProfile(ctx, user.id, {});
+  await sendSearchList(ctx, user.id, {});
 });
 
 featuresHandler.callbackQuery("search:recent", async (ctx) => {
@@ -519,7 +516,7 @@ featuresHandler.callbackQuery("more:province", async (ctx) => {
   }
   await ctx.answerCallbackQuery();
   await ctx.reply(`🏘 هم‌استانی‌های «${user.province}»:`);
-  await nextExploreProfile(ctx, user.id, { sameProvince: true });
+  await sendSearchList(ctx, user.id, { sameProvince: true });
 });
 
 featuresHandler.callbackQuery("more:guide", async (ctx) => {
@@ -738,25 +735,29 @@ featuresHandler.on("message:location", async (ctx, next) => {
     );
     return;
   }
-  await ctx.reply(`📍 ${nearby.length} نفر اطراف تو:`, {
-    reply_markup: mainKeyboard(),
-  });
+
+  const { ensureUserCode } = await import("../db/users.js");
+  const lines: string[] = [
+    "کی را نشون بدم؟ انتخاب کن 👇",
+    `📍 ${nearby.length} نفر نزدیک تو:`,
+    "",
+  ];
   for (const item of nearby) {
     const u = item.user;
-    await ctx.replyWithPhoto(await publicPhotoWithBadge(ctx.api, u), {
-      caption: [
-        `❤️ ${formatNum(u.likesCount)} لایک`,
-        "",
-        `👤 ${u.displayName ?? "ناشناس"}`,
-        `فاصله تقریبی: ${item.distanceLabel}`,
-        `سن: ${u.age ?? "—"}`,
-        u.photoStatus !== "approved" ? "🖼️ عکس پیش‌فرض" : null,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      reply_markup: nearbyUserKeyboard(u.id, u.likesCount),
-    });
+    if (!u.userCode) await ensureUserCode(u.id, u.userCode);
+    const code = u.userCode ?? (await ensureUserCode(u.id, null));
+    const place = [u.city, u.province ? `(${u.province})` : null]
+      .filter(Boolean)
+      .join("");
+    lines.push(
+      `/user_${code} ${u.displayName ?? "ناشناس"} ${u.age ?? "—"}`,
+      `${place || "—"} (🏁 ${item.distanceLabel}) (❤️ ${formatNum(u.likesCount)})`,
+      "",
+    );
   }
+  await ctx.reply(lines.join("\n").trimEnd(), {
+    reply_markup: mainKeyboard(),
+  });
 });
 
 featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {

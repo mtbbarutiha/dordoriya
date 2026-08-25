@@ -15,8 +15,14 @@ import { getAdminIds } from "../lib/admin.js";
 import { formatAdminUserLine } from "./account.js";
 
 export async function sendProfileCard(ctx: Context, userId: number) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  let user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.deletedAt) return;
+  if (!user.userCode) {
+    const { ensureUserCode } = await import("../db/users.js");
+    await ensureUserCode(user.id, user.userCode);
+    user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return;
+  }
 
   const genderEmoji =
     user.gender === "female" ? "👩" : user.gender === "male" ? "🧔‍♂️" : "👤";
@@ -40,14 +46,15 @@ export async function sendProfileCard(ctx: Context, userId: number) {
   ].filter(Boolean);
 
   const hasGps = user.latitude != null && user.longitude != null;
-  const box = [
+  const text = [
     `❤️ ${formatNum(user.likesCount)} لایک`,
     "",
+    user.userCode ? `آیدی: /user_${user.userCode}` : null,
     `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
     interest,
     "",
-    `🪙 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)}`,
+    `💰 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,
     hasGps ? "📍 موقعیت: ثبت‌شده (قابل ویرایش)" : "📍 موقعیت: ثبت نشده",
     !user.isActive ? "⏸️ حساب غیرفعال" : null,
@@ -56,7 +63,7 @@ export async function sendProfileCard(ctx: Context, userId: number) {
     .join("\n");
 
   await ctx.replyWithPhoto(await ownPhotoWithBadge(ctx.api, user), {
-    caption: box,
+    caption: text,
     reply_markup: profilePanelKeyboard(
       user.isActive,
       user.faceVerified,

@@ -8,9 +8,10 @@ import {
 } from "../keyboards/main.js";
 import { sendProfileCard } from "../services/profile.js";
 import { tryQuickMatch } from "../services/match.js";
-import { patchUser } from "../db/users.js";
+import { patchUser, ensureUserCode } from "../db/users.js";
 import { formatNum, BOOST_COST, BOOST_HOURS } from "../data/packages.js";
 import { prisma } from "../db/prisma.js";
+import { showProfileByUserCode } from "../services/explore.js";
 
 export const commandsHandler = new Composer();
 
@@ -41,9 +42,18 @@ commandsHandler.command("menu", async (ctx) => {
   await showMainMenu(ctx);
 });
 
+/** /user_XXXX — باز کردن پروفایل از لیست سرچ */
+commandsHandler.hears(/^\/user_([A-Za-z0-9]+)/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const code = ctx.match[1]!;
+  await showProfileByUserCode(ctx, user.id, code);
+});
+
 commandsHandler.command("profile", async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (!user.userCode) await ensureUserCode(user.id, user.userCode);
   await sendProfileCard(ctx, user.id);
 });
 

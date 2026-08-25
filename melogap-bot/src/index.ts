@@ -18,6 +18,9 @@ async function main() {
 
   await prisma.$connect();
   console.log("Database connected.");
+  const { backfillMissingUserCodes } = await import("./db/users.js");
+  const filled = await backfillMissingUserCodes();
+  if (filled) console.log(`Backfilled ${filled} userCode(s).`);
 
   for (let attempt = 1; attempt <= 5; attempt++) {
     const bot = createBot(token);

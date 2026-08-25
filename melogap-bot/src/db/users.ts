@@ -2,23 +2,62 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "./prisma.js";
 import { REFERRAL_BONUS, WELCOME_DIAMONDS } from "../data/packages.js";
 
+const CODE_ALPHABET =
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+
+/** کد کوتاه شبیه ملوگپ (مثلاً Rd4z5A) */
+export function makePublicCode(len = 6): string {
+  const bytes = randomBytes(len);
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
+  }
+  return out;
+}
+
 function code(bytes = 4): string {
   return randomBytes(bytes).toString("hex");
 }
 
-async function uniqueCode(field: "referralCode" | "anonCode"): Promise<string> {
-  for (let i = 0; i < 8; i++) {
-    const value = code();
+async function uniqueCode(
+  field: "referralCode" | "anonCode" | "userCode",
+): Promise<string> {
+  for (let i = 0; i < 12; i++) {
+    const value = field === "userCode" ? makePublicCode(6) : code();
     const clash = await prisma.user.findFirst({ where: { [field]: value } });
     if (!clash) return value;
   }
-  return code(8);
+  return field === "userCode" ? makePublicCode(8) : code(8);
 }
 
 export async function findByTelegram(telegramId: number) {
   return prisma.user.findUnique({
     where: { telegramId: BigInt(telegramId) },
   });
+}
+
+export async function findByUserCode(userCode: string) {
+  return prisma.user.findUnique({ where: { userCode } });
+}
+
+/** برای کاربران قدیمی بدون userCode */
+export async function ensureUserCode(userId: number, current?: string | null) {
+  if (current) return current;
+  const userCode = await uniqueCode("userCode");
+  await prisma.user.update({ where: { id: userId }, data: { userCode } });
+  return userCode;
+}
+
+export async function backfillMissingUserCodes() {
+  const all = await prisma.user.findMany({ select: { id: true, userCode: true } });
+  let n = 0;
+  for (const u of all) {
+    if (!u.userCode || u.userCode.length < 3) {
+      await ensureUserCode(u.id, null);
+      n++;
+    }
+  }
+  return n;
 }
 
 export async function ensureUser(params: {
@@ -32,6 +71,9 @@ export async function ensureUser(params: {
 
   const existing = await findByTelegram(params.telegramId);
   if (existing) {
+    if (!existing.userCode) {
+      await ensureUserCode(existing.id, existing.userCode);
+    }
     return prisma.user.update({
       where: { id: existing.id },
       data: {
@@ -57,6 +99,7 @@ export async function ensureUser(params: {
       telegramId: BigInt(params.telegramId),
       username: params.username ?? null,
       firstName: params.firstName ?? null,
+      userCode: await uniqueCode("userCode"),
       referralCode: await uniqueCode("referralCode"),
       anonCode: await uniqueCode("anonCode"),
       referredById,

@@ -7,6 +7,7 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "../src/db/prisma.js";
 import { IRAN_PROVINCES } from "../src/data/locations.js";
+import { makePublicCode } from "../src/db/users.js";
 
 const FAKE_BASE = 9_000_000_000n;
 const COUNT = 50;
@@ -113,6 +114,7 @@ async function main() {
         displayName: `${displayName}${i % 5 === 0 ? " ✨" : ""}`,
         bio: pick(BIOS),
         diamonds: randInt(5, 80),
+        userCode: makePublicCode(6),
         referralCode: code("fr", i),
         anonCode: code("fa", i),
         gender,
