@@ -9,7 +9,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "db:seed-fake": "tsx scripts/seed-fake-users.ts"
   },
   "keywords": [
     "telegram",
