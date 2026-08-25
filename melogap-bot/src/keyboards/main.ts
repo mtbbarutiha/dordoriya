@@ -294,14 +294,7 @@ export function profilePanelKeyboard(
       "prof:face",
     )
     .row()
-    .text(
-      isActive
-        ? "🔴⏸  غیرفعال‌سازی حساب  ⏸🔴"
-        : "🟢▶️  فعال‌سازی حساب  ▶️🟢",
-      "prof:toggle",
-    )
-    .row()
-    .text("🔴🗑  حذف دائمی حساب  🗑🔴", "prof:delete");
+    .text("🔴 حذف / غیرفعال‌سازی حساب", "prof:manage");
 }
 
 /** مقدمه احراز چهره — مثل دوردور */
@@ -339,14 +332,14 @@ export function accountManageKeyboard(isActive: boolean) {
   return new InlineKeyboard()
     .text(
       isActive
-        ? "🔴⏸  غیرفعال‌سازی حساب  ⏸🔴"
-        : "🟢▶️  فعال‌سازی حساب  ▶️🟢",
+        ? "🔴⏸ غیرفعال‌سازی حساب"
+        : "🟢▶️ فعال‌سازی حساب",
       "prof:toggle",
     )
     .row()
-    .text("🔴🗑  حذف دائمی حساب  🗑🔴", "prof:delete")
+    .text("🔴🗑 حذف دائمی حساب", "prof:delete")
     .row()
-    .text("↩️ بازگشت", "prof:back");
+    .text("↩️ بازگشت به پروفایل", "prof:back");
 }
 
 export function adminPhotoKeyboard(userId: number) {

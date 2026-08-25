@@ -87,9 +87,16 @@ profileHandler.callbackQuery("prof:manage", async (ctx) => {
     return;
   }
   await ctx.answerCallbackQuery();
-  await ctx.reply("مدیریت حساب:", {
-    reply_markup: accountManageKeyboard(user.isActive),
-  });
+  await ctx.reply(
+    [
+      "🔴 مدیریت حساب",
+      "",
+      "یکی را انتخاب کن:",
+      "• غیرفعال‌سازی: از اکسپلور مخفی می‌شوی (قابل برگشت)",
+      "• حذف دائمی: حساب پاک می‌شود و دیگر برنمی‌گردد",
+    ].join("\n"),
+    { reply_markup: accountManageKeyboard(user.isActive) },
+  );
 });
 
 profileHandler.callbackQuery("prof:back", async (ctx) => {
