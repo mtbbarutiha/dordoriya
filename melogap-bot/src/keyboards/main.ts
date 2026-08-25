@@ -1,14 +1,14 @@
 import { Keyboard } from "grammy";
 
 export const BTN = {
-  CONNECT: "به یه ناشناس وصلم کن! 🙈",
-  NEARBY: "افراد نزدیک 📍🛰️",
-  SEARCH: "جستجو کاربران 🔍🗨️",
-  GUIDE: "راهنما 🤔",
-  PROFILE: "پروفایل 👤",
-  COINS: "سکه 💰",
-  REFERRAL: "معرفی به دوستان (سکه رایگان) 🔗",
-  ANON_LINK: "لینک ناشناس من 🎭",
+  CONNECT: "بزن بریم ناشناس ⚡",
+  NEARBY: "نزدیکای شهر 📍",
+  SEARCH: "فیلتر هوشمند 🎯",
+  GUIDE: "چطور کار می‌کنه؟",
+  PROFILE: "هویت من 🪪",
+  COINS: "کیف سکه 🪙",
+  REFERRAL: "دعوت کن، سکه بگیر 🎁",
+  ANON_LINK: "صندوق ناشناس من 🎭",
 } as const;
 
 export function mainKeyboard() {

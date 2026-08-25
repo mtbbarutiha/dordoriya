@@ -4,37 +4,58 @@ import { BTN, mainKeyboard } from "../keyboards/main.js";
 
 export const menuHandler = new Composer();
 
-const COMING_SOON = "این بخش به‌زودی فعال می‌شه ⏳";
-
 menuHandler.hears(BTN.CONNECT, async (ctx) => {
   await ctx.reply(
-    "اتصال به ناشناس در مرحله بعد اضافه می‌شه.\nفعلاً منتظر بمون 🙈",
+    [
+      "⚡ تونل شب",
+      "",
+      "داری وارد صف می‌شی…",
+      "یه نفر اون طرف منتظره. محترم باش، آزاد حرف بزن.",
+      "",
+      "برای قطع بعد از اتصال: /end",
+      "",
+      "مچینگ واقعی در مرحله بعد فعال می‌شه — فعلاً صف آماده‌سازی‌ست.",
+    ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
 });
 
 menuHandler.hears(BTN.NEARBY, async (ctx) => {
-  await ctx.reply(COMING_SOON, { reply_markup: mainKeyboard() });
+  await ctx.reply(
+    [
+      "📍 رادار شهری",
+      "",
+      "نزدیکای شهرت رو پیدا کن.",
+      "این بخش به‌زودی با لوکیشن فعال می‌شه.",
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
 });
 
 menuHandler.hears(BTN.SEARCH, async (ctx) => {
-  await ctx.reply(COMING_SOON, { reply_markup: mainKeyboard() });
+  await ctx.reply(
+    [
+      "🎯 فیلتر هوشمند",
+      "",
+      "چت رو با معیارهایی که می‌خوای محدود کن.",
+      "حالت انتخابی به‌زودی اینجاست.",
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
 });
 
 menuHandler.hears(BTN.GUIDE, async (ctx) => {
   await ctx.reply(
     [
-      "📖 راهنمای ربات",
+      "📖 چطور کار می‌کنه؟",
       "",
-      "• به یه ناشناس وصلم کن: چت تصادفی ناشناس",
-      "• افراد نزدیک: پیدا کردن افراد نزدیکت",
-      "• جستجو کاربران: جستجو بر اساس معیار",
-      "• پروفایل: مشاهده و ویرایش اطلاعات",
-      "• سکه: خرید و مدیریت سکه",
-      "• معرفی به دوستان: لینک دعوت و سکه رایگان",
-      "• لینک ناشناس من: دریافت پیام ناشناس از دیگران",
+      "۱) بزن بریم ناشناس → چت رندوم در تونل شب",
+      "۲) صندوق ناشناس → پیام از بیرون بدون لو رفتن اسم",
+      "۳) دعوت کن → سکه رایگان",
       "",
-      "فعلاً فقط منوی اصلی آماده است؛ بقیه قابلیت‌ها مرحله‌به‌مرحله اضافه می‌شن.",
+      "قانون طلایی: توهین / اسپم = بلاک",
+      "",
+      "بقیه قابلیت‌ها مرحله‌به‌مرحله روشن می‌شن.",
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
@@ -49,7 +70,7 @@ menuHandler.hears(BTN.PROFILE, async (ctx) => {
   });
 
   if (!user) {
-    await ctx.reply("اول /start بزن تا ثبت‌نام شی.", {
+    await ctx.reply("اول /start بزن تا وارد دودوریا شی.", {
       reply_markup: mainKeyboard(),
     });
     return;
@@ -57,12 +78,14 @@ menuHandler.hears(BTN.PROFILE, async (ctx) => {
 
   await ctx.reply(
     [
-      "👤 پروفایل تو",
+      "🪪 هویت من",
+      "",
+      "این هویت فعلیت داخل دودوریاست — نه تلگرامت.",
       "",
       `نام: ${user.firstName ?? "—"}`,
       `یوزرنیم: ${user.username ? `@${user.username}` : "—"}`,
       `سکه: ${user.coins}`,
-      `کد معرف: ${user.referralCode}`,
+      `کد دعوت: ${user.referralCode}`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
@@ -77,7 +100,15 @@ menuHandler.hears(BTN.COINS, async (ctx) => {
   });
 
   await ctx.reply(
-    `💰 موجودی سکه: ${user?.coins ?? 0}\n\nخرید سکه به‌زودی فعال می‌شه.`,
+    [
+      "🪙 کیف سکه",
+      "",
+      "سکه = بنزین چت‌های خاص‌تر.",
+      `موجودی‌ات: ${user?.coins ?? 0}`,
+      "",
+      "پکیج بخر یا با دعوت دوست پر کن.",
+      "خرید مستقیم به‌زودی فعال می‌شه.",
+    ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
 });
@@ -91,7 +122,7 @@ menuHandler.hears(BTN.REFERRAL, async (ctx) => {
   });
 
   if (!user) {
-    await ctx.reply("اول /start بزن تا ثبت‌نام شی.", {
+    await ctx.reply("اول /start بزن تا وارد دودوریا شی.", {
       reply_markup: mainKeyboard(),
     });
     return;
@@ -102,11 +133,13 @@ menuHandler.hears(BTN.REFERRAL, async (ctx) => {
 
   await ctx.reply(
     [
-      "🔗 معرفی به دوستان",
+      "🎁 دعوت کن، سکه بگیر",
       "",
-      "این لینک رو برای دوستات بفرست. وقتی با لینک تو وارد بشن، معرف‌شون می‌شی.",
-      "(پاداش سکه در مرحله‌های بعدی فعال می‌شه)",
+      "لینکت رو بده به رفیقات.",
+      "هر ورود واقعی = سکه برای تو.",
+      "(پاداش سکه به‌زودی روشن می‌شه)",
       "",
+      "لینک دعوتت:",
       link,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
@@ -115,7 +148,14 @@ menuHandler.hears(BTN.REFERRAL, async (ctx) => {
 
 menuHandler.hears(BTN.ANON_LINK, async (ctx) => {
   await ctx.reply(
-    "🎭 لینک ناشناس شخصی‌ات در مرحله بعد ساخته می‌شه.",
+    [
+      "🎭 صندوق ناشناس من",
+      "",
+      "این لینک رو بذار توی بایو / استوری.",
+      "بقیه بدون دیدن اسمت برات پیام می‌فرستن.",
+      "",
+      "لینک شخصی‌ات در مرحله بعد ساخته می‌شه.",
+    ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
 });
