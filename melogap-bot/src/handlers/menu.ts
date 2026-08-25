@@ -5,10 +5,8 @@ import {
   BTN,
   mainKeyboard,
   diamondPackagesKeyboard,
-  moreKeyboard,
-  lookingForKeyboard,
+  searchPanelKeyboard,
   locationKeyboard,
-  cancelKeyboard,
 } from "../keyboards/main.js";
 import {
   formatNum,
@@ -29,36 +27,6 @@ menuHandler.hears(BTN.PROFILE, async (ctx) => {
   await sendProfileCard(ctx, user.id);
 });
 
-menuHandler.hears(BTN.EXPLORE, async (ctx) => {
-  const user = await requireRegistered(ctx);
-  if (!user) return;
-  if (user.state === "chatting") {
-    await ctx.reply("اول چت فعلی را قطع کن (/end).");
-    return;
-  }
-  await patchUser(user.id, { state: "explore" });
-  await nextExploreProfile(ctx, user.id);
-});
-
-menuHandler.hears(BTN.ANON, async (ctx) => {
-  const user = await requireRegistered(ctx);
-  if (!user) return;
-  const me = await ctx.api.getMe();
-  const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
-  await ctx.reply(
-    [
-      "🕵️‍♂️ پیام ناشناس",
-      "",
-      "لینک شخصی خودت را بگذار در استوری یا بیو تا بقیه برایت ناشناس پیام بفرستند:",
-      "",
-      link,
-      "",
-      "اگر لینک کس دیگری را داری، همان را در تلگرام باز کن و پیام بفرست.",
-    ].join("\n"),
-    { reply_markup: mainKeyboard() },
-  );
-});
-
 menuHandler.hears(BTN.QUICK_CHAT, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
@@ -69,44 +37,53 @@ menuHandler.hears(BTN.QUICK_CHAT, async (ctx) => {
   await tryQuickMatch(ctx, user.id);
 });
 
-menuHandler.hears(BTN.BOOST, async (ctx) => {
+menuHandler.hears(BTN.NEARBY, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
-
-  if (user.boostUntil && user.boostUntil > new Date()) {
-    await ctx.reply(
-      `شتاب‌دهی‌ات هنوز فعال است تا ${user.boostUntil.toLocaleString("fa-IR")}`,
-      { reply_markup: mainKeyboard() },
-    );
-    return;
-  }
-
-  if (user.diamonds < BOOST_COST) {
-    await ctx.reply(
-      [
-        "🚀 شتاب‌دهی",
-        "",
-        `هزینه: ${formatNum(BOOST_COST)} سکه برای ${BOOST_HOURS} ساعت`,
-        `موجودی تو: ${formatNum(user.diamonds)} سکه`,
-        "",
-        "سکه کافی نداری. از بخش «سکه‌ها» خرید کن.",
-      ].join("\n"),
-      { reply_markup: mainKeyboard() },
-    );
-    return;
-  }
-
-  const until = new Date(Date.now() + BOOST_HOURS * 3600_000);
-  await patchUser(user.id, {
-    diamonds: { decrement: BOOST_COST },
-    boostUntil: until,
-  });
+  await patchUser(user.id, { state: "await_location" });
   await ctx.reply(
     [
-      "🚀 شتاب‌دهی فعال شد!",
+      "📍 افراد نزدیک",
       "",
-      `تا ${until.toLocaleString("fa-IR")} در اکسپلور و چت سریع جلوتری.`,
-      `${formatNum(BOOST_COST)} سکه کم شد.`,
+      "موقعیتت را بفرست تا افراد اطراف را ببینی.",
+      "مختصات دقیق به کسی نشان داده نمی‌شود.",
+    ].join("\n"),
+    { reply_markup: locationKeyboard() },
+  );
+});
+
+menuHandler.hears(BTN.SEARCH, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  if (user.state === "chatting") {
+    await ctx.reply("اول چت فعلی را قطع کن.");
+    return;
+  }
+  await ctx.reply("🔍 جستجو کاربران — یک گزینه را انتخاب کن:", {
+    reply_markup: searchPanelKeyboard(),
+  });
+});
+
+menuHandler.hears(BTN.GUIDE, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  await ctx.reply(
+    [
+      "🤔 راهنمای دوردوریا",
+      "",
+      `• ${BTN.QUICK_CHAT} — اتصال تصادفی ناشناس`,
+      `• ${BTN.NEARBY} — افراد اطراف با GPS`,
+      `• ${BTN.SEARCH} — فیلتر هم‌استانی، هم‌سن، محبوب و…`,
+      `• ${BTN.PROFILE} — ویرایش، احراز، مدیریت حساب`,
+      `• ${BTN.DIAMONDS} — خرید و موجودی سکه`,
+      `• ${BTN.REFERRAL} — دعوت دوست = سکه رایگان`,
+      `• ${BTN.ANON_LINK} — لینک پیام ناشناس شخصی`,
+      "",
+      "شتاب‌دهی و پرو:",
+      `🚀 شتاب‌دهی: ${formatNum(BOOST_COST)} سکه / ${BOOST_HOURS} ساعت — /boost`,
+      "🅿️ اشتراک پرو: /pro",
+      "",
+      "قطع چت: /end",
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
@@ -117,7 +94,7 @@ menuHandler.hears(BTN.DIAMONDS, async (ctx) => {
   if (!user) return;
   await ctx.reply(
     [
-      "🪙 سکه‌ها",
+      "💰 سکه‌ها",
       "",
       `موجودی: ${formatNum(user.diamonds)} سکه`,
       "",
@@ -128,45 +105,101 @@ menuHandler.hears(BTN.DIAMONDS, async (ctx) => {
   );
 });
 
+menuHandler.hears(BTN.REFERRAL, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const me = await ctx.api.getMe();
+  const link = `https://t.me/${me.username}?start=${user.referralCode}`;
+  await ctx.reply(
+    [
+      "🔗 معرفی به دوستان",
+      "",
+      `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} سکه رایگان برای تو 💰`,
+      "",
+      "لینک دعوتت:",
+      link,
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+menuHandler.hears(BTN.ANON_LINK, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const me = await ctx.api.getMe();
+  const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
+  await ctx.reply(
+    [
+      "🎭 لینک ناشناس من",
+      "",
+      "این لینک را در استوری یا بیو بگذار تا بقیه ناشناس برایت پیام بفرستند:",
+      "",
+      link,
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+});
+
+/** سازگاری دستورات قدیمی */
+menuHandler.hears(BTN.BOOST, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  if (user.boostUntil && user.boostUntil > new Date()) {
+    await ctx.reply(
+      `شتاب‌دهی‌ات هنوز فعال است تا ${user.boostUntil.toLocaleString("fa-IR")}`,
+      { reply_markup: mainKeyboard() },
+    );
+    return;
+  }
+  if (user.diamonds < BOOST_COST) {
+    await ctx.reply(
+      [
+        "🚀 شتاب‌دهی",
+        `هزینه: ${formatNum(BOOST_COST)} سکه برای ${BOOST_HOURS} ساعت`,
+        `موجودی: ${formatNum(user.diamonds)} سکه`,
+        "سکه کافی نیست — از «سکه 💰» بخر.",
+      ].join("\n"),
+      { reply_markup: mainKeyboard() },
+    );
+    return;
+  }
+  const until = new Date(Date.now() + BOOST_HOURS * 3600_000);
+  await patchUser(user.id, {
+    diamonds: { decrement: BOOST_COST },
+    boostUntil: until,
+  });
+  await ctx.reply(
+    `🚀 شتاب‌دهی فعال شد تا ${until.toLocaleString("fa-IR")}\n${formatNum(BOOST_COST)} سکه کم شد.`,
+    { reply_markup: mainKeyboard() },
+  );
+});
+
 menuHandler.hears(BTN.PRO, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
-
   if (user.isPro) {
     await ctx.reply("اشتراک پرو تو فعال است 🅿️", {
       reply_markup: mainKeyboard(),
     });
     return;
   }
-
   const cost = 200;
   await ctx.reply(
     [
       "🅿️ اشتراک پرو",
+      "• دیده شدن بیشتر",
+      "• نشان پرو",
+      "• اولویت چت سریع",
       "",
-      "مزایا:",
-      "• دیده شدن بیشتر در اکسپلور",
-      "• نشان پرو روی پروفایل",
-      "• اولویت در چت سریع",
-      "",
-      `هزینه فعال‌سازی: ${formatNum(cost)} سکه`,
-      `موجودی: ${formatNum(user.diamonds)}`,
+      `هزینه: ${formatNum(cost)} سکه | موجودی: ${formatNum(user.diamonds)}`,
     ].join("\n"),
     {
       reply_markup: new InlineKeyboard().text(
-        `فعال‌سازی پرو (${formatNum(cost)}🪙)`,
+        `فعال‌سازی پرو (${formatNum(cost)}💰)`,
         "pro:buy",
       ),
     },
   );
-});
-
-menuHandler.hears(BTN.MORE, async (ctx) => {
-  const user = await requireRegistered(ctx);
-  if (!user) return;
-  await ctx.reply("📋 بیشتر — یک گزینه را انتخاب کن:", {
-    reply_markup: moreKeyboard(),
-  });
 });
 
 menuHandler.hears(BTN.STATS, async (ctx) => {
@@ -176,14 +209,11 @@ menuHandler.hears(BTN.STATS, async (ctx) => {
   await ctx.reply(
     [
       "📊 آمار",
-      "",
-      "آمار تو:",
-      `• بازدید پروفایل: ${formatNum(user.viewsCount)}`,
-      `• لایک دریافتی: ${formatNum(user.likesCount)}`,
+      `• بازدید: ${formatNum(user.viewsCount)}`,
+      `• لایک: ${formatNum(user.likesCount)}`,
       `• چت‌ها: ${formatNum(user.chatsCount)}`,
       `• سکه: ${formatNum(user.diamonds)}`,
-      "",
-      `کاربران فعال دوردوریا: ${formatNum(totalUsers)}`,
+      `کاربران دوردوریا: ${formatNum(totalUsers)}`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );

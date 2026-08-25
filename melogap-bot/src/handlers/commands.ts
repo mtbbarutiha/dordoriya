@@ -1,12 +1,15 @@
-import { Composer } from "grammy";
+import { Composer, InlineKeyboard } from "grammy";
 import { requireRegistered } from "../services/register.js";
-import { mainKeyboard, BTN } from "../keyboards/main.js";
+import {
+  mainKeyboard,
+  BTN,
+  diamondPackagesKeyboard,
+  searchPanelKeyboard,
+} from "../keyboards/main.js";
 import { sendProfileCard } from "../services/profile.js";
-import { nextExploreProfile } from "../services/explore.js";
 import { tryQuickMatch } from "../services/match.js";
-import { patchUser, findByTelegram } from "../db/users.js";
-import { formatNum, REFERRAL_BONUS } from "../data/packages.js";
-import { diamondPackagesKeyboard } from "../keyboards/main.js";
+import { patchUser } from "../db/users.js";
+import { formatNum, BOOST_COST, BOOST_HOURS } from "../data/packages.js";
 import { prisma } from "../db/prisma.js";
 
 export const commandsHandler = new Composer();
@@ -20,14 +23,13 @@ export async function showMainMenu(ctx: {
     [
       "📋 منوی اصلی دوردوریا",
       "",
-      "از دکمه‌های پایین یا منوی ≡ کنار کادر پیام استفاده کن:",
+      "از دکمه‌های پایین استفاده کن — شبیه ملوگپ:",
       "",
-      `• ${BTN.PROFILE}`,
-      `• ${BTN.EXPLORE}`,
-      `• ${BTN.ANON}`,
       `• ${BTN.QUICK_CHAT}`,
-      `• ${BTN.BOOST} / ${BTN.DIAMONDS} / ${BTN.PRO}`,
-      `• ${BTN.MORE} / ${BTN.STATS}`,
+      `• ${BTN.NEARBY} / ${BTN.SEARCH}`,
+      `• ${BTN.GUIDE} / ${BTN.PROFILE} / ${BTN.DIAMONDS}`,
+      `• ${BTN.REFERRAL}`,
+      `• ${BTN.ANON_LINK}`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
@@ -52,8 +54,9 @@ commandsHandler.command("explore", async (ctx) => {
     await ctx.reply("اول چت فعلی را قطع کن (/end).");
     return;
   }
-  await patchUser(user.id, { state: "explore" });
-  await nextExploreProfile(ctx, user.id);
+  await ctx.reply("🔍 جستجو کاربران — یک گزینه را انتخاب کن:", {
+    reply_markup: searchPanelKeyboard(),
+  });
 });
 
 commandsHandler.command("chat", async (ctx) => {
@@ -71,15 +74,9 @@ commandsHandler.command("anon", async (ctx) => {
   if (!user) return;
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
-  await ctx.reply(
-    [
-      "🕵️ پیام ناشناس",
-      "",
-      "لینک شخصی تو:",
-      link,
-    ].join("\n"),
-    { reply_markup: mainKeyboard() },
-  );
+  await ctx.reply(["🎭 لینک ناشناس من", "", link].join("\n"), {
+    reply_markup: mainKeyboard(),
+  });
 });
 
 commandsHandler.command("diamonds", async (ctx) => {
@@ -87,13 +84,58 @@ commandsHandler.command("diamonds", async (ctx) => {
   if (!user) return;
   await ctx.reply(
     [
-      "🪙 سکه‌ها",
+      "💰 سکه‌ها",
       "",
       `موجودی: ${formatNum(user.diamonds)} سکه`,
       "",
       "یکی از بسته‌ها را انتخاب کن:",
     ].join("\n"),
     { reply_markup: diamondPackagesKeyboard() },
+  );
+});
+
+commandsHandler.command("boost", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  if (user.boostUntil && user.boostUntil > new Date()) {
+    await ctx.reply(
+      `شتاب‌دهی فعال تا ${user.boostUntil.toLocaleString("fa-IR")}`,
+      { reply_markup: mainKeyboard() },
+    );
+    return;
+  }
+  if (user.diamonds < BOOST_COST) {
+    await ctx.reply(`سکه کافی نیست. نیاز: ${formatNum(BOOST_COST)}`, {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+  const until = new Date(Date.now() + BOOST_HOURS * 3600_000);
+  await patchUser(user.id, {
+    diamonds: { decrement: BOOST_COST },
+    boostUntil: until,
+  });
+  await ctx.reply(`🚀 شتاب‌دهی فعال شد تا ${until.toLocaleString("fa-IR")}`, {
+    reply_markup: mainKeyboard(),
+  });
+});
+
+commandsHandler.command("pro", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  if (user.isPro) {
+    await ctx.reply("پرو فعال است 🅿️", { reply_markup: mainKeyboard() });
+    return;
+  }
+  const cost = 200;
+  await ctx.reply(
+    `🅿️ پرو — هزینه ${formatNum(cost)} سکه\nموجودی: ${formatNum(user.diamonds)}`,
+    {
+      reply_markup: new InlineKeyboard().text(
+        `فعال‌سازی (${formatNum(cost)}💰)`,
+        "pro:buy",
+      ),
+    },
   );
 });
 
@@ -104,12 +146,10 @@ commandsHandler.command("stats", async (ctx) => {
   await ctx.reply(
     [
       "📊 آمار",
-      "",
       `👁 بازدید: ${formatNum(user.viewsCount)}`,
       `❤️ لایک: ${formatNum(user.likesCount)}`,
       `💬 چت: ${formatNum(user.chatsCount)}`,
-      `🪙 سکه: ${formatNum(user.diamonds)}`,
-      "",
+      `💰 سکه: ${formatNum(user.diamonds)}`,
       `کاربران فعال: ${formatNum(totalUsers)}`,
     ].join("\n"),
     { reply_markup: mainKeyboard() },

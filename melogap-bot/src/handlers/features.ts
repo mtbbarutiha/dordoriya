@@ -10,7 +10,6 @@ import {
   cancelKeyboard,
   locationKeyboard,
   editLocationKeyboard,
-  moreKeyboard,
   giftDiamondsKeyboard,
 } from "../keyboards/main.js";
 import {
@@ -27,13 +26,179 @@ import {
   LIKE_GIFT_DIAMONDS,
   GIFT_AMOUNTS,
 } from "../data/packages.js";
-import { nextExploreProfile } from "../services/explore.js";
+import {
+  nextExploreProfile,
+  exploreOptsFromState,
+} from "../services/explore.js";
 import { connectUsers } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
 import { nearbyUserKeyboard } from "../keyboards/nearby.js";
 import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
 
 export const featuresHandler = new Composer();
+
+/** پنل جستجو شبیه ملوگپ */
+featuresHandler.callbackQuery("search:province", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  if (!user.province) {
+    await ctx.answerCallbackQuery({ text: "استان ثبت نشده" });
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply(`🏘 هم‌استانی‌های «${user.province}»:`);
+  await nextExploreProfile(ctx, user.id, { sameProvince: true });
+});
+
+featuresHandler.callbackQuery("search:age", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  if (user.age == null) {
+    await ctx.answerCallbackQuery({ text: "سن ثبت نشده" });
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply(`👤 هم‌سن‌های حدود ${user.age} سال:`);
+  await nextExploreProfile(ctx, user.id, { sameAge: true });
+});
+
+featuresHandler.callbackQuery("search:new", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply("✨ کاربران جدید:");
+  await nextExploreProfile(ctx, user.id, { newUsers: true });
+});
+
+featuresHandler.callbackQuery("search:nochats", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply("🚶 کاربرانی که هنوز چت نکرده‌اند:");
+  await nextExploreProfile(ctx, user.id, { noChats: true });
+});
+
+featuresHandler.callbackQuery("search:popular", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply("❤️ محبوب‌ترین‌ها بر اساس لایک:");
+  await nextExploreProfile(ctx, user.id, { popular: true });
+});
+
+featuresHandler.callbackQuery("search:gps", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await patchUser(user.id, { state: "await_location" });
+  await ctx.reply(
+    "📍 موقعیتت را بفرست تا افراد نزدیک را ببینی.",
+    { reply_markup: locationKeyboard() },
+  );
+});
+
+featuresHandler.callbackQuery("search:special", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "await_special" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      "💌 وصل به مخاطب خاص",
+      "",
+      "لینک ناشناس یا کد ناشناس مخاطبت را بفرست.",
+      "مثال: https://t.me/Dordoriya_bot?start=anon_xxxx",
+      "یا فقط کد: xxxx",
+    ].join("\n"),
+    { reply_markup: cancelKeyboard() },
+  );
+});
+
+featuresHandler.callbackQuery("search:advanced", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await ctx.reply("🔍 جستجو پیشرفته — علاقه را انتخاب کن:", {
+    reply_markup: new InlineKeyboard()
+      .text("👩 خانم", "search:adv:female")
+      .text("👨 آقا", "search:adv:male")
+      .row()
+      .text("🎲 هردو", "search:adv:any"),
+  });
+});
+
+featuresHandler.callbackQuery(/^search:adv:(female|male|any)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const looking = ctx.match[1]!;
+  await patchUser(user.id, { lookingFor: looking });
+  await ctx.answerCallbackQuery({ text: "فیلتر ذخیره شد" });
+  await ctx.reply("جستجو با فیلتر جدید شروع شد:");
+  await nextExploreProfile(ctx, user.id, {});
+});
+
+featuresHandler.callbackQuery("search:recent", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  const recent = await prisma.interaction.findMany({
+    where: { fromUserId: user.id, type: { in: ["like", "view"] } },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+    include: { toUser: true },
+  });
+  const seen = new Set<number>();
+  const lines: string[] = [];
+  for (const i of recent) {
+    if (seen.has(i.toUserId) || i.toUser.deletedAt) continue;
+    seen.add(i.toUserId);
+    const n = i.toUser.displayName ?? "ناشناس";
+    lines.push(`• ${n} (${i.type === "like" ? "❤️" : "👁"})`);
+    if (lines.length >= 5) break;
+  }
+  if (!lines.length) {
+    await ctx.reply("هنوز چت/بازدید اخیری نداری.", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+  await ctx.reply(
+    ["👀 تعاملات اخیر تو:", "", ...lines, "", "برای دیدن پروفایل‌های جدید از جستجو استفاده کن."].join(
+      "\n",
+    ),
+    { reply_markup: mainKeyboard() },
+  );
+});
 
 featuresHandler.callbackQuery(/^buy:(.+)$/, async (ctx) => {
   const user = await requireRegistered(ctx);
@@ -206,7 +371,7 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
     `❤️ لایک ثبت شد.\n🎁 ${formatNum(LIKE_GIFT_DIAMONDS)} سکه برای «${target.displayName ?? "کاربر"}» هدیه شد.`,
   );
   await nextExploreProfile(ctx, user.id, {
-    sameProvince: user.state === "explore_province",
+    ...exploreOptsFromState(user.state),
   });
 });
 
@@ -242,7 +407,7 @@ featuresHandler.callbackQuery(/^gift:back:(\d+)$/, async (ctx) => {
   }
   await ctx.answerCallbackQuery();
   await nextExploreProfile(ctx, user.id, {
-    sameProvince: user.state === "explore_province",
+    ...exploreOptsFromState(user.state),
   });
 });
 
@@ -337,7 +502,7 @@ featuresHandler.callbackQuery(/^exp:(next|skip)$/, async (ctx) => {
   }
   await ctx.answerCallbackQuery();
   await nextExploreProfile(ctx, user.id, {
-    sameProvince: user.state === "explore_province",
+    ...exploreOptsFromState(user.state),
   });
 });
 

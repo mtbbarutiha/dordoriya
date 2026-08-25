@@ -15,19 +15,26 @@ import {
 } from "../data/locations.js";
 
 export const BTN = {
-  PROFILE: "👤 پروفایل من",
-  EXPLORE: "🎡 اکسپلور",
-  ANON: "🕵️ پیام ناشناس",
-  QUICK_CHAT: "⚡ چت سریع",
-  BOOST: "🚀 شتاب‌دهی",
-  DIAMONDS: "🪙 سکه‌ها",
-  PRO: "🅿️ اشتراک پرو",
-  MORE: "📋 بیشتر",
-  STATS: "📊 آمار",
+  /** اتصال تصادفی — دکمه اصلی تمام‌عرض مثل ملوگپ */
+  QUICK_CHAT: "به یه ناشناس وصلم کن! 🙊",
+  NEARBY: "افراد نزدیک 📍🛰️",
+  SEARCH: "جستجو کاربران 🔍🗨️",
+  GUIDE: "راهنما 🤔",
+  PROFILE: "پروفایل 👤",
+  DIAMONDS: "سکه 💰",
+  REFERRAL: "معرفی به دوستان (سکه رایگان) 🔗",
+  ANON_LINK: "لینک ناشناس من 🎭🎭",
   BACK: "↩️ بازگشت به منو",
   CANCEL_WAIT: "❌ لغو جستجو",
   END_CHAT: "🔚 قطع چت",
   SEND_LOCATION: "📍 ارسال موقعیت",
+  /** سازگاری با کدهای قبلی */
+  EXPLORE: "جستجو کاربران 🔍🗨️",
+  ANON: "لینک ناشناس من 🎭🎭",
+  BOOST: "🚀 شتاب‌دهی",
+  PRO: "🅿️ اشتراک پرو",
+  MORE: "راهنما 🤔",
+  STATS: "📊 آمار",
 } as const;
 
 export const REG = {
@@ -52,22 +59,43 @@ export const AGE_RANGES: { label: string; from: number; to: number }[] = [
   { label: "۵۳ تا ۶۰", from: 53, to: 60 },
 ];
 
+/** منوی اصلی شبیه ملوگپ */
 export function mainKeyboard() {
   return new Keyboard()
-    .text(BTN.PROFILE)
-    .text(BTN.EXPLORE)
-    .row()
-    .text(BTN.ANON)
     .text(BTN.QUICK_CHAT)
     .row()
-    .text(BTN.BOOST)
-    .text(BTN.DIAMONDS)
-    .text(BTN.PRO)
+    .text(BTN.NEARBY)
+    .text(BTN.SEARCH)
     .row()
-    .text(BTN.MORE)
-    .text(BTN.STATS)
+    .text(BTN.GUIDE)
+    .text(BTN.PROFILE)
+    .text(BTN.DIAMONDS)
+    .row()
+    .text(BTN.REFERRAL)
+    .row()
+    .text(BTN.ANON_LINK)
     .resized()
     .persistent();
+}
+
+/** پنل جستجو — دکمه‌های اینلاین شبیه ملوگپ */
+export function searchPanelKeyboard() {
+  return new InlineKeyboard()
+    .text("به مخاطب خاصم وصلم کن 💌", "search:special")
+    .row()
+    .text("هم استانی ها 📍🍷", "search:province")
+    .text("هم سن ها 👤👥", "search:age")
+    .row()
+    .text("جستجو پیشرفته 🔍", "search:advanced")
+    .row()
+    .text("کاربران جدید 🙋‍♀️💁‍♂️", "search:new")
+    .text("بدون چت ها 🚶‍♂️🚶‍♀️", "search:nochats")
+    .row()
+    .text("👀 چت های اخیر من 👀", "search:recent")
+    .row()
+    .text("جستجو با GPS فعلی من 📍", "search:gps")
+    .row()
+    .text("کاربران محبوب بر اساس لایک 📊❤️", "search:popular");
 }
 
 export function cancelKeyboard() {

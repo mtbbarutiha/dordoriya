@@ -37,6 +37,36 @@ chatHandler.on("message:text", async (ctx, next) => {
     return;
   }
 
+  if (user.state === "await_special") {
+    let code = text.trim();
+    const m = code.match(/anon_([a-zA-Z0-9]+)/);
+    if (m) code = m[1]!;
+    else if (code.startsWith("anon_")) code = code.slice(5);
+
+    const target = await prisma.user.findUnique({ where: { anonCode: code } });
+    if (!target || target.deletedAt || target.id === user.id) {
+      await ctx.reply(
+        "مخاطب پیدا نشد. لینک یا کد ناشناس درست را بفرست، یا بازگشت بزن.",
+      );
+      return;
+    }
+    const { connectUsers } = await import("../services/match.js");
+    const result = await connectUsers(ctx.api, user.id, target.id);
+    if (result === "demo") {
+      await patchUser(user.id, { state: "idle" });
+      await ctx.reply("این پروفایل نمونه است.", { reply_markup: mainKeyboard() });
+      return;
+    }
+    if (result !== "ok") {
+      await patchUser(user.id, { state: "idle" });
+      await ctx.reply("الان نمی‌شود وصل شد. بعداً دوباره امتحان کن.", {
+        reply_markup: mainKeyboard(),
+      });
+      return;
+    }
+    return;
+  }
+
   if (user.state === "await_anon_msg" && user.pendingAnonTo) {
     const target = await prisma.user.findUnique({
       where: { anonCode: user.pendingAnonTo },
