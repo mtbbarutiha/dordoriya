@@ -19,7 +19,8 @@ export const REFERRAL_BONUS = 30;
 export const WELCOME_DIAMONDS = 15;
 export const BOOST_COST = 40;
 export const BOOST_HOURS = 12;
-export const FACE_VERIFY_COST = 11;
+/** جایزه تأیید احراز چهره (ویدیو مطابق عکس پروفایل) */
+export const FACE_VERIFY_REWARD = 100;
 export const NEARBY_RADIUS_KM = 80;
 export const EXPLORE_LIMIT = 1;
 

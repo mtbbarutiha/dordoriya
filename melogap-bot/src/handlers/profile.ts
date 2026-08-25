@@ -1,4 +1,5 @@
 import { Composer } from "grammy";
+import type { Context } from "grammy";
 import { findByTelegram, patchUser } from "../db/users.js";
 import { requireRegistered } from "../services/register.js";
 import { prisma } from "../db/prisma.js";
@@ -9,14 +10,14 @@ import {
   cancelKeyboard,
   accountManageKeyboard,
 } from "../keyboards/main.js";
-import { formatNum, FACE_VERIFY_COST } from "../data/packages.js";
+import { formatNum, FACE_VERIFY_REWARD } from "../data/packages.js";
 import {
   sendProfileCard,
   notifyAdminsPhoto,
   notifyAdminsFace,
+  sendFaceVerifyIntro,
 } from "../services/profile.js";
 import { isAdmin } from "../lib/admin.js";
-import { publicPhotoInput } from "../lib/avatars.js";
 
 export const profileHandler = new Composer();
 
@@ -173,27 +174,65 @@ profileHandler.callbackQuery("prof:face", async (ctx) => {
     await ctx.reply("✅ احراز چهره تو قبلاً تأیید شده است.");
     return;
   }
-  if (user.diamonds < FACE_VERIFY_COST) {
-    await ctx.answerCallbackQuery({ text: "الماس کافی نیست" });
-    await ctx.reply(
-      `احراز چهره ${formatNum(FACE_VERIFY_COST)} الماس می‌خواهد.\nموجودی: ${formatNum(user.diamonds)}`,
-    );
+  await ctx.answerCallbackQuery();
+  await sendFaceVerifyIntro(ctx, user);
+});
+
+profileHandler.callbackQuery("face:ok", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  if (user.faceVerified) {
+    await ctx.answerCallbackQuery({ text: "قبلاً تأیید شده" });
+    return;
+  }
+  if (user.photoStatus !== "approved" || !user.photoFileId) {
+    await ctx.answerCallbackQuery({ text: "اول عکس تأییدشده لازم است" });
     return;
   }
   await patchUser(user.id, { state: "edit_face" });
+  await ctx.answerCallbackQuery({ text: "ویدیو بفرست" });
+  await ctx.reply(
+    [
+      "🎥 الان یک ویدیو مسیج (دایره‌ای) از خودت بفرست.",
+      "",
+      "چهره‌ات باید با عکس پروفایل بالا یکی باشد.",
+      "می‌توانی ویدیو معمولی هم بفرستی.",
+      "",
+      `🎁 جایزه تأیید: ${formatNum(FACE_VERIFY_REWARD)} الماس`,
+    ].join("\n"),
+    { reply_markup: cancelKeyboard() },
+  );
+});
+
+profileHandler.callbackQuery("face:photo", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "edit_photo" });
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
-      "✅ احراز چهره",
-      "",
-      `هزینه پس از تأیید ادمین: ${formatNum(FACE_VERIFY_COST)} 💎`,
-      "یک سلفی واضح بفرست (چهره‌ات مشخص باشد).",
-      user.faceStatus === "pending" ? "⏳ درخواست قبلی هنوز در بررسی است." : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+      "📷 عکس پروفایل جدید را بفرست.",
+      "بعد از تأیید ادمین، دوباره احراز چهره را شروع کن.",
+    ].join("\n"),
     { reply_markup: cancelKeyboard() },
   );
+});
+
+profileHandler.callbackQuery("face:cancel", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await patchUser(user.id, { state: "idle" });
+  await ctx.answerCallbackQuery({ text: "لغو شد" });
+  await ctx.reply("احراز چهره لغو شد.", { reply_markup: mainKeyboard() });
 });
 
 profileHandler.callbackQuery("prof:toggle", async (ctx) => {
@@ -257,7 +296,7 @@ profileHandler.callbackQuery("prof:delete:yes", async (ctx) => {
   );
 });
 
-/** آپلود عکس پروفایل / احراز */
+/** آپلود عکس پروفایل (احراز دیگر با عکس نیست) */
 profileHandler.on("message:photo", async (ctx, next) => {
   const from = ctx.from;
   if (!from) return next();
@@ -288,21 +327,66 @@ profileHandler.on("message:photo", async (ctx, next) => {
   }
 
   if (user.state === "edit_face") {
-    await patchUser(user.id, {
-      facePendingFileId: best.file_id,
-      faceStatus: "pending",
-      faceVerified: false,
-      state: "idle",
-    });
-    await notifyAdminsFace(ctx.api, user, best.file_id);
     await ctx.reply(
-      "✅ سلفی احراز دریافت شد و برای بررسی ادمین ارسال شد.",
-      { reply_markup: mainKeyboard() },
+      "برای احراز چهره باید ویدیو مسیج (دایره‌ای) یا ویدیو بفرستی، نه عکس.",
+      { reply_markup: cancelKeyboard() },
     );
     return;
   }
 
   return next();
+});
+
+async function acceptFaceVideo(
+  ctx: Context,
+  fileId: string,
+  kind: "video_note" | "video",
+) {
+  const from = ctx.from;
+  if (!from) return false;
+  const user = await findByTelegram(from.id);
+  if (!user || user.state !== "edit_face") return false;
+  if (user.photoStatus !== "approved" || !user.photoFileId) {
+    await ctx.reply("اول عکس پروفایل تأییدشده لازم است.");
+    return true;
+  }
+
+  await patchUser(user.id, {
+    facePendingFileId: fileId,
+    facePendingKind: kind,
+    faceStatus: "pending",
+    faceVerified: false,
+    state: "idle",
+  });
+  await notifyAdminsFace(
+    ctx.api,
+    { ...user, photoFileId: user.photoFileId },
+    fileId,
+    kind,
+  );
+  await ctx.reply(
+    [
+      "✅ ویدیو احراز دریافت شد و برای ادمین ارسال شد.",
+      "اگر چهره‌ات با عکس پروفایل یکی باشد، احراز تأیید می‌شود.",
+      `🎁 جایزه در صورت تأیید: ${formatNum(FACE_VERIFY_REWARD)} الماس`,
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
+  return true;
+}
+
+profileHandler.on("message:video_note", async (ctx, next) => {
+  const handled = await acceptFaceVideo(
+    ctx,
+    ctx.message.video_note.file_id,
+    "video_note",
+  );
+  if (!handled) return next();
+});
+
+profileHandler.on("message:video", async (ctx, next) => {
+  const handled = await acceptFaceVideo(ctx, ctx.message.video.file_id, "video");
+  if (!handled) return next();
 });
 
 /** تأیید/رد ادمین */
@@ -366,26 +450,27 @@ profileHandler.callbackQuery(/^adm:face:(ok|no):(\d+)$/, async (ctx) => {
   }
 
   if (ok) {
-    const fresh = await prisma.user.findUnique({ where: { id: userId } });
-    if (fresh && fresh.diamonds >= FACE_VERIFY_COST) {
-      await patchUser(user.id, {
-        faceVerified: true,
-        faceStatus: "approved",
-        facePendingFileId: null,
-        diamonds: { decrement: FACE_VERIFY_COST },
-      });
-    } else {
-      await patchUser(user.id, {
-        faceVerified: true,
-        faceStatus: "approved",
-        facePendingFileId: null,
-      });
+    if (user.faceVerified && user.faceStatus === "approved") {
+      await ctx.answerCallbackQuery({ text: "قبلاً تأیید شده" });
+      return;
     }
-    await ctx.answerCallbackQuery({ text: "احراز شد" });
+    await patchUser(user.id, {
+      faceVerified: true,
+      faceStatus: "approved",
+      facePendingFileId: null,
+      facePendingKind: null,
+      diamonds: { increment: FACE_VERIFY_REWARD },
+    });
+    const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+    await ctx.answerCallbackQuery({ text: "احراز شد +۱۰۰💎" });
     await ctx.api
       .sendMessage(
         Number(user.telegramId),
-        `✅ احراز چهره‌ات تأیید شد.\n${formatNum(FACE_VERIFY_COST)} الماس کم شد.`,
+        [
+          "✅ احراز چهره‌ات تأیید شد!",
+          `🎁 جایزه: ${formatNum(FACE_VERIFY_REWARD)} الماس به حسابت اضافه شد.`,
+          `موجودی: ${formatNum(fresh?.diamonds ?? 0)} 💎`,
+        ].join("\n"),
       )
       .catch(() => undefined);
   } else {
@@ -393,12 +478,13 @@ profileHandler.callbackQuery(/^adm:face:(ok|no):(\d+)$/, async (ctx) => {
       faceVerified: false,
       faceStatus: "rejected",
       facePendingFileId: null,
+      facePendingKind: null,
     });
     await ctx.answerCallbackQuery({ text: "رد شد" });
     await ctx.api
       .sendMessage(
         Number(user.telegramId),
-        "❌ احراز چهره رد شد. دوباره از پروفایل → احراز چهره سلفی بفرست.",
+        "❌ احراز چهره رد شد.\nچهره ویدیو با عکس پروفایل یکی نبود. از پروفایل → احراز چهره دوباره ویدیو بفرست.",
       )
       .catch(() => undefined);
   }

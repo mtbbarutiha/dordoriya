@@ -249,9 +249,19 @@ export function profilePanelKeyboard(isActive: boolean, faceVerified: boolean) {
     .row()
     .text("حذف/غیرفعال‌سازی ❌", "prof:manage")
     .text(
-      faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۱ 💎)",
+      faceVerified ? "احراز شده ✅" : "احراز چهره (+۱۰۰ 💎)",
       "prof:face",
     );
+}
+
+/** مقدمه احراز چهره — مثل دوردور */
+export function faceVerifyIntroKeyboard() {
+  return new InlineKeyboard()
+    .text("بله، متوجه شدم", "face:ok")
+    .row()
+    .text("تغییر عکس پروفایل", "face:photo")
+    .row()
+    .text("انصراف", "face:cancel");
 }
 
 export function profileEditKeyboard() {

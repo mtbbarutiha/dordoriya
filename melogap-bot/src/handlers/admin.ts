@@ -7,9 +7,9 @@ import {
 } from "../services/adminStats.js";
 import { formatNum } from "../data/packages.js";
 import { formatAdminUserLine } from "../services/account.js";
+import { sendPendingFaceToAdmin } from "../services/profile.js";
 import {
   adminPhotoKeyboard,
-  adminFaceKeyboard,
 } from "../keyboards/main.js";
 import { genderLabel } from "../data/packages.js";
 
@@ -206,16 +206,6 @@ adminHandler.callbackQuery("adm:faces", async (ctx) => {
   await ctx.reply(`✅ ${formatNum(list.length)} احراز در صف:`);
   for (const u of list) {
     if (!u.facePendingFileId) continue;
-    const info = await formatAdminUserLine(u);
-    await ctx.api
-      .sendPhoto(ctx.from!.id, u.facePendingFileId, {
-        caption: [
-          "✅ احراز چهره — در انتظار",
-          info,
-          `${genderLabel(u.gender)} | ${u.age ?? "—"}`,
-        ].join("\n"),
-        reply_markup: adminFaceKeyboard(u.id),
-      })
-      .catch(() => undefined);
+    await sendPendingFaceToAdmin(ctx.api, ctx.from!.id, u);
   }
 });

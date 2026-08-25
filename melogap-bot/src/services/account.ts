@@ -36,6 +36,7 @@ export async function deleteAccountPermanently(user: User) {
         photoStatus: "none",
         faceVerified: false,
         facePendingFileId: null,
+        facePendingKind: null,
         faceStatus: "none",
         username: null,
         displayName: `[حذف‌شده #${user.id}]`,

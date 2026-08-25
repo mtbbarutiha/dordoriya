@@ -38,7 +38,10 @@ model User {
   photoStatus       String    @default("none")
   /// احراز چهره
   faceVerified      Boolean   @default(false)
+  /// ویدیو/ویدیونوت در انتظار بررسی
   facePendingFileId String?
+  /// video_note | video
+  facePendingKind   String?
   /// none | pending | approved | rejected
   faceStatus        String    @default("none")
   registered        Boolean   @default(false)
