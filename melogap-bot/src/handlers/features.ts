@@ -671,23 +671,10 @@ featuresHandler.callbackQuery("more:province", async (ctx) => {
 
 featuresHandler.callbackQuery("more:guide", async (ctx) => {
   await ctx.answerCallbackQuery();
-  await ctx.reply(
-    [
-      "📖 راهنما",
-      "",
-      "• پروفایل من: مشاهده و ویرایش مشخصات",
-      "• اکسپلور: دیدن افراد و لایک / چت",
-      "• پیام ناشناس: لینک دریافت پیام مخفی",
-      "• چت سریع: وصل تصادفی ناشناس",
-      "• شتاب‌دهی: اولویت بیشتر با سکه",
-      "• سکه‌ها: خرید اعتبار",
-      "• اشتراک پرو: امکانات ویژه",
-      "• آمار: بازدید و لایک و چت‌ها",
-      "",
-      "قطع چت: /end",
-    ].join("\n"),
-    { reply_markup: mainKeyboard() },
-  );
+  const { fullGuideMessage } = await import("../data/guide.js");
+  await ctx.reply(fullGuideMessage(), {
+    reply_markup: mainKeyboard(),
+  });
 });
 
 featuresHandler.callbackQuery("more:ref", async (ctx) => {

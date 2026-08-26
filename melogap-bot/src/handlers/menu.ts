@@ -92,26 +92,10 @@ menuHandler.hears(BTN.SEARCH, async (ctx) => {
 menuHandler.hears(BTN.GUIDE, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
-  await ctx.reply(
-    [
-      "🤔 راهنمای دوردوریا",
-      "",
-      `• ${BTN.QUICK_CHAT} — اتصال تصادفی ناشناس`,
-      `• ${BTN.NEARBY} — افراد اطراف با GPS`,
-      `• ${BTN.SEARCH} — فیلتر هم‌استانی، هم‌سن، محبوب و…`,
-      `• ${BTN.PROFILE} — ویرایش، احراز، مدیریت حساب`,
-      `• ${BTN.DIAMONDS} — خرید و موجودی سکه`,
-      `• ${BTN.REFERRAL} — دعوت دوست = سکه رایگان`,
-      `• ${BTN.ANON_LINK} — لینک پیام ناشناس شخصی`,
-      "",
-      "شتاب‌دهی و پرو:",
-      `🚀 شتاب‌دهی: ${formatNum(BOOST_COST)} سکه / ${BOOST_HOURS} ساعت — /boost`,
-      "🅿️ اشتراک پرو: /pro",
-      "",
-      "قطع چت: /end",
-    ].join("\n"),
-    { reply_markup: mainKeyboard() },
-  );
+  const { fullGuideMessage } = await import("../data/guide.js");
+  await ctx.reply(fullGuideMessage(), {
+    reply_markup: mainKeyboard(),
+  });
 });
 
 menuHandler.hears(BTN.DIAMONDS, async (ctx) => {

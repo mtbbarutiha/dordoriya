@@ -207,20 +207,22 @@ export async function requireRegistered(ctx: Context) {
 export async function finishRegistration(ctx: Context, userId: number) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   await patchUser(userId, { state: "idle", registered: true });
-  const loc = [user?.province, user?.city].filter(Boolean).join("، ");
-  const hasGps = user?.latitude != null && user?.longitude != null;
+
+  const { welcomeSloganMessage, fullGuideMessage } = await import(
+    "../data/guide.js"
+  );
+
   await ctx.reply(
-    [
-      "✅ ثبت‌نام تمام شد!",
-      loc ? `🏘 ${loc}` : null,
-      hasGps ? "📍 موقعیت برای نزدیک‌ها ذخیره شد" : null,
-      "",
-      `هدیه ورود: ${WELCOME_DIAMONDS} سکه 🪙`,
-      "",
-      "منوی اصلی:",
-    ]
-      .filter(Boolean)
-      .join("\n"),
+    welcomeSloganMessage({
+      displayName: user?.displayName,
+      city: user?.city,
+      province: user?.province,
+      diamonds: WELCOME_DIAMONDS,
+    }),
     { reply_markup: mainKeyboard() },
   );
+
+  await ctx.reply(fullGuideMessage(), {
+    reply_markup: mainKeyboard(),
+  });
 }
