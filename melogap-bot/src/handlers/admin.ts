@@ -21,8 +21,9 @@ function adminOnly(ctx: { from?: { id: number } | undefined }) {
 
 export function adminPanelKeyboard(pendingPhotos: number, pendingFaces: number) {
   return new InlineKeyboard()
-    .text(`📷 عکس‌ها (${formatNum(pendingPhotos)})`, "adm:photos")
-    .text(`✅ احراز (${formatNum(pendingFaces)})`, "adm:faces")
+    .text(`📷 عکس‌های در انتظار تایید (${formatNum(pendingPhotos)})`, "adm:photos")
+    .row()
+    .text(`✅ پروفایل‌های در انتظار احراز (${formatNum(pendingFaces)})`, "adm:faces")
     .row()
     .text("📊 آمار این ماه", "adm:stats:month")
     .text("📈 آمار ۳ ماه", "adm:stats:3m")
@@ -41,8 +42,10 @@ adminHandler.command("admin", async (ctx) => {
     [
       "🛠 پنل ادمین دوردوریا",
       "",
-      `📷 عکس در انتظار: ${formatNum(s.pendingPhotos)}`,
-      `✅ احراز در انتظار: ${formatNum(s.pendingFaces)}`,
+      "—— صف تایید ——",
+      `📷 عکس‌های در انتظار تایید: ${formatNum(s.pendingPhotos)}`,
+      `✅ پروفایل‌های در انتظار احراز: ${formatNum(s.pendingFaces)}`,
+      "",
       `👥 ثبت‌نام‌شده فعال: ${formatNum(s.totalActive)}`,
       `📅 ثبت‌نام امروز: ${formatNum(s.registeredToday)}`,
       "",
@@ -65,8 +68,10 @@ adminHandler.callbackQuery(/^adm:home$/, async (ctx) => {
     [
       "🛠 پنل ادمین دوردوریا",
       "",
-      `📷 عکس در انتظار: ${formatNum(s.pendingPhotos)}`,
-      `✅ احراز در انتظار: ${formatNum(s.pendingFaces)}`,
+      "—— صف تایید ——",
+      `📷 عکس‌های در انتظار تایید: ${formatNum(s.pendingPhotos)}`,
+      `✅ پروفایل‌های در انتظار احراز: ${formatNum(s.pendingFaces)}`,
+      "",
       `👥 ثبت‌نام‌شده فعال: ${formatNum(s.totalActive)}`,
       `📅 ثبت‌نام امروز: ${formatNum(s.registeredToday)}`,
       "",
@@ -80,8 +85,8 @@ adminHandler.callbackQuery(/^adm:home$/, async (ctx) => {
       [
         "🛠 پنل ادمین دوردوریا",
         "",
-        `📷 عکس در انتظار: ${formatNum(s.pendingPhotos)}`,
-        `✅ احراز در انتظار: ${formatNum(s.pendingFaces)}`,
+        `📷 عکس‌های در انتظار تایید: ${formatNum(s.pendingPhotos)}`,
+        `✅ پروفایل‌های در انتظار احراز: ${formatNum(s.pendingFaces)}`,
       ].join("\n"),
       {
         reply_markup: adminPanelKeyboard(s.pendingPhotos, s.pendingFaces),

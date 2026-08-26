@@ -14,7 +14,11 @@ model User {
   firstName         String?
   displayName       String?
   bio               String?
+  /// JSON آرایهٔ id علاقه‌مندی‌ها
+  interests         String?
   diamonds          Int       @default(0)
+  /// چت امن فعال (عکس‌ها protect_content)
+  secureChat        Boolean   @default(false)
   /// آیدی عمومی کوتاه برای لینک /user_XXXX (مثل ملوگپ)
   userCode          String?   @unique
   referralCode      String    @unique
@@ -134,4 +138,30 @@ model AnonMessage {
   fromUser   User?    @relation("AnonFrom", fields: [fromUserId], references: [id])
   text       String
   createdAt  DateTime @default(now())
+}
+
+/// درخواست چت — تا تایید طرف مقابل وصل نمی‌شود
+model ChatRequest {
+  id         Int      @id @default(autoincrement())
+  fromUserId Int
+  toUserId   Int
+  /// pending | accepted | rejected | cancelled
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
+}
+
+/// پیام‌های رله‌شده برای پاک‌سازی بعد از قطع چت
+model ChatMsgLog {
+  id             Int      @id @default(autoincrement())
+  ownerUserId    Int
+  partnerUserId  Int
+  telegramChatId BigInt
+  messageId      Int
+  createdAt      DateTime @default(now())
+
+  @@index([ownerUserId, partnerUserId])
 }

@@ -13,6 +13,7 @@ import {
   iranRegions,
   provincesInRegion,
 } from "../data/locations.js";
+import { INTERESTS } from "../data/interests.js";
 
 export const BTN = {
   /** اتصال تصادفی — دکمه اصلی تمام‌عرض مثل ملوگپ */
@@ -27,6 +28,8 @@ export const BTN = {
   BACK: "↩️ بازگشت به منو",
   CANCEL_WAIT: "❌ لغو جستجو",
   END_CHAT: "🔚 قطع چت",
+  SECURE_CHAT_ON: "🔒 چت امن",
+  SECURE_CHAT_OFF: "🔓 خاموش کردن چت امن",
   SEND_LOCATION: "📍 ارسال موقعیت",
   /** سازگاری با کدهای قبلی */
   EXPLORE: "جستجو کاربران 🔍🗨️",
@@ -86,6 +89,8 @@ export function searchPanelKeyboard() {
     .text("هم استانی ها 📍🍷", "search:province")
     .text("هم سن ها 👤👥", "search:age")
     .row()
+    .text("📋 مشاهده همه", "search:all")
+    .row()
     .text("جستجو پیشرفته 🔍", "search:advanced")
     .row()
     .text("کاربران جدید 🙋‍♀️💁‍♂️", "search:new")
@@ -111,8 +116,13 @@ export function waitingKeyboard() {
     .persistent();
 }
 
-export function chattingKeyboard() {
-  return new Keyboard().text(BTN.END_CHAT).resized().persistent();
+export function chattingKeyboard(secure = false) {
+  return new Keyboard()
+    .text(BTN.END_CHAT)
+    .row()
+    .text(secure ? BTN.SECURE_CHAT_OFF : BTN.SECURE_CHAT_ON)
+    .resized()
+    .persistent();
 }
 
 export function locationKeyboard() {
@@ -275,13 +285,19 @@ export function exploreKeyboard(targetId: number, likesCount: number) {
   return new InlineKeyboard()
     .text(`❤️ ${formatNum(likesCount)}`, `exp:likes:${targetId}`)
     .row()
-    .text("💰 خرید سکه برای کاربر", `gift:menu:${targetId}`)
+    .text("🎁 هدیه سکه", `gift:menu:${targetId}`)
     .row()
     .text(`❤️ لایک (+۱🪙)`, `exp:like:${targetId}`)
-    .text("💬 درخواست چت", `exp:chat:${targetId}`)
+    .text("💬 درخواست چت", `exp:chat:${targetId}`);
+}
+
+/** دکمه‌های زیر لیست سرچ */
+export function searchListFooterKeyboard(optsKey = "default") {
+  return new InlineKeyboard()
+    .text("📋 مشاهده همه", `search:viewall:${optsKey}`)
     .row()
-    .text("⏭️ بعدی", "exp:next")
-    .text("✖️ رد", "exp:skip");
+    .text("⏭️ بعدی", `search:next:${optsKey}`)
+    .text("✖️ رد", `search:skip:${optsKey}`);
 }
 
 /** انتخاب مقدار هدیه سکه به کاربر دیگر */
@@ -341,12 +357,27 @@ export function profileEditKeyboard() {
     .text("🎂 سن", "edit:age")
     .row()
     .text("📄 بیو", "edit:bio")
-    .text("🎯 علاقه", "edit:looking")
+    .text("🎯 علاقه (جنسیت)", "edit:looking")
+    .row()
+    .text("✨ علاقه‌مندی‌ها", "edit:interests")
     .row()
     .text("📍 موقعیت", "edit:location")
     .text("📷 عکس", "edit:photo")
     .row()
     .text("↩️ بازگشت به پروفایل", "prof:back");
+}
+
+export function interestsKeyboard(selected: string[]) {
+  const sel = new Set(selected);
+  const kb = new InlineKeyboard();
+  INTERESTS.forEach((item, i) => {
+    const mark = sel.has(item.id) ? "✅ " : "";
+    kb.text(`${mark}${item.label}`, `interest:toggle:${item.id}`);
+    if ((i + 1) % 2 === 0) kb.row();
+  });
+  if (INTERESTS.length % 2 !== 0) kb.row();
+  kb.text("💾 ذخیره", "interest:save").text("↩️ انصراف", "interest:cancel");
+  return kb;
 }
 
 export function confirmDeleteKeyboard() {

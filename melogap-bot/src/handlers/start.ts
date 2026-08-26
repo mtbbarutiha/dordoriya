@@ -85,11 +85,14 @@ startHandler.command("start", async (ctx) => {
   }
 
   // /start نباید طرف چت را گیر بیندازد
+  const partnerId = user.chatPartnerId;
+  const wasChatting = user.state === "chatting" && partnerId != null;
   await leaveQueueOrChat(ctx.api, user, true);
   await patchUser(user.id, {
     state: "idle",
     pendingAnonTo: null,
     chatPartnerId: null,
+    secureChat: false,
   });
   await ctx.reply(
     [
@@ -100,6 +103,10 @@ startHandler.command("start", async (ctx) => {
     ].join("\n"),
     { reply_markup: mainKeyboard() },
   );
+  if (wasChatting && partnerId) {
+    const { offerWipeAfterEnd } = await import("../services/match.js");
+    await offerWipeAfterEnd(ctx.api, user.id, partnerId);
+  }
 });
 
 startHandler.command("cancel", async (ctx) => {
@@ -129,8 +136,13 @@ startHandler.command("end", async (ctx) => {
     await ctx.reply("الان در چت نیستی.", { reply_markup: mainKeyboard() });
     return;
   }
+  const partnerId = user.chatPartnerId;
   await leaveQueueOrChat(ctx.api, user, true);
   await ctx.reply("چت قطع شد.", { reply_markup: mainKeyboard() });
+  if (partnerId) {
+    const { offerWipeAfterEnd } = await import("../services/match.js");
+    await offerWipeAfterEnd(ctx.api, user.id, partnerId);
+  }
 });
 
 export const registerHandler = new Composer();

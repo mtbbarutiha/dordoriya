@@ -46,6 +46,8 @@ export async function sendProfileCard(ctx: Context, userId: number) {
   ].filter(Boolean);
 
   const hasGps = user.latitude != null && user.longitude != null;
+  const { formatInterestsLine } = await import("../data/interests.js");
+  const interests = formatInterestsLine(user.interests);
   const text = [
     `❤️ ${formatNum(user.likesCount)} لایک`,
     "",
@@ -53,6 +55,7 @@ export async function sendProfileCard(ctx: Context, userId: number) {
     `${genderEmoji} ${user.displayName ?? "بدون نام"} (${user.age ?? "—"}) | ${lang}`,
     locParts.length ? locParts.join(" - ") : "مکان ثبت نشده",
     interest,
+    interests ? `✨ ${interests}` : "✨ علاقه‌مندی‌ها: هنوز انتخاب نشده",
     "",
     `💰 ${formatNum(user.diamonds)} | 👁 ${formatNum(user.viewsCount)}`,
     `عکس: ${photoStatusLabel(user.photoStatus)}`,

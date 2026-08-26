@@ -235,8 +235,37 @@ menuHandler.hears(BTN.END_CHAT, async (ctx) => {
     await ctx.reply("الان در چت نیستی.", { reply_markup: mainKeyboard() });
     return;
   }
+  const partnerId = user.chatPartnerId;
   await leaveQueueOrChat(ctx.api, user, true);
   await ctx.reply("چت قطع شد.", { reply_markup: mainKeyboard() });
+  if (partnerId) {
+    const { offerWipeAfterEnd } = await import("../services/match.js");
+    await offerWipeAfterEnd(ctx.api, user.id, partnerId);
+  }
+});
+
+menuHandler.hears(BTN.SECURE_CHAT_ON, async (ctx) => {
+  const user = await findByTelegram(ctx.from!.id);
+  if (!user || user.state !== "chatting") {
+    await ctx.reply("این دکمه فقط حین چت فعال است.", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+  const { setSecureChat } = await import("../services/match.js");
+  await setSecureChat(ctx.api, user.id, true);
+});
+
+menuHandler.hears(BTN.SECURE_CHAT_OFF, async (ctx) => {
+  const user = await findByTelegram(ctx.from!.id);
+  if (!user || user.state !== "chatting") {
+    await ctx.reply("این دکمه فقط حین چت فعال است.", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
+  const { setSecureChat } = await import("../services/match.js");
+  await setSecureChat(ctx.api, user.id, false);
 });
 
 menuHandler.hears(BTN.BACK, async (ctx) => {
@@ -244,7 +273,7 @@ menuHandler.hears(BTN.BACK, async (ctx) => {
   if (!user) return;
   if (user.state === "chatting") {
     await ctx.reply("اول چت را قطع کن (/end).", {
-      reply_markup: chattingKeyboard(),
+      reply_markup: chattingKeyboard(user.secureChat),
     });
     return;
   }

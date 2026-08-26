@@ -30,8 +30,10 @@ import {
   nextExploreProfile,
   exploreOptsFromState,
   sendSearchList,
+  sendViewAllList,
+  exploreOptsFromKey,
 } from "../services/explore.js";
-import { connectUsers } from "../services/match.js";
+import { sendChatRequest, respondChatRequest } from "../services/match.js";
 import { saveLocation, findNearby } from "../services/nearby.js";
 import { nearbyUserKeyboard } from "../keyboards/nearby.js";
 import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
@@ -63,6 +65,41 @@ featuresHandler.callbackQuery("search:province", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(`🏘 هم‌استانی‌های «${user.province}»:`);
   await sendSearchList(ctx, user.id, { sameProvince: true });
+});
+
+featuresHandler.callbackQuery("search:all", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery();
+  await sendViewAllList(ctx, user.id, { ignoreLookingFor: true });
+});
+
+featuresHandler.callbackQuery(/^search:viewall:(.+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const key = ctx.match[1]!;
+  await ctx.answerCallbackQuery();
+  await sendViewAllList(ctx, user.id, {
+    ...exploreOptsFromKey(key),
+    ignoreLookingFor: true,
+  });
+});
+
+featuresHandler.callbackQuery(/^search:(next|skip):(.+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const key = ctx.match[2]!;
+  await ctx.answerCallbackQuery();
+  await nextExploreProfile(ctx, user.id, exploreOptsFromKey(key));
 });
 
 featuresHandler.callbackQuery("search:age", async (ctx) => {
@@ -398,9 +435,9 @@ featuresHandler.callbackQuery(/^gift:menu:(\d+)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply(
     [
-      `💰 خرید سکه برای «${target.displayName ?? "کاربر"}»`,
+      `🎁 هدیه سکه به «${target.displayName ?? "کاربر"}»`,
       "",
-      `موجودی تو: ${formatNum(user.diamonds)} 🪙`,
+      `موجودی خودت: ${formatNum(user.diamonds)} 🪙`,
       "مقدار هدیه را انتخاب کن (از موجودی خودت کم می‌شود):",
     ].join("\n"),
     { reply_markup: giftDiamondsKeyboard(targetId) },
@@ -489,17 +526,71 @@ featuresHandler.callbackQuery(/^exp:chat:(\d+)$/, async (ctx) => {
     return;
   }
   const targetId = Number(ctx.match[1]);
-  const result = await connectUsers(ctx.api, user.id, targetId);
+  const result = await sendChatRequest(ctx.api, user.id, targetId);
   if (result === "demo") {
     await ctx.answerCallbackQuery({ text: "پروفایل نمونه" });
     await ctx.reply("این پروفایل نمونه‌ است؛ با کاربر واقعی چت کن.");
     return;
   }
+  if (result === "pending") {
+    await ctx.answerCallbackQuery({ text: "درخواست قبلی هنوز باز است" });
+    return;
+  }
+  if (result === "busy") {
+    await ctx.answerCallbackQuery({ text: "الان مشغول است" });
+    return;
+  }
   if (result !== "ok") {
+    await ctx.answerCallbackQuery({ text: "ارسال نشد" });
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "درخواست ارسال شد" });
+  await ctx.reply("💬 درخواست چت ارسال شد.\nمنتظر قبول یا رد طرف مقابل باش.");
+});
+
+featuresHandler.callbackQuery(/^chatreq:(ok|no):(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const accept = ctx.match[1] === "ok";
+  const requestId = Number(ctx.match[2]);
+  const result = await respondChatRequest(ctx.api, requestId, user.id, accept);
+  if (result === "missing" || result === "gone") {
+    await ctx.answerCallbackQuery({ text: "درخواست منقضی شده" });
+    return;
+  }
+  if (result === "busy" || result === "demo") {
     await ctx.answerCallbackQuery({ text: "الان نمی‌شود وصل شد" });
     return;
   }
-  await ctx.answerCallbackQuery({ text: "وصل شدید" });
+  await ctx.answerCallbackQuery({
+    text: accept ? "قبول شد" : "رد شد",
+  });
+  if (!accept) {
+    await ctx.reply("درخواست رد شد.", { reply_markup: mainKeyboard() });
+  }
+});
+
+featuresHandler.callbackQuery(/^chat:wipe:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const partnerId = Number(ctx.match[1]);
+  const { wipeChatWithPartner } = await import("../services/chatLog.js");
+  const n = await wipeChatWithPartner(ctx.api, user.id, partnerId);
+  await ctx.answerCallbackQuery({ text: "پاک شد" });
+  await ctx.reply(
+    [
+      `🗑 ${n} پیام از این گفتگو پاک شد.`,
+      "",
+      "اگر هنوز چیزی دیدی، در تلگرام روی چت بزن و Clear history را بزن.",
+    ].join("\n"),
+    { reply_markup: mainKeyboard() },
+  );
 });
 
 featuresHandler.callbackQuery(/^exp:(next|skip)$/, async (ctx) => {
@@ -672,6 +763,89 @@ featuresHandler.callbackQuery("edit:looking", async (ctx) => {
   });
 });
 
+featuresHandler.callbackQuery("edit:interests", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const {
+    parseInterests,
+    MAX_INTERESTS,
+  } = await import("../data/interests.js");
+  const { interestsKeyboard } = await import("../keyboards/main.js");
+  const selected = parseInterests(user.interests);
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      "✨ علاقه‌مندی‌ها",
+      "",
+      `تا ${MAX_INTERESTS} مورد انتخاب کن.`,
+      "روی هر مورد بزن تا تیک بخورد، بعد ذخیره کن.",
+    ].join("\n"),
+    { reply_markup: interestsKeyboard(selected) },
+  );
+});
+
+featuresHandler.callbackQuery(/^interest:toggle:(.+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const id = ctx.match[1]!;
+  const {
+    parseInterests,
+    serializeInterests,
+    MAX_INTERESTS,
+    INTERESTS,
+  } = await import("../data/interests.js");
+  const { interestsKeyboard } = await import("../keyboards/main.js");
+  if (!INTERESTS.some((i) => i.id === id)) {
+    await ctx.answerCallbackQuery({ text: "نامعتبر" });
+    return;
+  }
+  let selected = parseInterests(user.interests);
+  if (selected.includes(id)) {
+    selected = selected.filter((x) => x !== id);
+  } else {
+    if (selected.length >= MAX_INTERESTS) {
+      await ctx.answerCallbackQuery({
+        text: `حداکثر ${MAX_INTERESTS} مورد`,
+        show_alert: true,
+      });
+      return;
+    }
+    selected = [...selected, id];
+  }
+  await patchUser(user.id, { interests: serializeInterests(selected) });
+  await ctx.answerCallbackQuery({ text: "به‌روز شد" });
+  await ctx.editMessageReplyMarkup({
+    reply_markup: interestsKeyboard(selected),
+  }).catch(() => undefined);
+});
+
+featuresHandler.callbackQuery("interest:save", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "ذخیره شد" });
+  const { sendProfileCard } = await import("../services/profile.js");
+  await sendProfileCard(ctx, user.id);
+});
+
+featuresHandler.callbackQuery("interest:cancel", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "بسته شد" });
+  await ctx.reply("منوی اصلی:", { reply_markup: mainKeyboard() });
+});
+
 featuresHandler.callbackQuery("edit:location", async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {
@@ -795,17 +969,22 @@ featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
     await ctx.answerCallbackQuery();
     return;
   }
-  const result = await connectUsers(ctx.api, user.id, Number(ctx.match[1]));
+  const result = await sendChatRequest(ctx.api, user.id, Number(ctx.match[1]));
   if (result === "demo") {
     await ctx.answerCallbackQuery({ text: "نمونه" });
     await ctx.reply("پروفایل نمونه است.");
     return;
   }
-  if (result !== "ok") {
-    await ctx.answerCallbackQuery({ text: "وصل نشد" });
+  if (result === "pending") {
+    await ctx.answerCallbackQuery({ text: "درخواست قبلی باز است" });
     return;
   }
-  await ctx.answerCallbackQuery({ text: "وصل شدید" });
+  if (result !== "ok") {
+    await ctx.answerCallbackQuery({ text: "ارسال نشد" });
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "درخواست ارسال شد" });
+  await ctx.reply("💬 درخواست چت ارسال شد.");
 });
 
 featuresHandler.callbackQuery("nearby_skip", async (ctx) => {
