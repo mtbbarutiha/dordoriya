@@ -410,5 +410,22 @@ registerHandler.on("message:text", async (ctx, next) => {
     return;
   }
 
+  if (user.state === "edit_gender") {
+    const gender =
+      text === REG.GENDER_F ? "female" : text === REG.GENDER_M ? "male" : null;
+    if (!gender) {
+      await ctx.reply("از دکمه‌ها انتخاب کن:", {
+        reply_markup: genderReplyKeyboard(),
+      });
+      return;
+    }
+    await patchUser(user.id, { gender, state: "idle" });
+    await ctx.reply(
+      gender === "female" ? "جنسیت: خانم ✅" : "جنسیت: آقا ✅",
+      { reply_markup: mainKeyboard() },
+    );
+    return;
+  }
+
   return next();
 });

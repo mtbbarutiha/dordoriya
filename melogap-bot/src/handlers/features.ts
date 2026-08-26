@@ -689,8 +689,11 @@ featuresHandler.callbackQuery("more:edit", async (ctx) => {
       .text("نام", "edit:name")
       .text("سن", "edit:age")
       .row()
-      .text("بیو", "edit:bio")
+      .text("جنسیت", "edit:gender")
       .text("علاقه", "edit:looking")
+      .row()
+      .text("بیو", "edit:bio")
+      .text("علاقه‌مندی‌ها", "edit:interests")
       .row()
       .text("📍 موقعیت", "edit:location")
       .text("عکس پروفایل", "edit:photo"),
@@ -760,6 +763,20 @@ featuresHandler.callbackQuery("edit:looking", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply("به دنبال چه کسی هستی؟", {
     reply_markup: lookingReplyKeyboard(),
+  });
+});
+
+featuresHandler.callbackQuery("edit:gender", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const { genderReplyKeyboard } = await import("../keyboards/main.js");
+  await patchUser(user.id, { state: "edit_gender" });
+  await ctx.answerCallbackQuery();
+  await ctx.reply("جنسیت جدید را انتخاب کن:", {
+    reply_markup: genderReplyKeyboard(),
   });
 });
 
