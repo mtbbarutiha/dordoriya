@@ -214,9 +214,9 @@ export async function finishRegistration(ctx: Context, userId: number) {
 
   await ctx.reply(
     welcomeSloganMessage({
-      displayName: user?.displayName,
-      city: user?.city,
-      province: user?.province,
+      displayName: user?.displayName ?? null,
+      city: user?.city ?? null,
+      province: user?.province ?? null,
       diamonds: WELCOME_DIAMONDS,
     }),
     { reply_markup: mainKeyboard() },
