@@ -147,6 +147,8 @@ model ChatRequest {
   toUserId   Int
   /// pending | accepted | rejected | cancelled
   status     String   @default("pending")
+  /// direct | quick
+  source     String   @default("direct")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

@@ -2,12 +2,24 @@ import type { Api, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { prisma } from "../db/prisma.js";
 import { patchUser } from "../db/users.js";
+import { haversineKm } from "../lib/geo.js";
 import {
   chattingKeyboard,
   mainKeyboard,
   waitingKeyboard,
 } from "../keyboards/main.js";
 import { logPairMessages, logChatMessage } from "./chatLog.js";
+
+async function cancelPendingFromUser(userId: number, exceptId?: number) {
+  await prisma.chatRequest.updateMany({
+    where: {
+      fromUserId: userId,
+      status: "pending",
+      ...(exceptId != null ? { id: { not: exceptId } } : {}),
+    },
+    data: { status: "cancelled" },
+  });
+}
 
 export function chatRequestKeyboard(requestId: number) {
   return new InlineKeyboard()
@@ -94,6 +106,7 @@ export async function leaveQueueOrChat(
       chatPartnerId: null,
       secureChat: false,
     });
+    await cancelPendingFromUser(user.id);
   }
 }
 
@@ -152,46 +165,168 @@ export async function repairOrphanChats() {
 export async function tryQuickMatch(ctx: Context, userId: number) {
   const me = await prisma.user.findUnique({ where: { id: userId } });
   if (!me) return;
+  if (me.state === "chatting") {
+    await ctx.reply("الان در چت هستی. اول قطع کن.", {
+      reply_markup: mainKeyboard(),
+    });
+    return;
+  }
 
-  const genderFilter =
-    me.lookingFor && me.lookingFor !== "any"
-      ? { gender: me.lookingFor }
-      : {};
-
-  const partner = await prisma.user.findFirst({
-    where: {
-      state: "waiting",
-      registered: true,
-      id: { not: me.id },
-      ...genderFilter,
-    },
-    orderBy: [{ boostUntil: "desc" }, { lastActiveAt: "asc" }],
+  // لغو درخواست‌های قبلی باز
+  await prisma.chatRequest.updateMany({
+    where: { fromUserId: me.id, status: "pending" },
+    data: { status: "cancelled" },
   });
 
-  if (!partner) {
+  const candidates = await prisma.user.findMany({
+    where: {
+      id: { not: me.id },
+      registered: true,
+      isActive: true,
+      deletedAt: null,
+      state: { not: "chatting" },
+      telegramId: { lt: 9000000000n },
+    },
+  });
+
+  const scored = candidates
+    .map((u) => ({ u, score: quickMatchScore(me, u) }))
+    .sort((a, b) => b.score - a.score || b.u.lastActiveAt.getTime() - a.u.lastActiveAt.getTime());
+
+  // همه فعال‌ها، با سقف ایمنی برای محدودیت تلگرام
+  const MAX = 80;
+  const targets = scored.slice(0, MAX).map((x) => x.u);
+
+  if (!targets.length) {
     await patchUser(me.id, { state: "waiting", chatPartnerId: null });
     await ctx.reply(
       [
         "⚡ چت سریع",
         "",
-        "وارد صف شدی…",
-        "به محض پیدا شدن یک نفر، وصل‌ات می‌کنم.",
-        "برای لغو: «لغو جستجو»",
+        "فعلاً کاربر فعالی برای ارسال درخواست نیست.",
+        "در صف ماندی — به‌محض آنلاین شدن دیگران دوباره امتحان کن.",
+        "لغو: «لغو جستجو»",
       ].join("\n"),
       { reply_markup: waitingKeyboard() },
     );
     return;
   }
 
-  await connectUsers(ctx.api, me.id, partner.id);
+  await patchUser(me.id, { state: "waiting", chatPartnerId: null });
+  await ctx.reply(
+    [
+      "⚡ چت سریع",
+      "",
+      `درخواست چت به ${targets.length} کاربر فعال ارسال شد.`,
+      "اولویت: آنلاین‌ها → لوکیشن/کشور/استان/شهر نزدیک‌تر",
+      "",
+      "به‌محض قبول یکی، وصل می‌شوی.",
+      "لغو: «لغو جستجو»",
+    ].join("\n"),
+    { reply_markup: waitingKeyboard() },
+  );
+
+  let sent = 0;
+  for (const target of targets) {
+    const result = await sendChatRequest(ctx.api, me.id, target.id, {
+      source: "quick",
+      silentPending: true,
+    });
+    if (result === "ok") sent++;
+    // کمی فاصله برای rate limit
+    if (sent % 15 === 0) await sleep(350);
+  }
+
+  if (sent === 0) {
+    await ctx.reply(
+      "ارسال درخواست ممکن نشد. بعداً دوباره امتحان کن.",
+      { reply_markup: mainKeyboard() },
+    );
+    await patchUser(me.id, { state: "idle" });
+    return;
+  }
+
+  if (sent < targets.length) {
+    await ctx.reply(`✅ ${sent} درخواست ارسال شد. منتظر قبول بمان…`);
+  }
 }
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** امتیاز اولویت: آنلاین، لوکیشن، کشور، استان، شهر */
+function quickMatchScore(
+  me: {
+    lookingFor: string | null;
+    country: string | null;
+    province: string | null;
+    city: string | null;
+    latitude: number | null;
+    longitude: number | null;
+  },
+  u: {
+    gender: string | null;
+    country: string | null;
+    province: string | null;
+    city: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    lastActiveAt: Date;
+    boostUntil: Date | null;
+    faceVerified: boolean;
+  },
+): number {
+  let score = 0;
+  const mins = (Date.now() - u.lastActiveAt.getTime()) / 60_000;
+  if (mins <= 5) score += 12_000;
+  else if (mins <= 15) score += 10_000;
+  else if (mins <= 60) score += 7_000;
+  else if (mins <= 60 * 24) score += 3_000;
+  else score += Math.max(0, 1000 - mins);
+
+  if (u.boostUntil && u.boostUntil.getTime() > Date.now()) score += 800;
+  if (u.faceVerified) score += 150;
+
+  if (me.lookingFor && me.lookingFor !== "any" && u.gender === me.lookingFor) {
+    score += 500;
+  }
+
+  if (me.country && u.country && me.country === u.country) score += 400;
+  if (me.province && u.province && me.province === u.province) score += 700;
+  if (me.city && u.city && me.city === u.city) score += 900;
+
+  if (
+    me.latitude != null &&
+    me.longitude != null &&
+    u.latitude != null &&
+    u.longitude != null
+  ) {
+    const km = haversineKm(me.latitude, me.longitude, u.latitude, u.longitude);
+    if (km <= 5) score += 2_000;
+    else if (km <= 20) score += 1_400;
+    else if (km <= 50) score += 900;
+    else if (km <= 100) score += 500;
+    else score += Math.max(0, 300 - Math.floor(km / 10));
+  }
+
+  return score;
+}
+
+export type SendChatRequestOptions = {
+  source?: "direct" | "quick" | string;
+  /** اگر درخواست pending از قبل باشد، بدون اثر جانبی فقط pending برمی‌گرداند */
+  silentPending?: boolean;
+};
 
 /** ارسال درخواست چت — بدون وصل مستقیم */
 export async function sendChatRequest(
   api: Api,
   fromUserId: number,
   toUserId: number,
+  options?: SendChatRequestOptions,
 ): Promise<"ok" | "busy" | "missing" | "demo" | "self" | "pending"> {
+  const source = options?.source ?? "direct";
   const a = await prisma.user.findUnique({ where: { id: fromUserId } });
   const b = await prisma.user.findUnique({ where: { id: toUserId } });
   if (!a || !b) return "missing";
@@ -209,12 +344,19 @@ export async function sendChatRequest(
   if (existing) return "pending";
 
   const req = await prisma.chatRequest.create({
-    data: { fromUserId: a.id, toUserId: b.id, status: "pending" },
+    data: {
+      fromUserId: a.id,
+      toUserId: b.id,
+      status: "pending",
+      source,
+    },
   });
 
   const fromName = a.displayName ?? "یک کاربر";
+  const title =
+    source === "quick" ? "⚡ درخواست چت سریع" : "💬 درخواست چت ناشناس";
   const text = [
-    "💬 درخواست چت ناشناس",
+    title,
     "",
     `از طرف: ${fromName}${a.age ? ` (${a.age})` : ""}`,
     a.faceVerified ? "✅ احرازچهره شده" : "🕶 بدون احراز",
@@ -252,15 +394,20 @@ export async function respondChatRequest(
       where: { id: req.id },
       data: { status: "rejected" },
     });
-    const from = await prisma.user.findUnique({ where: { id: req.fromUserId } });
-    if (from && from.telegramId < 9000000000n) {
-      await api
-        .sendMessage(
-          Number(from.telegramId),
-          "❌ درخواست چت‌ات رد شد.",
-          { reply_markup: mainKeyboard() },
-        )
-        .catch(() => undefined);
+    // برای چت سریع به ازای هر رد نوتیف نده (اسپم)
+    if (req.source !== "quick") {
+      const from = await prisma.user.findUnique({
+        where: { id: req.fromUserId },
+      });
+      if (from && from.telegramId < 9000000000n) {
+        await api
+          .sendMessage(
+            Number(from.telegramId),
+            "❌ درخواست چت‌ات رد شد.",
+            { reply_markup: mainKeyboard() },
+          )
+          .catch(() => undefined);
+      }
     }
     return "ok";
   }
@@ -269,6 +416,8 @@ export async function respondChatRequest(
     where: { id: req.id },
     data: { status: "accepted" },
   });
+  // بقیه درخواست‌های باز همین فرستنده لغو شود
+  await cancelPendingFromUser(req.fromUserId, req.id);
   const result = await connectUsers(api, req.fromUserId, req.toUserId);
   return result;
 }
@@ -299,6 +448,10 @@ export async function connectUsers(
     chatsCount: { increment: 1 },
     secureChat: false,
   });
+
+  // لغو درخواست‌های pending باقی‌مانده از هر دو طرف
+  await cancelPendingFromUser(a.id);
+  await cancelPendingFromUser(b.id);
 
   const msg = [
     "✅ وصل شدید!",
