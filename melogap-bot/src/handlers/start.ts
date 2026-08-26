@@ -14,10 +14,12 @@ import {
   provinceReplyKeyboard,
   cityReplyKeyboard,
   regLocationKeyboard,
+  regNameKeyboard,
 } from "../keyboards/main.js";
 import {
   beginRegistration,
   resumeRegistration,
+  goBackRegistration,
 } from "../services/register.js";
 import { leaveQueueOrChat } from "../services/match.js";
 import {
@@ -159,6 +161,11 @@ registerHandler.on("message:text", async (ctx, next) => {
 
   // --- ثبت‌نام ---
   if (!user.registered) {
+    if (text === REG.STEP_BACK) {
+      await goBackRegistration(ctx, user);
+      return;
+    }
+
     if (user.state === "language") {
       const language =
         text === REG.LANG_FA ? "fa" : text === REG.LANG_EN ? "en" : null;
@@ -169,8 +176,8 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       await patchUser(user.id, { language, state: "country" });
-      await ctx.reply("۲/۹ — کشور را انتخاب کن:", {
-        reply_markup: countryReplyKeyboard(),
+      await ctx.reply("۲/۹ — کشور را انتخاب کن:\n(برای اصلاح: ↩️ بازگشت به قبل)", {
+        reply_markup: countryReplyKeyboard(true),
       });
       return;
     }
@@ -179,7 +186,7 @@ registerHandler.on("message:text", async (ctx, next) => {
       const found = COUNTRIES.find((c) => c.label === text);
       if (!found) {
         await ctx.reply("از دکمه‌های پایین کشور را انتخاب کن:", {
-          reply_markup: countryReplyKeyboard(),
+          reply_markup: countryReplyKeyboard(true),
         });
         return;
       }
@@ -194,7 +201,7 @@ registerHandler.on("message:text", async (ctx, next) => {
           ? "۳/۹ — منطقه را انتخاب کن:"
           : "۳/۹ — استان را انتخاب کن:",
         {
-          reply_markup: provinceReplyKeyboard(found.id),
+          reply_markup: provinceReplyKeyboard(found.id, undefined, true),
         },
       );
       return;
@@ -207,7 +214,7 @@ registerHandler.on("message:text", async (ctx, next) => {
       }
       if (text === REG.REGION_BACK) {
         await ctx.reply("منطقه را انتخاب کن:", {
-          reply_markup: provinceReplyKeyboard(user.country),
+          reply_markup: provinceReplyKeyboard(user.country, undefined, true),
         });
         return;
       }
@@ -215,7 +222,7 @@ registerHandler.on("message:text", async (ctx, next) => {
         const regionProvinces = provincesInRegion(text);
         if (regionProvinces) {
           await ctx.reply(`استان در «${text}» را بزن:`, {
-            reply_markup: provinceReplyKeyboard(user.country, text),
+            reply_markup: provinceReplyKeyboard(user.country, text, true),
           });
           return;
         }
@@ -227,14 +234,14 @@ registerHandler.on("message:text", async (ctx, next) => {
             ? "اول منطقه، بعد استان را از دکمه‌ها بزن:"
             : "از دکمه‌های پایین استان را انتخاب کن:",
           {
-            reply_markup: provinceReplyKeyboard(user.country),
+            reply_markup: provinceReplyKeyboard(user.country, undefined, true),
           },
         );
         return;
       }
       await patchUser(user.id, { province: text, city: null, state: "city" });
       await ctx.reply(`۴/۹ — شهر را در «${text}» انتخاب کن:`, {
-        reply_markup: cityReplyKeyboard(user.country, text),
+        reply_markup: cityReplyKeyboard(user.country, text, true),
       });
       return;
     }
@@ -247,13 +254,13 @@ registerHandler.on("message:text", async (ctx, next) => {
       const list = citiesFor(user.country, user.province);
       if (!list.includes(text)) {
         await ctx.reply("از دکمه‌های پایین شهر را انتخاب کن:", {
-          reply_markup: cityReplyKeyboard(user.country, user.province),
+          reply_markup: cityReplyKeyboard(user.country, user.province, true),
         });
         return;
       }
       await patchUser(user.id, { city: text, state: "gender" });
       await ctx.reply("۵/۹ — جنسیت را انتخاب کن:", {
-        reply_markup: genderReplyKeyboard(),
+        reply_markup: genderReplyKeyboard(true),
       });
       return;
     }
@@ -263,13 +270,13 @@ registerHandler.on("message:text", async (ctx, next) => {
         text === REG.GENDER_F ? "female" : text === REG.GENDER_M ? "male" : null;
       if (!gender) {
         await ctx.reply("از دکمه‌های پایین جنسیت را انتخاب کن:", {
-          reply_markup: genderReplyKeyboard(),
+          reply_markup: genderReplyKeyboard(true),
         });
         return;
       }
       await patchUser(user.id, { gender, state: "age" });
       await ctx.reply("۶/۹ — بازه سنت را بزن (دکمه‌های بزرگ پایین):", {
-        reply_markup: ageRangeReplyKeyboard(),
+        reply_markup: ageRangeReplyKeyboard(true),
       });
       return;
     }
@@ -277,21 +284,21 @@ registerHandler.on("message:text", async (ctx, next) => {
     if (user.state === "age") {
       if (text === REG.AGE_BACK) {
         await ctx.reply("بازه سن را انتخاب کن:", {
-          reply_markup: ageRangeReplyKeyboard(),
+          reply_markup: ageRangeReplyKeyboard(true),
         });
         return;
       }
       const range = parseAgeRange(text);
       if (range) {
         await ctx.reply(`سنت چند سال است؟ (${range.label})`, {
-          reply_markup: ageReplyKeyboard(range.from, range.to),
+          reply_markup: ageReplyKeyboard(range.from, range.to, true),
         });
         return;
       }
       const age = Number(text);
       if (!Number.isFinite(age) || age < 18 || age > 60) {
         await ctx.reply("اول بازه، بعد سن دقیق را از دکمه‌ها بزن:", {
-          reply_markup: ageRangeReplyKeyboard(),
+          reply_markup: ageRangeReplyKeyboard(true),
         });
         return;
       }
@@ -301,20 +308,23 @@ registerHandler.on("message:text", async (ctx, next) => {
           `سن ${age} ثبت شد ✅`,
           "",
           "۷/۹ — یک نام نمایشی بنویس (مثلاً سارا یا آرمین):",
+          "اگر سن اشتباه بود «↩️ بازگشت به قبل» را بزن.",
         ].join("\n"),
-        { reply_markup: { remove_keyboard: true } },
+        { reply_markup: regNameKeyboard() },
       );
       return;
     }
 
     if (user.state === "name") {
       if (text.length < 2 || text.length > 24) {
-        await ctx.reply("نام باید بین ۲ تا ۲۴ حرف باشد.");
+        await ctx.reply("نام باید بین ۲ تا ۲۴ حرف باشد.", {
+          reply_markup: regNameKeyboard(),
+        });
         return;
       }
       await patchUser(user.id, { displayName: text, state: "looking" });
       await ctx.reply("۸/۹ — به دنبال چه کسی هستی؟", {
-        reply_markup: lookingReplyKeyboard(),
+        reply_markup: lookingReplyKeyboard(true),
       });
       return;
     }
@@ -330,7 +340,7 @@ registerHandler.on("message:text", async (ctx, next) => {
               : null;
       if (!lookingFor) {
         await ctx.reply("از دکمه‌های پایین انتخاب کن:", {
-          reply_markup: lookingReplyKeyboard(),
+          reply_markup: lookingReplyKeyboard(true),
         });
         return;
       }

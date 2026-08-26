@@ -50,6 +50,8 @@ export const REG = {
   LOOK_ANY: "🎲 هردو",
   AGE_BACK: "↩️ بازه سن",
   REGION_BACK: "↩️ مناطق",
+  /** بازگشت به مرحله قبلی ثبت‌نام */
+  STEP_BACK: "↩️ بازگشت به قبل",
 } as const;
 
 /** بازه‌های سن — دکمه‌های درشت، بعد انتخاب سن دقیق */
@@ -134,12 +136,19 @@ export function locationKeyboard() {
     .oneTime();
 }
 
-/** لوکیشن اجباری در ثبت‌نام — بدون بازگشت به منو */
+/** لوکیشن اجباری در ثبت‌نام — با بازگشت به مرحله قبل */
 export function regLocationKeyboard() {
   return new Keyboard()
     .requestLocation("📍 ارسال موقعیت من")
+    .row()
+    .text(REG.STEP_BACK)
     .resized()
     .oneTime();
+}
+
+/** فقط بازگشت — مرحله نام نمایشی */
+export function regNameKeyboard() {
+  return new Keyboard().text(REG.STEP_BACK).resized().persistent();
 }
 
 /** ویرایش لوکیشن از پروفایل */
@@ -156,13 +165,23 @@ export function editLocationKeyboard() {
  * ReplyKeyboard ثبت‌نام: ستون زیاد = اسکرول کمتر،
  * oneTime = بعد از انتخاب کیبورد جمع می‌شود تا مرحله بعد فول‌صفحه باشد.
  */
-function gridReply(labels: string[], cols: number, oneTime = true) {
+function gridReply(
+  labels: string[],
+  cols: number,
+  opts: { oneTime?: boolean; stepBack?: boolean } | boolean = true,
+) {
+  // سازگاری با فراخوانی قدیمی gridReply(labels, cols, oneTime?)
+  const normalized =
+    typeof opts === "boolean" ? { oneTime: opts, stepBack: false } : opts;
+  const oneTime = normalized.oneTime ?? true;
+  const stepBack = normalized.stepBack ?? false;
   const kb = new Keyboard();
   labels.forEach((label, i) => {
     kb.text(label);
     if ((i + 1) % cols === 0) kb.row();
   });
   if (labels.length % cols !== 0) kb.row();
+  if (stepBack) kb.text(REG.STEP_BACK).row();
   const built = kb.resized();
   return oneTime ? built.oneTime() : built.persistent();
 }
@@ -171,64 +190,64 @@ export function languageReplyKeyboard() {
   return gridReply([REG.LANG_FA, REG.LANG_EN], 2);
 }
 
-export function countryReplyKeyboard() {
-  // ۴ کشور در ۲×۲ — دکمه‌های پهن
-  return gridReply(
-    COUNTRIES.map((c) => c.label),
-    2,
-  );
+export function countryReplyKeyboard(stepBack = true) {
+  return gridReply(COUNTRIES.map((c) => c.label), 2, { stepBack });
 }
 
-export function provinceReplyKeyboard(country: string, region?: string) {
+export function provinceReplyKeyboard(
+  country: string,
+  region?: string,
+  stepBack = true,
+) {
   if (country === "IR" && !region) {
-    // مرحله منطقه: ۶ دکمه درشت در ۲ ستون
-    return gridReply(iranRegions(), 2);
+    return gridReply(iranRegions(), 2, { stepBack });
   }
   if (country === "IR" && region) {
     const list = provincesInRegion(region) ?? [];
     const cols = list.length <= 4 ? 2 : 3;
-    const kb = gridReply(list, cols);
+    const kb = gridReply(list, cols, { stepBack: false });
     kb.row().text(REG.REGION_BACK);
+    if (stepBack) kb.row().text(REG.STEP_BACK);
     return kb;
   }
   const list = provincesForCountry(country);
   const cols = list.length <= 6 ? 2 : 3;
-  return gridReply(list, cols);
+  return gridReply(list, cols, { stepBack });
 }
 
-export function cityReplyKeyboard(country: string, province: string) {
+export function cityReplyKeyboard(
+  country: string,
+  province: string,
+  stepBack = true,
+) {
   const list = citiesFor(country, province);
   const cols = list.length <= 4 ? 2 : list.length <= 9 ? 3 : 4;
-  return gridReply(list, cols);
+  return gridReply(list, cols, { stepBack });
 }
 
-export function genderReplyKeyboard() {
-  return gridReply([REG.GENDER_F, REG.GENDER_M], 2);
+export function genderReplyKeyboard(stepBack = false) {
+  return gridReply([REG.GENDER_F, REG.GENDER_M], 2, { stepBack });
 }
 
-export function lookingReplyKeyboard() {
-  // هر سه در یک سطر — دکمه‌های پهن، بدون اسکرول
-  return gridReply([REG.LOOK_F, REG.LOOK_M, REG.LOOK_ANY], 3);
+export function lookingReplyKeyboard(stepBack = false) {
+  return gridReply([REG.LOOK_F, REG.LOOK_M, REG.LOOK_ANY], 3, { stepBack });
 }
 
 /** مرحله ۱ سن: فقط ۶ بازه بزرگ */
-export function ageRangeReplyKeyboard() {
-  return gridReply(
-    AGE_RANGES.map((r) => r.label),
-    2,
-  );
+export function ageRangeReplyKeyboard(stepBack = false) {
+  return gridReply(AGE_RANGES.map((r) => r.label), 2, { stepBack });
 }
 
 /** مرحله ۲ سن: فقط سن‌های همان بازه — دکمه‌های درشت */
-export function ageReplyKeyboard(from = 18, to = 60) {
+export function ageReplyKeyboard(from = 18, to = 60, stepBack = false) {
   const ages: string[] = [];
   for (let a = from; a <= to; a++) ages.push(String(a));
   const cols = ages.length <= 4 ? 2 : ages.length <= 8 ? 4 : 5;
-  const kb = gridReply(ages, cols);
-  // اگر بازه کامل نیست، دکمه برگشت به بازه‌ها
+  const kb = gridReply(ages, cols, { stepBack: false });
   if (from > 18 || to < 60) {
     kb.row().text(REG.AGE_BACK);
   }
+  if (stepBack) kb.row().text(REG.STEP_BACK);
   return kb;
 }
 

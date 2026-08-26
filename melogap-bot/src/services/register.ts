@@ -11,8 +11,20 @@ import {
   ageRangeReplyKeyboard,
   lookingReplyKeyboard,
   regLocationKeyboard,
+  regNameKeyboard,
 } from "../keyboards/main.js";
 import { WELCOME_DIAMONDS } from "../data/packages.js";
+
+const PREV_STEP: Record<string, string> = {
+  country: "language",
+  province: "country",
+  city: "province",
+  gender: "city",
+  age: "gender",
+  name: "age",
+  looking: "name",
+  location: "looking",
+};
 
 export async function beginRegistration(ctx: Context, userId: number) {
   await patchUser(userId, { state: "language", registered: false });
@@ -21,12 +33,15 @@ export async function beginRegistration(ctx: Context, userId: number) {
       "به دوردوریا خوش آمدی 💞",
       "",
       "برای شروع، ثبت‌نام را کامل کن.",
+      "در هر مرحله می‌توانی «↩️ بازگشت به قبل» را بزنی.",
+      "",
       "۱/۹ — زبان خودت را انتخاب کن:",
     ].join("\n"),
     { reply_markup: languageReplyKeyboard() },
   );
 }
 
+/** نمایش UI مرحله فعلی ثبت‌نام */
 export async function resumeRegistration(
   ctx: Context,
   user: {
@@ -44,7 +59,7 @@ export async function resumeRegistration(
       break;
     case "country":
       await ctx.reply("۲/۹ — کشور را انتخاب کن:", {
-        reply_markup: countryReplyKeyboard(),
+        reply_markup: countryReplyKeyboard(true),
       });
       break;
     case "province":
@@ -53,7 +68,7 @@ export async function resumeRegistration(
           ? "۳/۹ — منطقه را انتخاب کن:"
           : "۳/۹ — استان را انتخاب کن:",
         {
-          reply_markup: provinceReplyKeyboard(user.country ?? "IR"),
+          reply_markup: provinceReplyKeyboard(user.country ?? "IR", undefined, true),
         },
       );
       break;
@@ -63,27 +78,27 @@ export async function resumeRegistration(
         break;
       }
       await ctx.reply("۴/۹ — شهر را انتخاب کن:", {
-        reply_markup: cityReplyKeyboard(user.country, user.province),
+        reply_markup: cityReplyKeyboard(user.country, user.province, true),
       });
       break;
     case "gender":
       await ctx.reply("۵/۹ — جنسیت را انتخاب کن:", {
-        reply_markup: genderReplyKeyboard(),
+        reply_markup: genderReplyKeyboard(true),
       });
       break;
     case "age":
       await ctx.reply("۶/۹ — بازه سن را انتخاب کن:", {
-        reply_markup: ageRangeReplyKeyboard(),
+        reply_markup: ageRangeReplyKeyboard(true),
       });
       break;
     case "name":
       await ctx.reply("۷/۹ — یک نام نمایشی بفرست:", {
-        reply_markup: { remove_keyboard: true },
+        reply_markup: regNameKeyboard(),
       });
       break;
     case "looking":
       await ctx.reply("۸/۹ — به دنبال چه کسی هستی؟", {
-        reply_markup: lookingReplyKeyboard(),
+        reply_markup: lookingReplyKeyboard(true),
       });
       break;
     case "location":
@@ -100,6 +115,67 @@ export async function resumeRegistration(
     default:
       await beginRegistration(ctx, user.id);
   }
+}
+
+/** بازگشت یک مرحله در ثبت‌نام */
+export async function goBackRegistration(
+  ctx: Context,
+  user: {
+    id: number;
+    state: string;
+    country: string | null;
+    province: string | null;
+  },
+) {
+  if (user.state === "language" || textIsFirst(user.state)) {
+    await ctx.reply("این اولین مرحله است — زبان را انتخاب کن:", {
+      reply_markup: languageReplyKeyboard(),
+    });
+    return;
+  }
+  const prev = PREV_STEP[user.state];
+  if (!prev) {
+    await resumeRegistration(ctx, user);
+    return;
+  }
+
+  const data: Record<string, unknown> = { state: prev };
+  // پاک‌سازی فیلدهای مراحل جلوتر تا اشتباه نماند
+  if (prev === "language") {
+    data.language = null;
+    data.country = null;
+    data.province = null;
+    data.city = null;
+  } else if (prev === "country") {
+    data.country = null;
+    data.province = null;
+    data.city = null;
+  } else if (prev === "province") {
+    data.province = null;
+    data.city = null;
+  } else if (prev === "city") {
+    data.city = null;
+  } else if (prev === "gender") {
+    data.gender = null;
+  } else if (prev === "age") {
+    data.age = null;
+  } else if (prev === "name") {
+    data.displayName = null;
+  } else if (prev === "looking") {
+    data.lookingFor = null;
+  }
+
+  await patchUser(user.id, data);
+  const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!fresh) return;
+  await ctx.reply("↩️ برگشتی به مرحله قبل — دوباره انتخاب کن:", {
+    reply_markup: { remove_keyboard: true },
+  });
+  await resumeRegistration(ctx, fresh);
+}
+
+function textIsFirst(state: string) {
+  return !PREV_STEP[state];
 }
 
 export async function requireRegistered(ctx: Context) {
