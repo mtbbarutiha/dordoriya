@@ -25,6 +25,16 @@ async function getChattingPair(userId: number) {
   return { user, partner };
 }
 
+async function logRelay(
+  user: { id: number; telegramId: bigint },
+  partner: { id: number; telegramId: bigint },
+  userMsgId: number,
+  partnerMsgId: number,
+) {
+  await logChatMessage(partner.id, user.id, partner.telegramId, partnerMsgId);
+  await logChatMessage(user.id, partner.id, user.telegramId, userMsgId);
+}
+
 chatHandler.on("message:text", async (ctx, next) => {
   const text = ctx.message.text.trim();
   if (text.startsWith("/")) return next();
@@ -34,7 +44,6 @@ chatHandler.on("message:text", async (ctx, next) => {
   const user = await findByTelegram(from.id);
   if (!user) return next();
 
-  // دکمه‌های چت امن / قطع — قبل از MENU عمومی
   if (text === BTN.SECURE_CHAT_ON || text === BTN.SECURE_CHAT_OFF) {
     if (user.state !== "chatting") {
       await ctx.reply("الان در چت نیستی.", { reply_markup: mainKeyboard() });
@@ -53,7 +62,6 @@ chatHandler.on("message:text", async (ctx, next) => {
 
   if (MENU.has(text)) return next();
 
-  // ویرایش پروفایل
   if (user.state === "edit_name") {
     if (text.length < 2 || text.length > 24) {
       await ctx.reply("نام باید ۲ تا ۲۴ حرف باشد.");
@@ -174,19 +182,7 @@ chatHandler.on("message:text", async (ctx, next) => {
         `👤 ناشناس:\n${text}`,
         { protect_content: secure },
       );
-      await logChatMessage(
-        partner.id,
-        user.id,
-        partner.telegramId,
-        sent.message_id,
-      );
-      // پیام خود کاربر هم برای wipe (اختیاری)
-      await logChatMessage(
-        user.id,
-        partner.id,
-        user.telegramId,
-        ctx.message.message_id,
-      );
+      await logRelay(user, partner, ctx.message.message_id, sent.message_id);
     } catch (err) {
       console.error("chat relay failed", user.id, "->", partner.id, err);
       await patchUser(user.id, {
@@ -209,7 +205,7 @@ chatHandler.on("message:text", async (ctx, next) => {
   return next();
 });
 
-/** رله عکس در چت (+ چت امن = protect_content) */
+/** رله عکس */
 chatHandler.on("message:photo", async (ctx, next) => {
   const from = ctx.from;
   if (!from) return next();
@@ -243,25 +239,12 @@ chatHandler.on("message:photo", async (ctx, next) => {
     const sent = await ctx.api.sendPhoto(
       Number(partner.telegramId),
       best.file_id,
-      {
-        caption,
-        protect_content: secure,
-      },
+      { caption, protect_content: secure },
     );
-    await logChatMessage(
-      partner.id,
-      user.id,
-      partner.telegramId,
-      sent.message_id,
-    );
-    await logChatMessage(
-      user.id,
-      partner.id,
-      user.telegramId,
-      ctx.message.message_id,
-    );
+    await logRelay(user, partner, ctx.message.message_id, sent.message_id);
     if (secure) {
-      await ctx.reply("🔒 عکس با چت امن ارسال شد (غیرقابل ذخیره).");
+      const ack = await ctx.reply("🔒 عکس با چت امن ارسال شد.");
+      await logChatMessage(user.id, partner.id, user.telegramId, ack.message_id);
     }
   } catch (err) {
     console.error("photo relay failed", err);
@@ -269,23 +252,103 @@ chatHandler.on("message:photo", async (ctx, next) => {
   }
 });
 
+/** رله ویدیو */
+chatHandler.on("message:video", async (ctx, next) => {
+  const from = ctx.from;
+  if (!from) return next();
+  const user = await findByTelegram(from.id);
+  if (!user || user.state !== "chatting") return next();
+
+  const pair = await getChattingPair(user.id);
+  if (!pair?.partner) {
+    await patchUser(user.id, {
+      state: "idle",
+      chatPartnerId: null,
+      secureChat: false,
+    });
+    await ctx.reply("چت قطع شده.", { reply_markup: mainKeyboard() });
+    return;
+  }
+  const partner = pair.partner;
+  if (partner.telegramId >= 9000000000n) {
+    await ctx.reply("مخاطب نمونه است.");
+    return;
+  }
+
+  const secure = user.secureChat || partner.secureChat;
+  const caption = ctx.message.caption
+    ? `👤 ناشناس:\n${ctx.message.caption}`
+    : "👤 ناشناس یک ویدیو فرستاد";
+
+  try {
+    const sent = await ctx.api.sendVideo(
+      Number(partner.telegramId),
+      ctx.message.video.file_id,
+      { caption, protect_content: secure },
+    );
+    await logRelay(user, partner, ctx.message.message_id, sent.message_id);
+    if (secure) {
+      const ack = await ctx.reply("🔒 ویدیو با چت امن ارسال شد.");
+      await logChatMessage(user.id, partner.id, user.telegramId, ack.message_id);
+    }
+  } catch (err) {
+    console.error("video relay failed", err);
+    await ctx.reply("ارسال ویدیو نشد.");
+  }
+});
+
+/** رله ویدیو مسیج (دایره‌ای) */
+chatHandler.on("message:video_note", async (ctx, next) => {
+  const from = ctx.from;
+  if (!from) return next();
+  const user = await findByTelegram(from.id);
+  if (!user || user.state !== "chatting") return next();
+
+  const pair = await getChattingPair(user.id);
+  if (!pair?.partner) {
+    await patchUser(user.id, {
+      state: "idle",
+      chatPartnerId: null,
+      secureChat: false,
+    });
+    await ctx.reply("چت قطع شده.", { reply_markup: mainKeyboard() });
+    return;
+  }
+  const partner = pair.partner;
+  if (partner.telegramId >= 9000000000n) {
+    await ctx.reply("مخاطب نمونه است.");
+    return;
+  }
+
+  const secure = user.secureChat || partner.secureChat;
+  try {
+    const sent = await ctx.api.sendVideoNote(
+      Number(partner.telegramId),
+      ctx.message.video_note.file_id,
+      { protect_content: secure },
+    );
+    await logRelay(user, partner, ctx.message.message_id, sent.message_id);
+    const note = await ctx.api.sendMessage(
+      Number(partner.telegramId),
+      "👤 ناشناس یک ویدیومسیج فرستاد",
+      { protect_content: secure },
+    );
+    await logChatMessage(partner.id, user.id, partner.telegramId, note.message_id);
+  } catch (err) {
+    console.error("video_note relay failed", err);
+    await ctx.reply("ارسال ویدیومسیج نشد.");
+  }
+});
+
 chatHandler.on(
-  [
-    "message:video",
-    "message:voice",
-    "message:sticker",
-    "message:document",
-    "message:video_note",
-  ],
+  ["message:voice", "message:sticker", "message:document"],
   async (ctx, next) => {
     const from = ctx.from;
     if (!from) return next();
     const user = await findByTelegram(from.id);
     if (!user || user.state !== "chatting") return next();
     await ctx.reply(
-      "در چت ناشناس فعلاً متن و عکس پشتیبانی می‌شود.\nقطع: /end",
+      "در چت ناشناس: متن، عکس و ویدیو پشتیبانی می‌شود.\nقطع: /end",
     );
   },
 );
-
-// end of chat media handlers

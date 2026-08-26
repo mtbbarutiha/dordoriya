@@ -41,12 +41,36 @@ menuHandler.hears(BTN.QUICK_CHAT, async (ctx) => {
 menuHandler.hears(BTN.NEARBY, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  const hasSaved =
+    user.latitude != null &&
+    user.longitude != null &&
+    Number.isFinite(user.latitude) &&
+    Number.isFinite(user.longitude);
+
+  if (hasSaved) {
+    const { nearbyLocationChoiceKeyboard } = await import(
+      "../services/nearbyUi.js"
+    );
+    await ctx.reply(
+      [
+        "📍 افراد نزدیک",
+        "",
+        "از کدام موقعیت استفاده کنم؟",
+        "• لوکیشن ذخیره‌شده — همان GPS قبلی",
+        "• لوکیشن فعلی — دوباره موقعیتت را می‌گیرم و ذخیره می‌کنم",
+      ].join("\n"),
+      { reply_markup: nearbyLocationChoiceKeyboard() },
+    );
+    return;
+  }
+
   await patchUser(user.id, { state: "await_location" });
   await ctx.reply(
     [
       "📍 افراد نزدیک",
       "",
-      "موقعیتت را بفرست تا افراد اطراف را ببینی.",
+      "هنوز موقعیت ذخیره‌شده نداری.",
+      "موقعیت فعلی‌ات را بفرست تا افراد اطراف را ببینی و ذخیره شود.",
       "مختصات دقیق به کسی نشان داده نمی‌شود.",
     ].join("\n"),
     { reply_markup: locationKeyboard() },

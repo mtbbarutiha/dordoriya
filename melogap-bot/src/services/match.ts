@@ -17,7 +17,7 @@ export function chatRequestKeyboard(requestId: number) {
 
 export function wipeChatKeyboard(partnerUserId: number) {
   return new InlineKeyboard().text(
-    "🗑 پاک کردن این گفتگو",
+    "🗑 پاک کردن کامل گفتگو (هر دو طرف)",
     `chat:wipe:${partnerUserId}`,
   );
 }
@@ -58,9 +58,8 @@ export async function leaveQueueOrChat(
             const endText = [
               "طرف مقابل چت را قطع کرد.",
               "",
-              "می‌توانی پیام‌های این گفتگو را از چت ربات پاک کنی.",
-              "⚠️ فقط پیام‌هایی که ربات فرستاده پاک می‌شوند.",
-              "برای پاک‌کردن کامل تاریخچه در تلگرام: روی چت بزن → Clear history.",
+              "می‌توانی کل گفتگو (متن/عکس/ویدیو) را برای هر دو طرف پاک کنی.",
+              "اگر چیزی باقی ماند: Clear history روی این چت.",
             ].join("\n");
             const m = await api.sendMessage(
               Number(partner.telegramId),
@@ -373,9 +372,8 @@ export async function offerWipeAfterEnd(
   const text = [
     "چت قطع شد.",
     "",
-    "می‌توانی پیام‌های این گفتگو را پاک کنی.",
-    "⚠️ فقط پیام‌های ربات در این چت پاک می‌شوند.",
-    "پاک‌کردن کامل تاریخچه تلگرام: Clear history روی چت.",
+    "می‌توانی کل گفتگو را برای هر دو طرف پاک کنی (متن/عکس/ویدیو).",
+    "اگر چیزی باقی ماند: Clear history روی این چت.",
   ].join("\n");
   const m = await api.sendMessage(Number(user.telegramId), text, {
     reply_markup: wipeChatKeyboard(partnerUserId),

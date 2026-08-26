@@ -34,8 +34,7 @@ import {
   exploreOptsFromKey,
 } from "../services/explore.js";
 import { sendChatRequest, respondChatRequest } from "../services/match.js";
-import { saveLocation, findNearby } from "../services/nearby.js";
-import { nearbyUserKeyboard } from "../keyboards/nearby.js";
+import { saveLocation } from "../services/nearby.js";
 import { publicPhotoWithBadge } from "../lib/faceBadgePhoto.js";
 
 export const featuresHandler = new Composer();
@@ -580,16 +579,65 @@ featuresHandler.callbackQuery(/^chat:wipe:(\d+)$/, async (ctx) => {
     return;
   }
   const partnerId = Number(ctx.match[1]);
-  const { wipeChatWithPartner } = await import("../services/chatLog.js");
-  const n = await wipeChatWithPartner(ctx.api, user.id, partnerId);
-  await ctx.answerCallbackQuery({ text: "پاک شد" });
+  const partner = await prisma.user.findUnique({ where: { id: partnerId } });
+  const { wipeChatBothSides } = await import("../services/chatLog.js");
+  const { notifyWipeDone } = await import("../services/nearbyUi.js");
+  const counts = await wipeChatBothSides(ctx.api, user.id, partnerId);
+  await ctx.answerCallbackQuery({ text: "پاک شد برای هر دو طرف" });
   await ctx.reply(
     [
-      `🗑 ${n} پیام از این گفتگو پاک شد.`,
+      "🗑 گفتگو برای هر دو طرف پاک شد.",
+      `پیام‌های حذف‌شده از چت تو: ${counts.a}`,
+      partner ? `پیام‌های حذف‌شده از چت طرف مقابل: ${counts.b}` : null,
       "",
-      "اگر هنوز چیزی دیدی، در تلگرام روی چت بزن و Clear history را بزن.",
-    ].join("\n"),
+      "متن، عکس و ویدیوهای ربات حذف شدند.",
+      "اگر چیزی باقی ماند: Clear history روی این چت در تلگرام.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
     { reply_markup: mainKeyboard() },
+  );
+  if (partner && partner.telegramId < 9000000000n) {
+    await notifyWipeDone(ctx.api, partner.telegramId, counts.b);
+  }
+});
+
+featuresHandler.callbackQuery("nearby:saved", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  if (user.latitude == null || user.longitude == null) {
+    await ctx.answerCallbackQuery({ text: "لوکیشن ذخیره‌شده نیست" });
+    await patchUser(user.id, { state: "await_location" });
+    await ctx.reply("لوکیشن ذخیره‌شده نداری. موقعیت فعلی را بفرست:", {
+      reply_markup: locationKeyboard(),
+    });
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "با لوکیشن ذخیره‌شده" });
+  await patchUser(user.id, { state: "idle", lastActiveAt: new Date() });
+  const { showNearbyResults } = await import("../services/nearbyUi.js");
+  await showNearbyResults(ctx, user.id);
+});
+
+featuresHandler.callbackQuery("nearby:fresh", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  await ctx.answerCallbackQuery({ text: "لوکیشن فعلی" });
+  await patchUser(user.id, { state: "await_location" });
+  await ctx.reply(
+    [
+      "📡 لوکیشن فعلی",
+      "",
+      "دکمه ارسال موقعیت را بزن تا موقعیت تازه ذخیره شود",
+      "و افراد نزدیک نشان داده شوند.",
+    ].join("\n"),
+    { reply_markup: locationKeyboard() },
   );
 });
 
@@ -923,61 +971,18 @@ featuresHandler.on("message:location", async (ctx, next) => {
     return;
   }
 
-  // نزدیک‌ها / به‌روزرسانی عمومی موقعیت
+  // نزدیک‌ها / به‌روزرسانی عمومی موقعیت — همیشه ذخیره می‌شود
   await saveLocation(user.id, latitude, longitude);
-  if (user.state !== "await_location") {
-    await patchUser(user.id, { state: "idle" });
-  }
+  await patchUser(user.id, { state: "idle" });
 
-  const nearby = await findNearby(user.id);
-  if (!nearby.length) {
-    await ctx.reply(
-      "موقعیت ذخیره شد.\nفعلاً کسی در اطراف پیدا نشد.",
-      { reply_markup: mainKeyboard() },
-    );
+  if (user.state === "await_location") {
+    await ctx.reply("✅ موقعیت ذخیره شد. در حال پیدا کردن افراد نزدیک…");
+    const { showNearbyResults } = await import("../services/nearbyUi.js");
+    await showNearbyResults(ctx, user.id);
     return;
   }
 
-  const { ensureUserCode } = await import("../db/users.js");
-  const { listThumbWithBadge } = await import("../lib/faceBadgePhoto.js");
-  await ctx.reply(
-    [
-      "کی را نشون بدم؟ انتخاب کن 👇",
-      `📍 ${nearby.length} نفر نزدیک تو:`,
-      "",
-      "روی عکس یا /user_ بزن.",
-    ].join("\n"),
-  );
-  for (const item of nearby) {
-    const u = item.user;
-    if (!u.userCode) await ensureUserCode(u.id, u.userCode);
-    const code = u.userCode ?? (await ensureUserCode(u.id, null));
-    const online =
-      Date.now() - u.lastActiveAt.getTime() <= 15 * 60_000 ? "🟢 " : "";
-    const special = u.faceVerified ? " ⭐" : "";
-    const place = [u.city, u.province ? `(${u.province})` : null]
-      .filter(Boolean)
-      .join("");
-    try {
-      const thumb = await listThumbWithBadge(ctx.api, u);
-      await ctx.replyWithPhoto(thumb, {
-        caption: [
-          `${online}${u.displayName ?? "ناشناس"} ${u.age ?? "—"}${special}`,
-          `/user_${code}`,
-          `${place || "—"} (🏁 ${item.distanceLabel}) (❤️ ${formatNum(u.likesCount)})`,
-        ].join("\n"),
-        reply_markup: new InlineKeyboard().text(
-          "👤 مشاهده پروفایل",
-          `open:${code}`,
-        ),
-      });
-    } catch {
-      await ctx.reply(
-        `${online}${u.displayName ?? "ناشناس"} ${u.age ?? "—"}\n/user_${code}`,
-      );
-    }
-  }
-  await ctx.reply("⬆️ لیست بالا", { reply_markup: mainKeyboard() });
+  await ctx.reply("✅ موقعیتت ذخیره شد.", { reply_markup: mainKeyboard() });
 });
 
 featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
