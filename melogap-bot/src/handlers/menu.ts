@@ -7,6 +7,7 @@ import {
   diamondPackagesKeyboard,
   searchPanelKeyboard,
   locationKeyboard,
+  chattingKeyboard,
 } from "../keyboards/main.js";
 import {
   formatNum,
@@ -230,7 +231,7 @@ menuHandler.hears(BTN.CANCEL_WAIT, async (ctx) => {
 menuHandler.hears(BTN.END_CHAT, async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
-  if (user.state !== "chatting") {
+  if (user.state !== "chatting" && !user.chatPartnerId) {
     await ctx.reply("الان در چت نیستی.", { reply_markup: mainKeyboard() });
     return;
   }
@@ -240,10 +241,16 @@ menuHandler.hears(BTN.END_CHAT, async (ctx) => {
 
 menuHandler.hears(BTN.BACK, async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
-  if (user && user.state !== "chatting") {
-    await patchUser(user.id, { state: user.registered ? "idle" : user.state });
+  if (!user) return;
+  if (user.state === "chatting") {
+    await ctx.reply("اول چت را قطع کن (/end).", {
+      reply_markup: chattingKeyboard(),
+    });
+    return;
   }
-  if (user?.registered) {
+  await leaveQueueOrChat(ctx.api, user, false);
+  if (user.registered) {
+    await patchUser(user.id, { state: "idle", chatPartnerId: null });
     await ctx.reply("منوی اصلی:", { reply_markup: mainKeyboard() });
   }
 });

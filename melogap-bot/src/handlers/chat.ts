@@ -94,17 +94,55 @@ chatHandler.on("message:text", async (ctx, next) => {
     const partner = await prisma.user.findUnique({
       where: { id: user.chatPartnerId },
     });
-    if (!partner || partner.state !== "chatting") {
+    if (
+      !partner ||
+      partner.state !== "chatting" ||
+      partner.chatPartnerId !== user.id
+    ) {
       await patchUser(user.id, { state: "idle", chatPartnerId: null });
-      await ctx.reply("چت قطع شده.", { reply_markup: mainKeyboard() });
+      if (partner?.chatPartnerId === user.id) {
+        await patchUser(partner.id, { state: "idle", chatPartnerId: null });
+      }
+      await ctx.reply("چت قطع شده. از منو دوباره وصل شو.", {
+        reply_markup: mainKeyboard(),
+      });
       return;
     }
-    await ctx.api.sendMessage(
-      Number(partner.telegramId),
-      `👤 ناشناس:\n${text}`,
-    );
+    if (partner.telegramId >= 9000000000n) {
+      await patchUser(user.id, { state: "idle", chatPartnerId: null });
+      await patchUser(partner.id, { state: "idle", chatPartnerId: null });
+      await ctx.reply("این مخاطب نمونه است — چت واقعی نیست.", {
+        reply_markup: mainKeyboard(),
+      });
+      return;
+    }
+    try {
+      await ctx.api.sendMessage(
+        Number(partner.telegramId),
+        `👤 ناشناس:\n${text}`,
+      );
+    } catch (err) {
+      console.error("chat relay failed", user.id, "->", partner.id, err);
+      await patchUser(user.id, { state: "idle", chatPartnerId: null });
+      await patchUser(partner.id, { state: "idle", chatPartnerId: null });
+      await ctx.reply("ارسال نشد — چت قطع شد.", {
+        reply_markup: mainKeyboard(),
+      });
+    }
     return;
   }
 
   return next();
 });
+
+/** رسانه در چت — فقط متن رله می‌شود */
+chatHandler.on(
+  ["message:photo", "message:video", "message:voice", "message:sticker", "message:document", "message:video_note"],
+  async (ctx, next) => {
+    const from = ctx.from;
+    if (!from) return next();
+    const user = await findByTelegram(from.id);
+    if (!user || user.state !== "chatting") return next();
+    await ctx.reply("در چت ناشناس فعلاً فقط متن پشتیبانی می‌شود.\nقطع: /end");
+  },
+);

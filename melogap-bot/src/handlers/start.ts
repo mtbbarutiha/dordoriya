@@ -84,7 +84,13 @@ startHandler.command("start", async (ctx) => {
     return;
   }
 
-  await patchUser(user.id, { state: "idle", pendingAnonTo: null });
+  // /start نباید طرف چت را گیر بیندازد
+  await leaveQueueOrChat(ctx.api, user, true);
+  await patchUser(user.id, {
+    state: "idle",
+    pendingAnonTo: null,
+    chatPartnerId: null,
+  });
   await ctx.reply(
     [
       "📋 منوی اصلی دوردوریا",
@@ -105,7 +111,12 @@ startHandler.command("cancel", async (ctx) => {
     await beginRegistration(ctx, user.id);
     return;
   }
-  await patchUser(user.id, { state: "idle", pendingAnonTo: null });
+  await leaveQueueOrChat(ctx.api, user, true);
+  await patchUser(user.id, {
+    state: "idle",
+    pendingAnonTo: null,
+    chatPartnerId: null,
+  });
   await ctx.reply("لغو شد.", { reply_markup: mainKeyboard() });
 });
 
@@ -114,7 +125,7 @@ startHandler.command("end", async (ctx) => {
   if (!from) return;
   const user = await findByTelegram(from.id);
   if (!user) return;
-  if (user.state !== "chatting") {
+  if (user.state !== "chatting" && !user.chatPartnerId) {
     await ctx.reply("الان در چت نیستی.", { reply_markup: mainKeyboard() });
     return;
   }

@@ -67,14 +67,19 @@ async function main() {
   const filled = await backfillMissingUserCodes();
   if (filled) console.log(`Backfilled ${filled} userCode(s).`);
 
+  const { repairOrphanChats } = await import("./services/match.js");
+  const repaired = await repairOrphanChats();
+  if (repaired) console.log(`Repaired ${repaired} orphan chat state(s).`);
+
   for (let attempt = 1; attempt <= 8; attempt++) {
     const bot = createBot(token);
     try {
-      await bot.api.deleteWebhook({ drop_pending_updates: true });
+      // فقط webhook را پاک کن؛ پیام‌های در صف را دور نریز
+      await bot.api.deleteWebhook({ drop_pending_updates: false });
       await setupBotMenu(bot);
       console.log("Bot menu commands registered.");
       await bot.start({
-        drop_pending_updates: true,
+        drop_pending_updates: attempt > 1, // فقط بعد از conflict
         onStart: (info) => {
           console.log(`Bot @${info.username} is running. (attempt ${attempt})`);
         },

@@ -17,8 +17,21 @@ export function createBot(token: string) {
       : ctx.message
         ? "message"
         : "update";
-    console.log(`[update] ${kind} from=${ctx.from?.id ?? "-"}`);
-    await next();
+    const hint = ctx.callbackQuery?.data
+      ? ` data=${ctx.callbackQuery.data.slice(0, 40)}`
+      : ctx.message && "text" in ctx.message && ctx.message.text
+        ? ` text=${JSON.stringify(ctx.message.text.slice(0, 40))}`
+        : "";
+    console.log(`[update] ${kind} from=${ctx.from?.id ?? "-"}${hint}`);
+    try {
+      await next();
+    } catch (err) {
+      console.error(
+        `[handler] failed from=${ctx.from?.id ?? "-"}:`,
+        err instanceof Error ? err.stack ?? err.message : err,
+      );
+      throw err;
+    }
   });
 
   bot.use(startHandler);

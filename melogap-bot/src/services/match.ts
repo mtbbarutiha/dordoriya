@@ -17,26 +17,79 @@ export async function leaveQueueOrChat(
   },
   notifyPartner = true,
 ) {
-  if (user.state === "chatting" && user.chatPartnerId) {
-    const partner = await prisma.user.findUnique({
-      where: { id: user.chatPartnerId },
-    });
+  const partnerId = user.chatPartnerId;
+  const wasChatting = user.state === "chatting" && partnerId != null;
+
+  if (wasChatting || partnerId != null) {
+    const partner = partnerId
+      ? await prisma.user.findUnique({ where: { id: partnerId } })
+      : null;
     await patchUser(user.id, { state: "idle", chatPartnerId: null });
     if (partner) {
-      await patchUser(partner.id, { state: "idle", chatPartnerId: null });
-      if (notifyPartner) {
-        await api.sendMessage(
-          Number(partner.telegramId),
-          "طرف مقابل چت را قطع کرد.\nاز منو دوباره می‌توانی وصل شوی.",
-          { reply_markup: mainKeyboard() },
-        );
+      const partnerStillLinked =
+        partner.chatPartnerId === user.id || partner.state === "chatting";
+      if (partnerStillLinked) {
+        await patchUser(partner.id, { state: "idle", chatPartnerId: null });
+        if (notifyPartner && wasChatting && partner.telegramId < 9000000000n) {
+          try {
+            await api.sendMessage(
+              Number(partner.telegramId),
+              "طرف مقابل چت را قطع کرد.\nاز منو دوباره می‌توانی وصل شوی.",
+              { reply_markup: mainKeyboard() },
+            );
+          } catch (err) {
+            console.error("notify partner end-chat failed", partner.id, err);
+          }
+        }
       }
     }
     return;
   }
+
   if (user.state === "waiting") {
     await patchUser(user.id, { state: "idle", chatPartnerId: null });
   }
+}
+
+/** تعمیر وضعیت‌های گیرکرده چت (مثلاً بعد از /start بدون /end) */
+export async function repairOrphanChats() {
+  const chatting = await prisma.user.findMany({
+    where: { state: "chatting" },
+  });
+  let fixed = 0;
+  for (const u of chatting) {
+    if (!u.chatPartnerId) {
+      await patchUser(u.id, { state: "idle", chatPartnerId: null });
+      fixed++;
+      continue;
+    }
+    const partner = await prisma.user.findUnique({
+      where: { id: u.chatPartnerId },
+    });
+    if (
+      !partner ||
+      partner.state !== "chatting" ||
+      partner.chatPartnerId !== u.id
+    ) {
+      await patchUser(u.id, { state: "idle", chatPartnerId: null });
+      if (partner?.chatPartnerId === u.id) {
+        await patchUser(partner.id, { state: "idle", chatPartnerId: null });
+      }
+      fixed++;
+    }
+  }
+  // chatPartnerId کهنه روی کاربران idle
+  const stale = await prisma.user.findMany({
+    where: {
+      state: { not: "chatting" },
+      chatPartnerId: { not: null },
+    },
+  });
+  for (const u of stale) {
+    await patchUser(u.id, { chatPartnerId: null });
+    fixed++;
+  }
+  return fixed;
 }
 
 export async function tryQuickMatch(ctx: Context, userId: number) {
