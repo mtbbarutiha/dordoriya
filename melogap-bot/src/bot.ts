@@ -11,6 +11,16 @@ import { fallbackHandler } from "./handlers/fallback.js";
 export function createBot(token: string) {
   const bot = new Bot(token);
 
+  bot.use(async (ctx, next) => {
+    const kind = ctx.callbackQuery
+      ? "callback"
+      : ctx.message
+        ? "message"
+        : "update";
+    console.log(`[update] ${kind} from=${ctx.from?.id ?? "-"}`);
+    await next();
+  });
+
   bot.use(startHandler);
   bot.use(adminHandler);
   bot.use(commandsHandler);
@@ -22,7 +32,11 @@ export function createBot(token: string) {
   bot.use(fallbackHandler);
 
   bot.catch((err) => {
-    console.error("Bot error:", err.error);
+    const e = err.error;
+    console.error(
+      "Bot error:",
+      e instanceof Error ? e.stack ?? e.message : e,
+    );
   });
 
   return bot;
