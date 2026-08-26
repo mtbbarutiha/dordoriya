@@ -57,12 +57,12 @@ export const REG = {
 
 /** بازه‌های سن — دکمه‌های درشت، بعد انتخاب سن دقیق */
 export const AGE_RANGES: { label: string; from: number; to: number }[] = [
-  { label: "۱۸ تا ۲۴", from: 18, to: 24 },
-  { label: "۲۵ تا ۳۱", from: 25, to: 31 },
-  { label: "۳۲ تا ۳۸", from: 32, to: 38 },
-  { label: "۳۹ تا ۴۵", from: 39, to: 45 },
-  { label: "۴۶ تا ۵۲", from: 46, to: 52 },
-  { label: "۵۳ تا ۶۰", from: 53, to: 60 },
+  { label: "🎂 ۱۸ تا ۲۴", from: 18, to: 24 },
+  { label: "🎂 ۲۵ تا ۳۱", from: 25, to: 31 },
+  { label: "🎂 ۳۲ تا ۳۸", from: 32, to: 38 },
+  { label: "🎂 ۳۹ تا ۴۵", from: 39, to: 45 },
+  { label: "🎂 ۴۶ تا ۵۲", from: 46, to: 52 },
+  { label: "🎂 ۵۳ تا ۶۰", from: 53, to: 60 },
 ];
 
 /** منوی اصلی شبیه ملوگپ */
@@ -373,11 +373,11 @@ export function profilePanelKeyboard(
 /** مقدمه احراز چهره — مثل دوردور */
 export function faceVerifyIntroKeyboard() {
   return new InlineKeyboard()
-    .text("بله، متوجه شدم", "face:ok")
+    .text("✅ بله، متوجه شدم", "face:ok")
     .row()
-    .text("تغییر عکس پروفایل", "face:photo")
+    .text("📷 تغییر عکس پروفایل", "face:photo")
     .row()
-    .text("انصراف", "face:cancel");
+    .text("❌ انصراف", "face:cancel");
 }
 
 export function profileEditKeyboard() {

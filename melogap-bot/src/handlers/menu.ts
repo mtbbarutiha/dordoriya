@@ -204,7 +204,7 @@ menuHandler.hears(BTN.PRO, async (ctx) => {
     ].join("\n"),
     {
       reply_markup: new InlineKeyboard().text(
-        `فعال‌سازی پرو (${formatNum(cost)}💰)`,
+        `✅ فعال‌سازی پرو (${formatNum(cost)}💰)`,
         "pro:buy",
       ),
     },

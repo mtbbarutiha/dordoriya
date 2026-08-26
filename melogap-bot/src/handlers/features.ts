@@ -721,17 +721,17 @@ featuresHandler.callbackQuery("more:edit", async (ctx) => {
   await ctx.answerCallbackQuery();
   await ctx.reply("چه چیزی را می‌خواهی تغییر بدهی؟", {
     reply_markup: new InlineKeyboard()
-      .text("نام", "edit:name")
-      .text("سن", "edit:age")
+      .text("📝 نام", "edit:name")
+      .text("🎂 سن", "edit:age")
       .row()
-      .text("جنسیت", "edit:gender")
-      .text("علاقه", "edit:looking")
+      .text("⚧ جنسیت", "edit:gender")
+      .text("🎯 علاقه", "edit:looking")
       .row()
-      .text("بیو", "edit:bio")
-      .text("علاقه‌مندی‌ها", "edit:interests")
+      .text("📄 بیو", "edit:bio")
+      .text("✨ علاقه‌مندی‌ها", "edit:interests")
       .row()
       .text("📍 موقعیت", "edit:location")
-      .text("عکس پروفایل", "edit:photo"),
+      .text("📷 عکس پروفایل", "edit:photo"),
   });
 });
 

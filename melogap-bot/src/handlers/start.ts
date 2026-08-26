@@ -1,4 +1,4 @@
-import { Composer } from "grammy";
+import { Composer, InlineKeyboard } from "grammy";
 import { ensureUser, findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
 import {
@@ -117,6 +117,16 @@ startHandler.command("cancel", async (ctx) => {
   if (!from) return;
   const user = await findByTelegram(from.id);
   if (!user) return;
+  if (
+    user.state === "admin_give_code" ||
+    user.state === "admin_give_amount"
+  ) {
+    await patchUser(user.id, { state: "idle", pendingAnonTo: null });
+    await ctx.reply("لغو شد.", {
+      reply_markup: new InlineKeyboard().text("↩️ پنل ادمین", "adm:home"),
+    });
+    return;
+  }
   if (!user.registered) {
     await beginRegistration(ctx, user.id);
     return;
