@@ -26,7 +26,6 @@ import {
   COUNTRIES,
   provincesForCountry,
   citiesFor,
-  provincesInRegion,
   resolveIranRegion,
   iranRegionPrompt,
 } from "../data/locations.js";
