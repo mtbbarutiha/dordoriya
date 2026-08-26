@@ -12,6 +12,7 @@ import {
   citiesFor,
   iranRegions,
   provincesInRegion,
+  iranRegionChoices,
 } from "../data/locations.js";
 import { INTERESTS } from "../data/interests.js";
 
@@ -49,7 +50,7 @@ export const REG = {
   LOOK_M: "👨 آقا",
   LOOK_ANY: "🎲 هردو",
   AGE_BACK: "↩️ بازه سن",
-  REGION_BACK: "↩️ مناطق",
+  REGION_BACK: "↩️ تغییر منطقه",
   /** بازگشت به مرحله قبلی ثبت‌نام */
   STEP_BACK: "↩️ بازگشت به قبل",
 } as const;
@@ -200,12 +201,21 @@ export function provinceReplyKeyboard(
   stepBack = true,
 ) {
   if (country === "IR" && !region) {
-    return gridReply(iranRegions(), 2, { stepBack });
+    // کیبورد اختصاصی منطقه با توضیح روی دکمه + بازگشت واضح
+    const choices = iranRegionChoices();
+    const kb = new Keyboard();
+    choices.forEach((c, i) => {
+      kb.text(c.label);
+      if ((i + 1) % 2 === 0) kb.row();
+    });
+    if (choices.length % 2 !== 0) kb.row();
+    if (stepBack) kb.text(REG.STEP_BACK).row();
+    return kb.resized().persistent();
   }
   if (country === "IR" && region) {
     const list = provincesInRegion(region) ?? [];
     const cols = list.length <= 4 ? 2 : 3;
-    const kb = gridReply(list, cols, { stepBack: false });
+    const kb = gridReply(list, cols, { stepBack: false, oneTime: false });
     kb.row().text(REG.REGION_BACK);
     if (stepBack) kb.row().text(REG.STEP_BACK);
     return kb;

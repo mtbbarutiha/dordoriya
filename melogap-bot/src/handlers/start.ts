@@ -27,6 +27,8 @@ import {
   provincesForCountry,
   citiesFor,
   provincesInRegion,
+  resolveIranRegion,
+  iranRegionPrompt,
 } from "../data/locations.js";
 
 export const startHandler = new Composer();
@@ -198,7 +200,7 @@ registerHandler.on("message:text", async (ctx, next) => {
       });
       await ctx.reply(
         found.id === "IR"
-          ? "۳/۹ — منطقه را انتخاب کن:"
+          ? iranRegionPrompt()
           : "۳/۹ — استان را انتخاب کن:",
         {
           reply_markup: provinceReplyKeyboard(found.id, undefined, true),
@@ -213,17 +215,27 @@ registerHandler.on("message:text", async (ctx, next) => {
         return;
       }
       if (text === REG.REGION_BACK) {
-        await ctx.reply("منطقه را انتخاب کن:", {
-          reply_markup: provinceReplyKeyboard(user.country, undefined, true),
-        });
+        await ctx.reply(
+          user.country === "IR" ? iranRegionPrompt() : "منطقه را انتخاب کن:",
+          {
+            reply_markup: provinceReplyKeyboard(user.country, undefined, true),
+          },
+        );
         return;
       }
       if (user.country === "IR") {
-        const regionProvinces = provincesInRegion(text);
-        if (regionProvinces) {
-          await ctx.reply(`استان در «${text}» را بزن:`, {
-            reply_markup: provinceReplyKeyboard(user.country, text, true),
-          });
+        const regionId = resolveIranRegion(text);
+        if (regionId) {
+          await ctx.reply(
+            [
+              `استان‌های منطقه «${regionId}»`,
+              "",
+              "استان خودت را از دکمه‌ها انتخاب کن:",
+            ].join("\n"),
+            {
+              reply_markup: provinceReplyKeyboard(user.country, regionId, true),
+            },
+          );
           return;
         }
       }
@@ -231,7 +243,12 @@ registerHandler.on("message:text", async (ctx, next) => {
       if (!list.includes(text)) {
         await ctx.reply(
           user.country === "IR"
-            ? "اول منطقه، بعد استان را از دکمه‌ها بزن:"
+            ? [
+                "اول منطقه را از دکمه‌ها بزن.",
+                "روی هر دکمه نمونه استان‌ها نوشته شده.",
+                "",
+                iranRegionPrompt(),
+              ].join("\n")
             : "از دکمه‌های پایین استان را انتخاب کن:",
           {
             reply_markup: provinceReplyKeyboard(user.country, undefined, true),

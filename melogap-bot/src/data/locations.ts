@@ -75,12 +75,51 @@ export const IRAN_REGIONS: Record<string, string[]> = {
   شرق: ["خراسان رضوی", "خراسان شمالی", "خراسان جنوبی", "سیستان", "کرمان"],
 };
 
+/** برچسب دکمه منطقه با نمونه استان‌ها — تا کاربر بفهمد */
+export function iranRegionChoices(): { id: string; label: string }[] {
+  return Object.entries(IRAN_REGIONS).map(([id, provinces]) => {
+    const sample = provinces.slice(0, 2).join("، ");
+    const more = provinces.length > 2 ? "…" : "";
+    return { id, label: `${id} (${sample}${more})` };
+  });
+}
+
 export function iranRegions(): string[] {
   return Object.keys(IRAN_REGIONS);
 }
 
+/** از متن دکمه، شناسه منطقه را دربیار */
+export function resolveIranRegion(text: string): string | null {
+  if (IRAN_REGIONS[text]) return text;
+  const hit = iranRegionChoices().find((c) => c.label === text);
+  if (hit) return hit.id;
+  // شروع با نام منطقه (سازگاری)
+  for (const id of Object.keys(IRAN_REGIONS)) {
+    if (text === id || text.startsWith(`${id} `) || text.startsWith(`${id}(`)) {
+      return id;
+    }
+  }
+  return null;
+}
+
 export function provincesInRegion(region: string): string[] | null {
-  return IRAN_REGIONS[region] ?? null;
+  const id = resolveIranRegion(region) ?? region;
+  return IRAN_REGIONS[id] ?? null;
+}
+
+/** متن راهنمای مرحله انتخاب منطقه ایران */
+export function iranRegionPrompt(): string {
+  return [
+    "۳/۹ — استانت کجاست؟",
+    "",
+    "استان‌های ایران زیادند؛ اول منطقه‌ات را بزن",
+    "تا لیست کوتاه شود، بعد استان دقیق را انتخاب کن.",
+    "",
+    "مثال:",
+    "• تهران / کرج / اصفهان → مرکز",
+    "• گیلان / مازندران → شمال",
+    "• شیراز / اهواز → جنوب",
+  ].join("\n");
 }
 
 export function provincesForCountry(country: string): string[] {

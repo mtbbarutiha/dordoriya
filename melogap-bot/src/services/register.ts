@@ -14,6 +14,7 @@ import {
   regNameKeyboard,
 } from "../keyboards/main.js";
 import { WELCOME_DIAMONDS } from "../data/packages.js";
+import { iranRegionPrompt } from "../data/locations.js";
 
 const PREV_STEP: Record<string, string> = {
   country: "language",
@@ -65,7 +66,7 @@ export async function resumeRegistration(
     case "province":
       await ctx.reply(
         (user.country ?? "IR") === "IR"
-          ? "۳/۹ — منطقه را انتخاب کن:"
+          ? iranRegionPrompt()
           : "۳/۹ — استان را انتخاب کن:",
         {
           reply_markup: provinceReplyKeyboard(user.country ?? "IR", undefined, true),
