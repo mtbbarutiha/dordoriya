@@ -9,8 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:seed-fake": "tsx scripts/seed-fake-users.ts"
+    "db:generate": "prisma generate"
   },
   "keywords": [
     "telegram",
@@ -22,12 +21,10 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "dotenv": "^17.4.2",
-    "grammy": "^1.45.1",
-    "sharp": "^0.35.3"
+    "grammy": "^1.45.1"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
-    "@types/sharp": "^0.31.1",
     "prisma": "^5.22.0",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
