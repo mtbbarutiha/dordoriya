@@ -1,7 +1,7 @@
 import { Composer } from "grammy";
 import { findByTelegram } from "../db/users.js";
 import { restoreUserSession } from "../services/sessionRestore.js";
-import { chattingInlineKeyboard } from "../keyboards/main.js";
+import { chattingKeyboard } from "../keyboards/main.js";
 import { langOf, tr } from "../i18n/index.js";
 
 export const fallbackHandler = new Composer();
@@ -29,10 +29,10 @@ fallbackHandler.on("message:text", async (ctx) => {
     await ctx.reply(
       tr(
         lang,
-        "هنوز در چتی. پیام را بنویس یا از دکمه‌های زیر پیام وصل استفاده کن.",
-        "You're still in a chat. Type a message or use the buttons under the connected message.",
+        "هنوز در چتی. پیام را بنویس یا از منوی پایین استفاده کن.",
+        "You're still in a chat. Type a message or use the bottom menu.",
       ),
-      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingKeyboard(user.secureChat, lang) },
     );
     return;
   }

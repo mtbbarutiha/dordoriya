@@ -37,7 +37,7 @@ async function getChattingPair(userId: number) {
   return { user, partner };
 }
 
-/** گزینه‌های رله — بدون ReplyKeyboard (شناور روی اسکرول) */
+/** گزینه‌های رله — بدون reply_markup تا کیبورد پایین استاندارد تلگرام بماند */
 function partnerRelayOpts(
   user: ChatUser,
   partner: ChatUser,

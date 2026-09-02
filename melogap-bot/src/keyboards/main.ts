@@ -130,9 +130,31 @@ export function cardReceiptReplyKeyboard(lang: Lang | string | null = "fa") {
 }
 
 /**
- * کنترل‌های حین چت ناشناس — فقط InlineKeyboard.
- * ReplyKeyboardMarkup هنگام اسکرول تاریخچه وسط viewport شناور می‌ماند؛
- * پس در چت اصلاً reply keyboard نمی‌فرستیم (فقط ReplyKeyboardRemove + این دکمه‌ها).
+ * منوی Reply حین چت ناشناس — مثل استاندارد تلگرام:
+ * resize_keyboard تا جمع‌وجور بماند، بدون is_persistent تا کاربر خودش جمع کند
+ * و با اسکرول صفحه پایین برود (فیکس اجباری نباشد).
+ * فقط یک‌بار روی اتصال/resume بفرست؛ روی پیام‌های رله نفرست.
+ */
+export function chattingKeyboard(
+  secure = false,
+  lang: Lang | string | null = "fa",
+) {
+  const L = normalizeLang(lang);
+  return new Keyboard()
+    .text(btn(L, "END_CHAT"), "danger")
+    .text(btn(L, "VIEW_PARTNER"), "primary")
+    .row()
+    .text(btn(L, "ADD_CONTACT"), "success")
+    .text(
+      secure ? btn(L, "SECURE_CHAT_OFF") : btn(L, "SECURE_CHAT_ON"),
+      "primary",
+    )
+    .resized();
+}
+
+/**
+ * دکمه‌های Inline اختیاری زیر پیام «وصل شدید» —
+ * مکمل منوی Reply هستند، جایگزین آن نیستند.
  */
 export function chattingInlineKeyboard(
   secure = false,
@@ -154,18 +176,7 @@ export function chattingInlineKeyboard(
     .primary();
 }
 
-/**
- * @deprecated حین چت از chattingInlineKeyboard استفاده کن.
- * نگه‌داشته شده فقط برای سازگاری import؛ همان inline را برمی‌گرداند.
- */
-export function chattingKeyboard(
-  secure = false,
-  lang: Lang | string | null = "fa",
-) {
-  return chattingInlineKeyboard(secure, lang);
-}
-
-/** حذف کامل ReplyKeyboard (منوی اصلی / کیبورد قدیمی چت) هنگام ورود به چت */
+/** حذف ReplyKeyboard — فقط وقتی واقعاً لازم است (نه هنگام شروع چت) */
 export const removeReplyKeyboard = {
   remove_keyboard: true,
 } as const;

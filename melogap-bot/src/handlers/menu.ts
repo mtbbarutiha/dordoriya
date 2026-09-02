@@ -6,9 +6,8 @@ import {
   coinsShopKeyboard,
   searchPanelKeyboard,
   locationKeyboard,
-  chattingInlineKeyboard,
+  chattingKeyboard,
   confirmEndChatKeyboard,
-  removeReplyKeyboard,
 } from "../keyboards/main.js";
 import { btnAll, langOf, t, fullGuide } from "../i18n/index.js";
 import {
@@ -24,27 +23,18 @@ import { safeAnswerCallback } from "../lib/telegramSafe.js";
 
 export const menuHandler = new Composer();
 
-/** Main-menu actions must not replace the chat UI mid-chat. */
+/** Main-menu actions must not replace the chat reply keyboard mid-chat. */
 async function blockIfChatting(
   ctx: { reply: (text: string, extra?: object) => Promise<unknown> },
   user: { state: string; secureChat: boolean; language?: string | null },
 ): Promise<boolean> {
   if (user.state !== "chatting") return false;
   const lang = langOf(user);
-  // پاک کردن ReplyKeyboard باقی‌مانده (شناور روی اسکرول) + کنترل Inline
-  await ctx
-    .reply(
-      lang === "en"
-        ? "You're in a chat. End it first (/end)."
-        : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: removeReplyKeyboard },
-    )
-    .catch(() => undefined);
   await ctx.reply(
     lang === "en"
-      ? "Chat controls:"
-      : "کنترل‌های چت:",
-    { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
+      ? "You're in a chat. End it first (/end)."
+      : "الان در چت هستی. اول قطع کن (/end).",
+    { reply_markup: chattingKeyboard(user.secureChat, lang) },
   );
   return true;
 }
@@ -367,13 +357,6 @@ menuHandler.hears(btnAll("END_CHAT"), async (ctx) => {
     });
     return;
   }
-  // اگر هنوز ReplyKeyboard قدیمی چت مانده، اول پاک کن
-  await ctx
-    .reply(
-      lang === "en" ? "Chat controls updated." : "کنترل‌های چت به‌روز شد.",
-      { reply_markup: removeReplyKeyboard },
-    )
-    .catch(() => undefined);
   await ctx.reply(t(lang, "end_chat_confirm"), {
     reply_markup: confirmEndChatKeyboard(lang),
   });
@@ -421,7 +404,7 @@ menuHandler.callbackQuery("chat:end:no", async (ctx) => {
   await safeAnswerCallback(ctx, { text: t(lang, "end_chat_cancelled") });
   if (!user || user.state !== "chatting") return;
   await ctx.reply(t(lang, "end_chat_cancelled"), {
-    reply_markup: chattingInlineKeyboard(user.secureChat, lang),
+    reply_markup: chattingKeyboard(user.secureChat, lang),
   });
 });
 
@@ -466,7 +449,7 @@ menuHandler.hears(btnAll("ADD_CONTACT"), async (ctx) => {
   }
   const { addContact } = await import("../services/contacts.js");
   const result = await addContact(user.id, user.chatPartnerId);
-  const kb = chattingInlineKeyboard(user.secureChat, lang);
+  const kb = chattingKeyboard(user.secureChat, lang);
   if (result === "ok") {
     await ctx.reply(t(lang, "contact_added"), { reply_markup: kb });
     return;
@@ -503,7 +486,7 @@ menuHandler.callbackQuery("chat:contact", async (ctx) => {
   }
   const { addContact } = await import("../services/contacts.js");
   const result = await addContact(user.id, user.chatPartnerId);
-  const kb = chattingInlineKeyboard(user.secureChat, lang);
+  const kb = chattingKeyboard(user.secureChat, lang);
   const msg =
     result === "ok"
       ? t(lang, "contact_added")
@@ -589,7 +572,7 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
       {
         reply_markup:
           nextState === "chatting"
-            ? chattingInlineKeyboard(user.secureChat, lang)
+            ? chattingKeyboard(user.secureChat, lang)
             : mainKeyboard(lang),
       },
     );
@@ -600,7 +583,7 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
       lang === "en"
         ? "End the chat first (/end)."
         : "اول چت را قطع کن (/end).",
-      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingKeyboard(user.secureChat, lang) },
     );
     return;
   }

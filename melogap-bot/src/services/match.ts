@@ -4,10 +4,10 @@ import { prisma } from "../db/prisma.js";
 import { patchUser } from "../db/users.js";
 import { haversineKm } from "../lib/geo.js";
 import {
+  chattingKeyboard,
   chattingInlineKeyboard,
   mainKeyboard,
   waitingKeyboard,
-  removeReplyKeyboard,
 } from "../keyboards/main.js";
 import { langOf, t, tr, normalizeLang, type Lang } from "../i18n/index.js";
 import { cityLabel, provinceLabel } from "../data/locations.js";
@@ -900,52 +900,32 @@ export async function connectUsers(
 
   const langA = langOf(a);
   const langB = langOf(b);
-  const kbA = chattingInlineKeyboard(false, langA);
-  const kbB = chattingInlineKeyboard(false, langB);
-
-  // Telegram: نمی‌شود remove_keyboard و Inline را روی یک پیام فرستاد.
-  // ۱) ReplyKeyboard منوی اصلی را کامل بردار (کیبورد فیکس/شناور نشود)
-  // ۲) پیام وصل + کنترل‌های Inline زیر همان پیام
-  const clearTextA =
-    langA === "en" ? "Keyboard cleared." : "کیبورد برداشته شد.";
-  const clearTextB =
-    langB === "en" ? "Keyboard cleared." : "کیبورد برداشته شد.";
-  const clearA = await api
-    .sendMessage(Number(a.telegramId), clearTextA, {
-      reply_markup: removeReplyKeyboard,
-    })
-    .catch(() => null);
-  const clearB = await api
-    .sendMessage(Number(b.telegramId), clearTextB, {
-      reply_markup: removeReplyKeyboard,
-    })
-    .catch(() => null);
-  if (clearA) {
-    await api
-      .deleteMessage(Number(a.telegramId), clearA.message_id)
-      .catch(() => undefined);
-  }
-  if (clearB) {
-    await api
-      .deleteMessage(Number(b.telegramId), clearB.message_id)
-      .catch(() => undefined);
-  }
+  // Inline زیر پیام وصل (اختیاری) + ReplyKeyboard منوی چت یک‌بار روی continue
+  // — بدون ReplyKeyboardRemove و بدون is_persistent (رفتار استاندارد تلگرام)
+  const inlineA = chattingInlineKeyboard(false, langA);
+  const inlineB = chattingInlineKeyboard(false, langB);
+  const replyA = chattingKeyboard(false, langA);
+  const replyB = chattingKeyboard(false, langB);
 
   const ma = await api.sendMessage(
     Number(a.telegramId),
     t(langA, "chat_connected"),
-    { reply_markup: kbA },
+    { reply_markup: inlineA },
   );
   const mb = await api.sendMessage(
     Number(b.telegramId),
     t(langB, "chat_connected"),
-    { reply_markup: kbB },
+    { reply_markup: inlineB },
   );
   await api
-    .sendMessage(Number(a.telegramId), t(langA, "continue_chat"))
+    .sendMessage(Number(a.telegramId), t(langA, "continue_chat"), {
+      reply_markup: replyA,
+    })
     .catch(() => undefined);
   await api
-    .sendMessage(Number(b.telegramId), t(langB, "continue_chat"))
+    .sendMessage(Number(b.telegramId), t(langB, "continue_chat"), {
+      reply_markup: replyB,
+    })
     .catch(() => undefined);
   await logPairMessages({
     aUserId: a.id,
@@ -995,10 +975,10 @@ export async function setSecureChat(
       : "🔓 چت امن خاموش شد.";
 
   const ma = await api.sendMessage(Number(me.telegramId), text, {
-    reply_markup: chattingInlineKeyboard(enabled, meLang),
+    reply_markup: chattingKeyboard(enabled, meLang),
   });
   const mb = await api.sendMessage(Number(partner.telegramId), partnerText, {
-    reply_markup: chattingInlineKeyboard(enabled, partnerLang),
+    reply_markup: chattingKeyboard(enabled, partnerLang),
   });
   await logPairMessages({
     aUserId: me.id,

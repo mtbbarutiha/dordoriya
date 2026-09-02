@@ -1,5 +1,5 @@
 /**
- * Smoke tests for chat inline-keyboard / no-float-on-scroll fix (no Telegram / DB).
+ * Smoke tests for standard Telegram chat reply-keyboard UX (no Telegram / DB).
  * Run: node scripts/smoke-chat-keyboard.mjs
  */
 
@@ -62,9 +62,31 @@ function partnerRelayOpts(user, partner, extra = {}) {
   };
 }
 
+/**
+ * Connect sequence: inline extras under connected message,
+ * then chatting ReplyKeyboard once on continue — no remove, no persistent.
+ */
 function connectKeyboardSequence() {
-  // 1) remove reply keyboard completely, 2) show inline chat controls
-  return ["remove_keyboard", "chattingInlineKeyboard"];
+  return ["chattingInlineKeyboard", "chattingKeyboard"];
+}
+
+function chattingKeyboard(secure = false) {
+  return {
+    keyboard: [
+      [
+        { text: "🔚 قطع چت" },
+        { text: "👤 پروفایل طرف مقابل" },
+      ],
+      [
+        { text: "➕ افزودن به مخاطبین" },
+        {
+          text: secure ? "🔓 خاموش کردن چت امن" : "🔒 چت امن",
+        },
+      ],
+    ],
+    resize_keyboard: true,
+    // intentionally NO is_persistent — user can collapse; scrolls with chat
+  };
 }
 
 function chattingInlineKeyboard(secure = false) {
@@ -138,7 +160,7 @@ assert(
   "idle uses menu",
 );
 
-// --- relay must NOT carry reply keyboard (scroll-float fix) ---
+// --- relay must NOT carry reply keyboard (standard bottom KB) ---
 const opts = partnerRelayOpts(
   { secureChat: false },
   { secureChat: true },
@@ -149,25 +171,31 @@ assert(opts.reply_markup == null, "relay has no reply_markup");
 assert(opts.caption === "hi", "extra fields preserved");
 assert(
   JSON.stringify(connectKeyboardSequence()) ===
-    JSON.stringify(["remove_keyboard", "chattingInlineKeyboard"]),
-  "connect removes reply kb then shows inline",
+    JSON.stringify(["chattingInlineKeyboard", "chattingKeyboard"]),
+  "connect shows inline extras then reply menu once",
+);
+
+const reply = chattingKeyboard(false);
+assert(Array.isArray(reply.keyboard), "reply keyboard present");
+assert(reply.resize_keyboard === true, "resize_keyboard true");
+assert(
+  !("is_persistent" in reply) || reply.is_persistent === false,
+  "no is_persistent forced",
+);
+assert(
+  reply.keyboard.flat().some((b) => b.text === "🔚 قطع چت"),
+  "end chat on reply menu",
+);
+assert(
+  chattingKeyboard(true).keyboard.flat().some((b) => b.text === "🔓 خاموش کردن چت امن"),
+  "secure off label when enabled",
 );
 
 const inline = chattingInlineKeyboard(false);
-assert(Array.isArray(inline.inline_keyboard), "inline_keyboard present");
-assert(
-  !("keyboard" in inline) && !("resize_keyboard" in inline),
-  "no ReplyKeyboard fields on chat controls",
-);
+assert(Array.isArray(inline.inline_keyboard), "inline extras present");
 assert(
   inline.inline_keyboard.flat().some((b) => b.callback_data === "chat:end"),
-  "end chat callback",
-);
-assert(
-  chattingInlineKeyboard(true).inline_keyboard
-    .flat()
-    .some((b) => b.callback_data === "chat:secure:off"),
-  "secure off when enabled",
+  "end chat callback on inline extras",
 );
 
 console.log("smoke-chat-keyboard: OK");
