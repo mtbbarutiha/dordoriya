@@ -220,7 +220,6 @@ export async function restoreUserSession(
         "🎟 کد هدیه / ووچر را بفرست:",
         "🎟 Send your gift code / voucher:",
       ),
-      { reply_markup: mainKeyboard(lang) },
     );
     return fresh;
   }

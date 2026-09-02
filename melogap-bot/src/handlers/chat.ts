@@ -87,9 +87,7 @@ chatHandler.on("message:text", async (ctx, next) => {
 
   if (SECURE_ON.has(text) || SECURE_OFF.has(text)) {
     if (user.state !== "chatting") {
-      await ctx.reply(t(lang, "not_chatting"), {
-        reply_markup: mainKeyboard(lang),
-      });
+      await ctx.reply(t(lang, "not_chatting"));
       return;
     }
     const ok = await setSecureChat(ctx.api, user.id, SECURE_ON.has(text));

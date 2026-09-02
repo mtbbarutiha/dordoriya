@@ -199,3 +199,18 @@ assert(
 );
 
 console.log("smoke-chat-keyboard: OK");
+
+
+function mainKeyboard() {
+  return {
+    keyboard: [[{ text: "به یه ناشناس وصلم کن! 🙈" }]],
+    resize_keyboard: true,
+  };
+}
+const mainKb = mainKeyboard();
+assert(mainKb.resize_keyboard === true, "main resize_keyboard true");
+assert(
+  !("is_persistent" in mainKb) || mainKb.is_persistent === false,
+  "main menu no is_persistent",
+);
+console.log("smoke-main-menu-keyboard: OK");

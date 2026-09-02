@@ -45,6 +45,12 @@ export const AGE_RANGES = AGE_RANGES_I18N.fa;
 /**
  * منوی اصلی — رنگ ملوگپ:
  * بالایی سبز (success) | سکه/پروفایل/راهنما/معرفی طوسی (پیش‌فرض)
+ *
+ * مثل منوی چت / استاندارد تلگرام:
+ * resize_keyboard تا جمع‌وجور بماند، بدون is_persistent تا کاربر خودش
+ * مینیمایز کند و با اسکرول پایین برود (فیکس اجباری نباشد).
+ * فقط روی /start، ورود منو، پایان چت و گذارهای مهم بفرست؛
+ * روی پاسخ‌های روزمرهٔ idle نفرست تا وسط اسکرول دوباره لنگر نشود.
  */
 export function mainKeyboard(lang: Lang | string | null = "fa") {
   const L = normalizeLang(lang);
@@ -64,8 +70,7 @@ export function mainKeyboard(lang: Lang | string | null = "fa") {
     .text(btn(L, "REFERRAL"))
     .row()
     .text(btn(L, "ANON_LINK"), "primary")
-    .resized()
-    .persistent();
+    .resized();
 }
 
 /** پنل جستجو — سبز/آبی برای اکشن‌های اصلی، بقیه طوسی */

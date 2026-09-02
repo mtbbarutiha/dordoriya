@@ -108,9 +108,8 @@ menuHandler.hears(btnAll("GUIDE"), async (ctx) => {
   if (!user) return;
   if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
-  await ctx.reply(fullGuide(lang), {
-    reply_markup: mainKeyboard(lang),
-  });
+  // بدون reply_markup تا کیبورد اصلی وسط اسکرول دوباره لنگر نشود
+  await ctx.reply(fullGuide(lang));
 });
 
 menuHandler.hears(btnAll("DIAMONDS"), async (ctx) => {
@@ -177,7 +176,6 @@ menuHandler.hears(btnAll("REFERRAL"), async (ctx) => {
           "لینک دعوتت:",
           link,
         ].join("\n"),
-    { reply_markup: mainKeyboard(lang) },
   );
 });
 
@@ -204,7 +202,6 @@ menuHandler.hears(btnAll("ANON_LINK"), async (ctx) => {
           "",
           link,
         ].join("\n"),
-    { reply_markup: mainKeyboard(lang) },
   );
 });
 
@@ -220,7 +217,6 @@ menuHandler.hears(btnAll("BOOST"), async (ctx) => {
       lang === "en"
         ? `Your boost is active until ${user.boostUntil.toLocaleString(locale)}`
         : `شتاب‌دهی‌ات هنوز فعال است تا ${user.boostUntil.toLocaleString(locale)}`,
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -239,7 +235,6 @@ menuHandler.hears(btnAll("BOOST"), async (ctx) => {
             `موجودی: ${formatNum(user.diamonds)} سکه`,
             "سکه کافی نیست — از «💛 سکه‌ها» بخر.",
           ].join("\n"),
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -251,7 +246,6 @@ menuHandler.hears(btnAll("BOOST"), async (ctx) => {
       lang === "en"
         ? "Not enough coins."
         : "سکه کافی نیست.",
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -261,7 +255,6 @@ menuHandler.hears(btnAll("BOOST"), async (ctx) => {
       until: until.toLocaleString(locale),
       cost: formatNum(BOOST_COST),
     }),
-    { reply_markup: mainKeyboard(lang) },
   );
 });
 
@@ -273,7 +266,6 @@ menuHandler.hears(btnAll("PRO"), async (ctx) => {
   if (user.isPro) {
     await ctx.reply(
       lang === "en" ? "Pro subscription is active 🅿️" : "اشتراک پرو تو فعال است 🅿️",
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -331,7 +323,6 @@ menuHandler.hears(btnAll("STATS"), async (ctx) => {
           `• سکه: ${formatNum(user.diamonds)}`,
           `کاربران دوردوریا: ${formatNum(totalUsers)}`,
         ].join("\n"),
-    { reply_markup: mainKeyboard(lang) },
   );
 });
 
@@ -352,9 +343,7 @@ menuHandler.hears(btnAll("END_CHAT"), async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" && !user.chatPartnerId) {
-    await ctx.reply(t(lang, "not_chatting"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "not_chatting"));
     return;
   }
   await ctx.reply(t(lang, "end_chat_confirm"), {
@@ -368,9 +357,7 @@ menuHandler.callbackQuery("chat:end", async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" && !user.chatPartnerId) {
-    await ctx.reply(t(lang, "not_chatting"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "not_chatting"));
     return;
   }
   await ctx.reply(t(lang, "end_chat_confirm"), {
@@ -384,9 +371,7 @@ menuHandler.callbackQuery("chat:end:yes", async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" && !user.chatPartnerId) {
-    await ctx.reply(t(lang, "not_chatting"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "not_chatting"));
     return;
   }
   const partnerId = user.chatPartnerId;
@@ -413,9 +398,7 @@ menuHandler.hears(btnAll("VIEW_PARTNER"), async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" || !user.chatPartnerId) {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { showPartnerProfileInChat } = await import("../services/profile.js");
@@ -428,9 +411,7 @@ menuHandler.callbackQuery("chat:partner", async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" || !user.chatPartnerId) {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { showPartnerProfileInChat } = await import("../services/profile.js");
@@ -442,9 +423,7 @@ menuHandler.hears(btnAll("ADD_CONTACT"), async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" || !user.chatPartnerId) {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { addContact } = await import("../services/contacts.js");
@@ -479,9 +458,7 @@ menuHandler.callbackQuery("chat:contact", async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" || !user.chatPartnerId) {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { addContact } = await import("../services/contacts.js");
@@ -506,9 +483,7 @@ menuHandler.hears(btnAll("SECURE_CHAT_ON"), async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   const lang = langOf(user);
   if (!user || user.state !== "chatting") {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { setSecureChat } = await import("../services/match.js");
@@ -519,9 +494,7 @@ menuHandler.hears(btnAll("SECURE_CHAT_OFF"), async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   const lang = langOf(user);
   if (!user || user.state !== "chatting") {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { setSecureChat } = await import("../services/match.js");
@@ -533,9 +506,7 @@ menuHandler.callbackQuery("chat:secure:on", async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   const lang = langOf(user);
   if (!user || user.state !== "chatting") {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { setSecureChat } = await import("../services/match.js");
@@ -547,9 +518,7 @@ menuHandler.callbackQuery("chat:secure:off", async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   const lang = langOf(user);
   if (!user || user.state !== "chatting") {
-    await ctx.reply(t(lang, "only_in_chat"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "only_in_chat"));
     return;
   }
   const { setSecureChat } = await import("../services/match.js");

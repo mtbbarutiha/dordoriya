@@ -51,9 +51,7 @@ commandsHandler.command("end", async (ctx) => {
   if (!user) return;
   const lang = langOf(user);
   if (user.state !== "chatting" && !user.chatPartnerId) {
-    await ctx.reply(t(lang, "not_chatting"), {
-      reply_markup: mainKeyboard(lang),
-    });
+    await ctx.reply(t(lang, "not_chatting"));
     return;
   }
   const { confirmEndChatKeyboard } = await import("../keyboards/main.js");
@@ -176,9 +174,7 @@ commandsHandler.command("anon", async (ctx) => {
   }
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
-  await ctx.reply([t(lang, "anon_title"), "", link].join("\n"), {
-    reply_markup: mainKeyboard(lang),
-  });
+  await ctx.reply([t(lang, "anon_title"), "", link].join("\n"));
 });
 
 commandsHandler.command("diamonds", async (ctx) => {
@@ -224,7 +220,6 @@ commandsHandler.command("voucher", async (ctx) => {
         "🎟 کد هدیه را بفرست:\nمثال: /voucher DORDORIA100",
         "🎟 Send gift code:\nExample: /voucher DORDORIA100",
       ),
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -268,7 +263,6 @@ commandsHandler.command("boost", async (ctx) => {
       lang === "en"
         ? `Boost active until ${user.boostUntil.toLocaleString(locale)}`
         : `شتاب‌دهی فعال تا ${user.boostUntil.toLocaleString(locale)}`,
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -277,7 +271,6 @@ commandsHandler.command("boost", async (ctx) => {
       lang === "en"
         ? `Not enough coins. Need: ${formatNum(BOOST_COST)}`
         : `سکه کافی نیست. نیاز: ${formatNum(BOOST_COST)}`,
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -287,7 +280,6 @@ commandsHandler.command("boost", async (ctx) => {
   if (!ok) {
     await ctx.reply(
       lang === "en" ? "Not enough coins." : "سکه کافی نیست.",
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -297,7 +289,6 @@ commandsHandler.command("boost", async (ctx) => {
       until: until.toLocaleString(locale),
       cost: formatNum(BOOST_COST),
     }),
-    { reply_markup: mainKeyboard(lang) },
   );
 });
 
@@ -317,7 +308,6 @@ commandsHandler.command("pro", async (ctx) => {
   if (user.isPro) {
     await ctx.reply(
       lang === "en" ? "Pro is active 🅿️" : "پرو فعال است 🅿️",
-      { reply_markup: mainKeyboard(lang) },
     );
     return;
   }
@@ -369,6 +359,5 @@ commandsHandler.command("stats", async (ctx) => {
           `💰 سکه: ${formatNum(user.diamonds)}`,
           `کاربران فعال: ${formatNum(totalUsers)}`,
         ].join("\n"),
-    { reply_markup: mainKeyboard(lang) },
   );
 });
