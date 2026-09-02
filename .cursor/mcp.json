@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "telegram-ads": {
+      "command": "/agent/tools/telegram_ads_mcp/.venv/bin/telegram-ads-mcp",
+      "env": {
+        "TELEGRAM_ADS_AUTH_STATE": "${userHome}/.config/telegram-ads-mcp/auth_state.json",
+        "TELEGRAM_ADS_ACCOUNT": "${env:TELEGRAM_ADS_ACCOUNT}"
+      }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+# Telegram Ads MCP (local install)
+tools/telegram_ads_mcp/.venv/
+tools/telegram_ads_mcp/auth_state.json
+**/.config/telegram-ads-mcp/
