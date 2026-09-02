@@ -533,7 +533,7 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
     const nextState = user.chatPartnerId ? "chatting" : "idle";
     const { cancelDirectCompose } = await import("../services/directMsg.js");
     await cancelDirectCompose(user.id);
-    await patchUser(user.id, { state: nextState, pendingAnonTo: null });
+    await patchUser(user.id, { state: nextState, pendingDirectTo: null });
     await ctx.reply(
       lang === "en"
         ? "Direct message cancelled."
@@ -562,6 +562,9 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
       state: "idle",
       chatPartnerId: null,
       pendingAnonTo: null,
+      pendingDirectTo: null,
+      pendingSellCard: null,
+      pendingReportOther: null,
     });
     await ctx.reply(
       lang === "en" ? "Main menu:" : "منوی اصلی:",

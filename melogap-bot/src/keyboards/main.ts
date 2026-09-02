@@ -110,7 +110,7 @@ export function searchPanelKeyboard(lang: Lang | string | null = "fa") {
 
 export function cancelKeyboard(lang: Lang | string | null = "fa") {
   const L = normalizeLang(lang);
-  return new Keyboard().text(btn(L, "BACK"), "danger").resized().persistent();
+  return new Keyboard().text(btn(L, "BACK"), "danger").resized();
 }
 
 export function waitingKeyboard(lang: Lang | string | null = "fa") {
@@ -119,8 +119,7 @@ export function waitingKeyboard(lang: Lang | string | null = "fa") {
     .text(btn(L, "CANCEL_WAIT"), "danger")
     .row()
     .text(btn(L, "BACK"), "primary")
-    .resized()
-    .persistent();
+    .resized();
 }
 
 /** بعد از انتخاب کارت‌به‌کارت — دکمه ارسال رسید */

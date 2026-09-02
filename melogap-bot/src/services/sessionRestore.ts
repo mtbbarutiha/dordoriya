@@ -235,10 +235,27 @@ export async function touchUserFromContext(ctx: Context): Promise<User | null> {
   const from = ctx.from;
   if (!from) return null;
 
+  // مهم: middleware قبل از /start اجرا می‌شود. اگر deep-link معرف را اینجا
+  // به ensureUser ندهیم، کاربر بدون referredById ساخته می‌شود و attribution از دست می‌رود.
+  let referralCodeFromStart: string | undefined;
+  const text =
+    ctx.message && "text" in ctx.message && typeof ctx.message.text === "string"
+      ? ctx.message.text
+      : undefined;
+  if (text) {
+    const m = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/);
+    const payload = m?.[1]?.trim();
+    if (payload?.startsWith("ref_")) {
+      const code = payload.slice(4).trim();
+      if (code) referralCodeFromStart = code;
+    }
+  }
+
   const user = await ensureUser({
     telegramId: from.id,
     ...(from.username ? { username: from.username } : {}),
     ...(from.first_name ? { firstName: from.first_name } : {}),
+    ...(referralCodeFromStart ? { referralCodeFromStart } : {}),
   });
 
   const before = `${user.state}:${user.chatPartnerId}:${user.registered}`;

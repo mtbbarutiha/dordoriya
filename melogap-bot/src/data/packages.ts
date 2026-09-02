@@ -20,7 +20,7 @@ export const COIN_PRICE_STARS = 1;
  * حداقل موجودی برای ثبت درخواست: MIN_SELL_COINS
  */
 export const COIN_SELL_PRICE_TOMAN = 1_000;
-export const MIN_SELL_COINS = 50;
+export const MIN_SELL_COINS = 1000;
 
 function pkg(
   id: string,
@@ -138,7 +138,7 @@ export function packageCheckoutText(
   ].join("\n");
 }
 
-export const REFERRAL_BONUS = 30;
+export const REFERRAL_BONUS = 25;
 export const WELCOME_DIAMONDS = 15;
 /** سکه رایگان روزانه با ورود به ربات */
 export const DAILY_COIN_REWARD = 10;

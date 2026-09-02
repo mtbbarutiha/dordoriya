@@ -42,5 +42,16 @@
     "moduleResolution": "nodenext",
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "scripts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "scripts",
+    // کپی‌های قدیمی ریشه‌ی src — با مسیر import اشتباه tsc را می‌شکنند
+    "src/features.ts",
+    "src/locations.ts",
+    "src/main.ts",
+    "src/messages.ts",
+    "src/register.ts",
+    "src/start.ts"
+  ]
 }

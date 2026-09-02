@@ -57,9 +57,13 @@ export function formatCardGrouped(card: string): string {
   return d.replace(/(\d{4})(?=\d)/g, "$1-");
 }
 
+/** مقدار pendingSellCard یا legacy `sell_card:N` در pendingAnonTo */
 export function parseSellCardPending(pending: string | null | undefined): number | null {
-  if (!pending || !pending.startsWith(SELL_CARD_PREFIX)) return null;
-  const amount = Number(pending.slice(SELL_CARD_PREFIX.length));
+  if (!pending) return null;
+  const raw = pending.startsWith(SELL_CARD_PREFIX)
+    ? pending.slice(SELL_CARD_PREFIX.length)
+    : pending;
+  const amount = Number(raw);
   return Number.isFinite(amount) && amount > 0 ? Math.floor(amount) : null;
 }
 

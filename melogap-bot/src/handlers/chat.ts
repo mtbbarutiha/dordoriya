@@ -229,7 +229,7 @@ chatHandler.on("message:text", async (ctx, next) => {
     return;
   }
 
-  if (user.state === "await_direct_msg" && user.pendingAnonTo) {
+  if (user.state === "await_direct_msg" && user.pendingDirectTo) {
     const { handleDirectMsgTyped } = await import("../services/directMsg.js");
     await handleDirectMsgTyped(ctx, user.id, text);
     return;
@@ -484,7 +484,7 @@ chatHandler.on("message:voice", async (ctx, next) => {
   const from = ctx.from;
   if (!from) return next();
   const user = await findByTelegram(from.id);
-  if (!user || user.state !== "await_direct_msg" || !user.pendingAnonTo) {
+  if (!user || user.state !== "await_direct_msg" || !user.pendingDirectTo) {
     return next();
   }
   const voice = ctx.message.voice;

@@ -5,14 +5,16 @@ import { prisma } from "../db/prisma.js";
 import { reportReasonKeyboard, mainKeyboard } from "../keyboards/main.js";
 import { createUserReport, isReportReason, notifyAdminsNewReport, reasonLabel, } from "../services/report.js";
 export const reportHandler = new Composer();
-const REPORT_OTHER_PREFIX = "report_other:";
 function cancelReportKb(lang: "fa" | "en") {
     return new InlineKeyboard().text(lang === "en" ? "↩️ Cancel" : "↩️ انصراف", "report:cancel");
 }
+/** id هدف از pendingReportOther یا legacy `report_other:ID` */
 function parseReportOtherPending(pending: string | null | undefined) {
-    if (!pending || !pending.startsWith(REPORT_OTHER_PREFIX))
-        return null;
-    const id = Number(pending.slice(REPORT_OTHER_PREFIX.length));
+    if (!pending) return null;
+    const raw = pending.startsWith("report_other:")
+        ? pending.slice("report_other:".length)
+        : pending;
+    const id = Number(raw);
     return Number.isFinite(id) && id > 0 ? id : null;
 }
 reportHandler.callbackQuery(/^report:start:(\d+)$/, async (ctx) => {
@@ -47,8 +49,8 @@ reportHandler.callbackQuery(/^report:start:(\d+)$/, async (ctx) => {
 });
 reportHandler.callbackQuery("report:cancel", async (ctx) => {
     const user = await findByTelegram(ctx.from.id);
-    if (user && parseReportOtherPending(user.pendingAnonTo)) {
-        await patchUser(user.id, { pendingAnonTo: null });
+    if (user && parseReportOtherPending(user.pendingReportOther)) {
+        await patchUser(user.id, { pendingReportOther: null });
     }
     await ctx.answerCallbackQuery({
         text: user?.language === "en" ? "Cancelled" : "لغو شد",
@@ -72,9 +74,10 @@ reportHandler.callbackQuery(/^report:reason:(\d+):([a-z_]+)$/, async (ctx) => {
         return;
     }
     if (reason === "other") {
-        // state چت را دست نزن — فقط pending برای گرفتن متن
+        // state/DM/anon را دست نزن — فیلد جدا؛ فروش کارت را آزاد کن
         await patchUser(user.id, {
-            pendingAnonTo: `${REPORT_OTHER_PREFIX}${targetId}`,
+            pendingReportOther: String(targetId),
+            pendingSellCard: null,
         });
         await ctx.answerCallbackQuery();
         const prompt = lang === "en"
@@ -119,7 +122,7 @@ reportHandler.on("message:text", async (ctx, next) => {
     const user = await findByTelegram(ctx.from.id);
     if (!user)
         return next();
-    const targetId = parseReportOtherPending(user.pendingAnonTo);
+    const targetId = parseReportOtherPending(user.pendingReportOther);
     if (!targetId)
         return next();
     const lang = user.language === "en" ? "en" : "fa";
@@ -139,7 +142,7 @@ reportHandler.on("message:text", async (ctx, next) => {
         reason: "other",
         details: text.slice(0, 1000),
     });
-    await patchUser(user.id, { pendingAnonTo: null });
+    await patchUser(user.id, { pendingReportOther: null });
     if (!result.ok) {
         await ctx.reply(lang === "en" ? "Could not submit report." : "ثبت گزارش ممکن نشد.");
         return;

@@ -10,7 +10,6 @@ import {
   formatToman,
 } from "../data/packages.js";
 import {
-  SELL_CARD_PREFIX,
   earnIntroText,
   parseSellCardPending,
   sellAmountToman,
@@ -49,9 +48,9 @@ earnHandler.callbackQuery("earn:close", async (ctx) => {
 
 earnHandler.callbackQuery("earn:cancel", async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
-  if (user && parseSellCardPending(user.pendingAnonTo) != null) {
-    // فقط pending فروش را پاک کن — state/partner دست نخورَد
-    await patchUser(user.id, { pendingAnonTo: null });
+  if (user && parseSellCardPending(user.pendingSellCard) != null) {
+    // فقط pending فروش را پاک کن — DM/anon/report دست نخورَد
+    await patchUser(user.id, { pendingSellCard: null });
   }
   const lang = user?.language === "en" ? "en" : "fa";
   await ctx.answerCallbackQuery({
@@ -157,9 +156,10 @@ earnHandler.callbackQuery(/^earn:confirm:(\d+)$/, async (ctx) => {
     return;
   }
 
-  // state چت را دست نزن — فقط pending برای گرفتن شماره کارت
+  // state/DM/anon را دست نزن — فیلد جدا برای شماره کارت؛ report متنی را آزاد کن
   await patchUser(user.id, {
-    pendingAnonTo: `${SELL_CARD_PREFIX}${coins}`,
+    pendingSellCard: String(coins),
+    pendingReportOther: null,
   });
   await ctx.answerCallbackQuery();
   const prompt =
@@ -189,7 +189,7 @@ earnHandler.on("message:text", async (ctx, next) => {
   if (!ctx.from) return next();
   const user = await findByTelegram(ctx.from.id);
   if (!user) return next();
-  const coins = parseSellCardPending(user.pendingAnonTo);
+  const coins = parseSellCardPending(user.pendingSellCard);
   if (!coins) return next();
 
   const lang = langOf(user);
@@ -216,7 +216,7 @@ earnHandler.on("message:text", async (ctx, next) => {
     coins,
     cardNumber: cardCheck.card,
   });
-  await patchUser(user.id, { pendingAnonTo: null });
+  await patchUser(user.id, { pendingSellCard: null });
 
   if (!result.ok) {
     const msg =

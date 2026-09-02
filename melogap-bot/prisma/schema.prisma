@@ -59,7 +59,14 @@ model User {
   isActive          Boolean   @default(true)
   deletedAt         DateTime?
   state             String    @default("language")
+  /// هدف پیام ناشناس (anonCode) — ادمین/ووچر هم از همین فیلد برای draft موقت استفاده می‌کنند
   pendingAnonTo     String?
+  /// هدف نوشتن پیام دایرکت (id | reply:id | blast:token)
+  pendingDirectTo   String?
+  /// فروش سکه: تعداد سکه‌ای که منتظر شماره کارت است
+  pendingSellCard   String?
+  /// گزارش «دیگر موارد»: id کاربر هدف برای گرفتن توضیح متنی
+  pendingReportOther String?
   chatPartnerId     Int?
   boostUntil        DateTime?
   /// تا این زمان درخواست چت دریافت نمی‌شود (سایلنت)
