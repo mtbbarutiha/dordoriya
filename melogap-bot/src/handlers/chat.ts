@@ -1,7 +1,7 @@
 import { Composer, type Api } from "grammy";
 import { findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
-import { chattingKeyboard, mainKeyboard } from "../keyboards/main.js";
+import { mainKeyboard } from "../keyboards/main.js";
 import { allMenuButtonTexts, btnAll, langOf, t } from "../i18n/index.js";
 import { logChatMessage } from "../services/chatLog.js";
 import { setSecureChat } from "../services/match.js";
@@ -37,7 +37,7 @@ async function getChattingPair(userId: number) {
   return { user, partner };
 }
 
-/** گزینه‌های ارسال به طرف مقابل — همیشه کیبورد چت را دوباره پین کن */
+/** گزینه‌های رله — بدون ReplyKeyboard (شناور روی اسکرول) */
 function partnerRelayOpts(
   user: ChatUser,
   partner: ChatUser,
@@ -47,7 +47,6 @@ function partnerRelayOpts(
   return {
     ...extra,
     protect_content: secure,
-    reply_markup: chattingKeyboard(partner.secureChat, langOf(partner)),
   };
 }
 
@@ -368,9 +367,7 @@ chatHandler.on("message:photo", async (ctx, next) => {
         ),
     );
     if (secure) {
-      const ack = await ctx.reply("🔒 عکس با چت امن ارسال شد.", {
-        reply_markup: chattingKeyboard(user.secureChat, lang),
-      });
+      const ack = await ctx.reply("🔒 عکس با چت امن ارسال شد.");
       await logChatMessage(user.id, partner.id, user.telegramId, ack.message_id);
     }
   } catch (err) {
@@ -432,9 +429,7 @@ chatHandler.on("message:video", async (ctx, next) => {
         ),
     );
     if (secure) {
-      const ack = await ctx.reply("🔒 ویدیو با چت امن ارسال شد.", {
-        reply_markup: chattingKeyboard(user.secureChat, lang),
-      });
+      const ack = await ctx.reply("🔒 ویدیو با چت امن ارسال شد.");
       await logChatMessage(user.id, partner.id, user.telegramId, ack.message_id);
     }
   } catch (err) {

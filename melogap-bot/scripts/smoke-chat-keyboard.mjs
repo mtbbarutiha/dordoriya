@@ -1,5 +1,5 @@
 /**
- * Smoke tests for chat keyboard / reconcile logic (no Telegram / DB).
+ * Smoke tests for chat inline-keyboard / no-float-on-scroll fix (no Telegram / DB).
  * Run: node scripts/smoke-chat-keyboard.mjs
  */
 
@@ -53,19 +53,36 @@ function chatActionForText(state, text) {
   return "relay";
 }
 
-/** Mirror of partnerRelayOpts — every chat relay must re-pin reply keyboard. */
-function partnerRelayOpts(user, partner, chattingKeyboard, extra = {}) {
+/** Mirror of partnerRelayOpts — relays must NOT attach reply keyboard. */
+function partnerRelayOpts(user, partner, extra = {}) {
   const secure = user.secureChat || partner.secureChat;
   return {
     ...extra,
     protect_content: secure,
-    reply_markup: chattingKeyboard,
   };
 }
 
 function connectKeyboardSequence() {
-  // 1) remove tall main menu, 2) pin compact chatting keyboard
-  return ["remove_keyboard", "chattingKeyboard"];
+  // 1) remove reply keyboard completely, 2) show inline chat controls
+  return ["remove_keyboard", "chattingInlineKeyboard"];
+}
+
+function chattingInlineKeyboard(secure = false) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "🔚 قطع چت", callback_data: "chat:end" },
+        { text: "👤 پروفایل طرف مقابل", callback_data: "chat:partner" },
+      ],
+      [
+        { text: "➕ افزودن به مخاطبین", callback_data: "chat:contact" },
+        {
+          text: secure ? "🔓 خاموش کردن چت امن" : "🔒 چت امن",
+          callback_data: secure ? "chat:secure:off" : "chat:secure:on",
+        },
+      ],
+    ],
+  };
 }
 
 // --- reconcile / connect race ---
@@ -121,26 +138,36 @@ assert(
   "idle uses menu",
 );
 
-// --- relay must carry chat keyboard (scroll-pin fix) ---
+// --- relay must NOT carry reply keyboard (scroll-float fix) ---
 const opts = partnerRelayOpts(
   { secureChat: false },
   { secureChat: true },
-  {
-    keyboard: [["🔚"]],
-    resize_keyboard: true,
-    is_persistent: true,
-    input_field_placeholder: "پیامت را بنویس…",
-  },
   { caption: "hi" },
 );
 assert(opts.protect_content === true, "secure content when either side secure");
-assert(opts.reply_markup?.resize_keyboard === true, "relay resize_keyboard");
-assert(opts.reply_markup?.is_persistent === true, "relay is_persistent");
+assert(opts.reply_markup == null, "relay has no reply_markup");
 assert(opts.caption === "hi", "extra fields preserved");
 assert(
   JSON.stringify(connectKeyboardSequence()) ===
-    JSON.stringify(["remove_keyboard", "chattingKeyboard"]),
-  "connect removes then pins chat kb",
+    JSON.stringify(["remove_keyboard", "chattingInlineKeyboard"]),
+  "connect removes reply kb then shows inline",
+);
+
+const inline = chattingInlineKeyboard(false);
+assert(Array.isArray(inline.inline_keyboard), "inline_keyboard present");
+assert(
+  !("keyboard" in inline) && !("resize_keyboard" in inline),
+  "no ReplyKeyboard fields on chat controls",
+);
+assert(
+  inline.inline_keyboard.flat().some((b) => b.callback_data === "chat:end"),
+  "end chat callback",
+);
+assert(
+  chattingInlineKeyboard(true).inline_keyboard
+    .flat()
+    .some((b) => b.callback_data === "chat:secure:off"),
+  "secure off when enabled",
 );
 
 console.log("smoke-chat-keyboard: OK");

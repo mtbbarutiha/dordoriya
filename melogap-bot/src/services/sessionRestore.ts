@@ -4,12 +4,13 @@ import { prisma } from "../db/prisma.js";
 import { ensureUser, patchUser } from "../db/users.js";
 import {
   mainKeyboard,
-  chattingKeyboard,
+  chattingInlineKeyboard,
   waitingKeyboard,
   searchPanelKeyboard,
   locationKeyboard,
   cancelKeyboard,
   cardReceiptReplyKeyboard,
+  removeReplyKeyboard,
 } from "../keyboards/main.js";
 import { langOf, t, tr } from "../i18n/index.js";
 import { syncIdleUserMenu, syncChattingUserMenu } from "../botMenu.js";
@@ -129,8 +130,14 @@ export async function restoreUserSession(
 
   if (fresh.state === "chatting" && fresh.chatPartnerId != null) {
     await ctx.reply(t(lang, "welcome_back_chat"), {
-      reply_markup: chattingKeyboard(fresh.secureChat, lang),
+      reply_markup: removeReplyKeyboard,
     });
+    await ctx.reply(
+      lang === "en"
+        ? "Use the buttons under this message to manage the chat."
+        : "با دکمه‌های زیر این پیام چت را مدیریت کن.",
+      { reply_markup: chattingInlineKeyboard(fresh.secureChat, lang) },
+    );
     return fresh;
   }
 
@@ -163,7 +170,7 @@ export async function restoreUserSession(
       {
         reply_markup:
           fresh.chatPartnerId != null
-            ? chattingKeyboard(fresh.secureChat, lang)
+            ? chattingInlineKeyboard(fresh.secureChat, lang)
             : mainKeyboard(lang),
       },
     );

@@ -6,8 +6,9 @@ import {
   coinsShopKeyboard,
   searchPanelKeyboard,
   locationKeyboard,
-  chattingKeyboard,
+  chattingInlineKeyboard,
   confirmEndChatKeyboard,
+  removeReplyKeyboard,
 } from "../keyboards/main.js";
 import { btnAll, langOf, t, fullGuide } from "../i18n/index.js";
 import {
@@ -23,18 +24,27 @@ import { safeAnswerCallback } from "../lib/telegramSafe.js";
 
 export const menuHandler = new Composer();
 
-/** Main-menu actions must not replace the chat reply keyboard mid-chat. */
+/** Main-menu actions must not replace the chat UI mid-chat. */
 async function blockIfChatting(
   ctx: { reply: (text: string, extra?: object) => Promise<unknown> },
   user: { state: string; secureChat: boolean; language?: string | null },
 ): Promise<boolean> {
   if (user.state !== "chatting") return false;
   const lang = langOf(user);
+  // پاک کردن ReplyKeyboard باقی‌مانده (شناور روی اسکرول) + کنترل Inline
+  await ctx
+    .reply(
+      lang === "en"
+        ? "You're in a chat. End it first (/end)."
+        : "الان در چت هستی. اول قطع کن (/end).",
+      { reply_markup: removeReplyKeyboard },
+    )
+    .catch(() => undefined);
   await ctx.reply(
     lang === "en"
-      ? "You're in a chat. End it first (/end)."
-      : "الان در چت هستی. اول قطع کن (/end).",
-    { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      ? "Chat controls:"
+      : "کنترل‌های چت:",
+    { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
   );
   return true;
 }
@@ -357,6 +367,29 @@ menuHandler.hears(btnAll("END_CHAT"), async (ctx) => {
     });
     return;
   }
+  // اگر هنوز ReplyKeyboard قدیمی چت مانده، اول پاک کن
+  await ctx
+    .reply(
+      lang === "en" ? "Chat controls updated." : "کنترل‌های چت به‌روز شد.",
+      { reply_markup: removeReplyKeyboard },
+    )
+    .catch(() => undefined);
+  await ctx.reply(t(lang, "end_chat_confirm"), {
+    reply_markup: confirmEndChatKeyboard(lang),
+  });
+});
+
+menuHandler.callbackQuery("chat:end", async (ctx) => {
+  await safeAnswerCallback(ctx);
+  const user = await findByTelegram(ctx.from!.id);
+  if (!user) return;
+  const lang = langOf(user);
+  if (user.state !== "chatting" && !user.chatPartnerId) {
+    await ctx.reply(t(lang, "not_chatting"), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
   await ctx.reply(t(lang, "end_chat_confirm"), {
     reply_markup: confirmEndChatKeyboard(lang),
   });
@@ -388,11 +421,26 @@ menuHandler.callbackQuery("chat:end:no", async (ctx) => {
   await safeAnswerCallback(ctx, { text: t(lang, "end_chat_cancelled") });
   if (!user || user.state !== "chatting") return;
   await ctx.reply(t(lang, "end_chat_cancelled"), {
-    reply_markup: chattingKeyboard(user.secureChat, lang),
+    reply_markup: chattingInlineKeyboard(user.secureChat, lang),
   });
 });
 
 menuHandler.hears(btnAll("VIEW_PARTNER"), async (ctx) => {
+  const user = await findByTelegram(ctx.from!.id);
+  if (!user) return;
+  const lang = langOf(user);
+  if (user.state !== "chatting" || !user.chatPartnerId) {
+    await ctx.reply(t(lang, "only_in_chat"), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+  const { showPartnerProfileInChat } = await import("../services/profile.js");
+  await showPartnerProfileInChat(ctx, user.id, user.chatPartnerId);
+});
+
+menuHandler.callbackQuery("chat:partner", async (ctx) => {
+  await safeAnswerCallback(ctx);
   const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
   const lang = langOf(user);
@@ -418,7 +466,7 @@ menuHandler.hears(btnAll("ADD_CONTACT"), async (ctx) => {
   }
   const { addContact } = await import("../services/contacts.js");
   const result = await addContact(user.id, user.chatPartnerId);
-  const kb = chattingKeyboard(user.secureChat, lang);
+  const kb = chattingInlineKeyboard(user.secureChat, lang);
   if (result === "ok") {
     await ctx.reply(t(lang, "contact_added"), { reply_markup: kb });
     return;
@@ -440,6 +488,35 @@ menuHandler.hears(btnAll("ADD_CONTACT"), async (ctx) => {
     lang === "en" ? "Could not add to contacts." : "افزودن به مخاطبین ممکن نشد.",
     { reply_markup: kb },
   );
+});
+
+menuHandler.callbackQuery("chat:contact", async (ctx) => {
+  await safeAnswerCallback(ctx);
+  const user = await findByTelegram(ctx.from!.id);
+  if (!user) return;
+  const lang = langOf(user);
+  if (user.state !== "chatting" || !user.chatPartnerId) {
+    await ctx.reply(t(lang, "only_in_chat"), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+  const { addContact } = await import("../services/contacts.js");
+  const result = await addContact(user.id, user.chatPartnerId);
+  const kb = chattingInlineKeyboard(user.secureChat, lang);
+  const msg =
+    result === "ok"
+      ? t(lang, "contact_added")
+      : result === "exists"
+        ? t(lang, "contact_exists")
+        : result === "demo"
+          ? lang === "en"
+            ? "This is a demo profile; it can't be saved to contacts."
+            : "پروفایل نمونه است؛ قابل ذخیره در مخاطبین نیست."
+          : lang === "en"
+            ? "Could not add to contacts."
+            : "افزودن به مخاطبین ممکن نشد.";
+  await ctx.reply(msg, { reply_markup: kb });
 });
 
 menuHandler.hears(btnAll("SECURE_CHAT_ON"), async (ctx) => {
@@ -468,6 +545,34 @@ menuHandler.hears(btnAll("SECURE_CHAT_OFF"), async (ctx) => {
   await setSecureChat(ctx.api, user.id, false);
 });
 
+menuHandler.callbackQuery("chat:secure:on", async (ctx) => {
+  await safeAnswerCallback(ctx);
+  const user = await findByTelegram(ctx.from!.id);
+  const lang = langOf(user);
+  if (!user || user.state !== "chatting") {
+    await ctx.reply(t(lang, "only_in_chat"), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+  const { setSecureChat } = await import("../services/match.js");
+  await setSecureChat(ctx.api, user.id, true);
+});
+
+menuHandler.callbackQuery("chat:secure:off", async (ctx) => {
+  await safeAnswerCallback(ctx);
+  const user = await findByTelegram(ctx.from!.id);
+  const lang = langOf(user);
+  if (!user || user.state !== "chatting") {
+    await ctx.reply(t(lang, "only_in_chat"), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+  const { setSecureChat } = await import("../services/match.js");
+  await setSecureChat(ctx.api, user.id, false);
+});
+
 menuHandler.hears(btnAll("BACK"), async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
@@ -484,7 +589,7 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
       {
         reply_markup:
           nextState === "chatting"
-            ? chattingKeyboard(user.secureChat, lang)
+            ? chattingInlineKeyboard(user.secureChat, lang)
             : mainKeyboard(lang),
       },
     );
@@ -495,7 +600,7 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
       lang === "en"
         ? "End the chat first (/end)."
         : "اول چت را قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }

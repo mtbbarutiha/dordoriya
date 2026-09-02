@@ -2,7 +2,7 @@ import { Composer, InlineKeyboard } from "grammy";
 import { requireRegistered } from "../services/register.js";
 import {
   mainKeyboard,
-  chattingKeyboard,
+  chattingInlineKeyboard,
   coinsShopKeyboard,
   searchPanelKeyboard,
 } from "../keyboards/main.js";
@@ -38,11 +38,28 @@ commandsHandler.command("menu", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
   await showMainMenu(ctx, lang);
+});
+
+/** قطع چت — از منوی اسلش حین چت */
+commandsHandler.command("end", async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) return;
+  const lang = langOf(user);
+  if (user.state !== "chatting" && !user.chatPartnerId) {
+    await ctx.reply(t(lang, "not_chatting"), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+  const { confirmEndChatKeyboard } = await import("../keyboards/main.js");
+  await ctx.reply(t(lang, "end_chat_confirm"), {
+    reply_markup: confirmEndChatKeyboard(lang),
+  });
 });
 
 /** سلامت ربات — برای دیباگ سریع */
@@ -102,7 +119,7 @@ commandsHandler.command("profile", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -119,7 +136,7 @@ commandsHandler.command("explore", async (ctx) => {
       lang === "en"
         ? "End your current chat first (/end)."
         : "اول چت فعلی را قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -137,7 +154,7 @@ commandsHandler.command("chat", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first."
         : "الان در چت هستی. اول قطع کن.",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -153,7 +170,7 @@ commandsHandler.command("anon", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -173,7 +190,7 @@ commandsHandler.command("diamonds", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -192,7 +209,7 @@ commandsHandler.command("voucher", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -241,7 +258,7 @@ commandsHandler.command("boost", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -293,7 +310,7 @@ commandsHandler.command("pro", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }
@@ -329,7 +346,7 @@ commandsHandler.command("stats", async (ctx) => {
       lang === "en"
         ? "You're in a chat. End it first (/end)."
         : "الان در چت هستی. اول قطع کن (/end).",
-      { reply_markup: chattingKeyboard(user.secureChat, lang) },
+      { reply_markup: chattingInlineKeyboard(user.secureChat, lang) },
     );
     return;
   }

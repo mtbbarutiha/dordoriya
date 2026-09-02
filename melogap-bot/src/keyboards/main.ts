@@ -130,28 +130,42 @@ export function cardReceiptReplyKeyboard(lang: Lang | string | null = "fa") {
 }
 
 /**
- * کیبورد فشردهٔ حین چت — همیشه resize + persistent تا روی کلاینت
- * به ناحیهٔ ورودی بچسبد و هنگام اسکرول وسط صفحه شناور نماند.
- * (تلگرام گاهی کیبورد را به آخرین پیام دارای reply_markup لنگر می‌زند؛
- *  پس این کیبورد باید روی پیام‌های رلهٔ چت هم دوباره ارسال شود.)
+ * کنترل‌های حین چت ناشناس — فقط InlineKeyboard.
+ * ReplyKeyboardMarkup هنگام اسکرول تاریخچه وسط viewport شناور می‌ماند؛
+ * پس در چت اصلاً reply keyboard نمی‌فرستیم (فقط ReplyKeyboardRemove + این دکمه‌ها).
+ */
+export function chattingInlineKeyboard(
+  secure = false,
+  lang: Lang | string | null = "fa",
+) {
+  const L = normalizeLang(lang);
+  return new InlineKeyboard()
+    .text(btn(L, "END_CHAT"), "chat:end")
+    .danger()
+    .text(btn(L, "VIEW_PARTNER"), "chat:partner")
+    .primary()
+    .row()
+    .text(btn(L, "ADD_CONTACT"), "chat:contact")
+    .success()
+    .text(
+      secure ? btn(L, "SECURE_CHAT_OFF") : btn(L, "SECURE_CHAT_ON"),
+      secure ? "chat:secure:off" : "chat:secure:on",
+    )
+    .primary();
+}
+
+/**
+ * @deprecated حین چت از chattingInlineKeyboard استفاده کن.
+ * نگه‌داشته شده فقط برای سازگاری import؛ همان inline را برمی‌گرداند.
  */
 export function chattingKeyboard(
   secure = false,
   lang: Lang | string | null = "fa",
 ) {
-  const L = normalizeLang(lang);
-  return new Keyboard()
-    .text(btn(L, "END_CHAT"), "danger")
-    .text(btn(L, "VIEW_PARTNER"), "primary")
-    .row()
-    .text(btn(L, "ADD_CONTACT"), "success")
-    .text(secure ? btn(L, "SECURE_CHAT_OFF") : btn(L, "SECURE_CHAT_ON"), "primary")
-    .resized(true)
-    .persistent(true)
-    .placeholder(L === "en" ? "Type a message…" : "پیامت را بنویس…");
+  return chattingInlineKeyboard(secure, lang);
 }
 
-/** حذف کیبورد قبلی (مثلاً منوی ۵ردیفه) قبل از ست‌کردن کیبورد چت */
+/** حذف کامل ReplyKeyboard (منوی اصلی / کیبورد قدیمی چت) هنگام ورود به چت */
 export const removeReplyKeyboard = {
   remove_keyboard: true,
 } as const;

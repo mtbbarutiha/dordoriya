@@ -4,7 +4,7 @@ import { prisma } from "../db/prisma.js";
 import { patchUser } from "../db/users.js";
 import { haversineKm } from "../lib/geo.js";
 import {
-  chattingKeyboard,
+  chattingInlineKeyboard,
   mainKeyboard,
   waitingKeyboard,
   removeReplyKeyboard,
@@ -900,11 +900,11 @@ export async function connectUsers(
 
   const langA = langOf(a);
   const langB = langOf(b);
-  const kbA = chattingKeyboard(false, langA);
-  const kbB = chattingKeyboard(false, langB);
+  const kbA = chattingInlineKeyboard(false, langA);
+  const kbB = chattingInlineKeyboard(false, langB);
 
-  // اول منوی بلند را بردار، بعد کیبورد فشردهٔ چت را پین کن
-  // (کلاینت تلگرام کیبورد را به آخرین پیامِ دارای reply_markup لنگر می‌زند)
+  // اول ReplyKeyboard منوی اصلی را کامل بردار، بعد کنترل‌های Inline زیر پیام وصل
+  // (ReplyKeyboard هنگام اسکرول تاریخچه وسط صفحه شناور می‌ماند)
   const ma = await api.sendMessage(
     Number(a.telegramId),
     t(langA, "chat_connected"),
@@ -973,10 +973,10 @@ export async function setSecureChat(
       : "🔓 چت امن خاموش شد.";
 
   const ma = await api.sendMessage(Number(me.telegramId), text, {
-    reply_markup: chattingKeyboard(enabled, meLang),
+    reply_markup: chattingInlineKeyboard(enabled, meLang),
   });
   const mb = await api.sendMessage(Number(partner.telegramId), partnerText, {
-    reply_markup: chattingKeyboard(enabled, partnerLang),
+    reply_markup: chattingInlineKeyboard(enabled, partnerLang),
   });
   await logPairMessages({
     aUserId: me.id,
