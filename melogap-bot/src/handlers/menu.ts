@@ -23,9 +23,26 @@ import { safeAnswerCallback } from "../lib/telegramSafe.js";
 
 export const menuHandler = new Composer();
 
+/** Main-menu actions must not replace the chat reply keyboard mid-chat. */
+async function blockIfChatting(
+  ctx: { reply: (text: string, extra?: object) => Promise<unknown> },
+  user: { state: string; secureChat: boolean; language?: string | null },
+): Promise<boolean> {
+  if (user.state !== "chatting") return false;
+  const lang = langOf(user);
+  await ctx.reply(
+    lang === "en"
+      ? "You're in a chat. End it first (/end)."
+      : "الان در چت هستی. اول قطع کن (/end).",
+    { reply_markup: chattingKeyboard(user.secureChat, lang) },
+  );
+  return true;
+}
+
 menuHandler.hears(btnAll("PROFILE"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const { sendProfileCard } = await import("../services/profile.js");
   await sendProfileCard(ctx, user.id);
 });
@@ -33,21 +50,14 @@ menuHandler.hears(btnAll("PROFILE"), async (ctx) => {
 menuHandler.hears(btnAll("QUICK_CHAT"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
-  const lang = langOf(user);
-  if (user.state === "chatting") {
-    await ctx.reply(
-      lang === "en"
-        ? "You're in a chat. End it first."
-        : "الان در چت هستی. اول قطع کن.",
-    );
-    return;
-  }
+  if (await blockIfChatting(ctx, user)) return;
   await promptQuickMatchGender(ctx, user.id);
 });
 
 menuHandler.hears(btnAll("NEARBY"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   const hasSaved =
     user.latitude != null &&
@@ -86,15 +96,8 @@ menuHandler.hears(btnAll("NEARBY"), async (ctx) => {
 menuHandler.hears(btnAll("SEARCH"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
-  if (user.state === "chatting") {
-    await ctx.reply(
-      lang === "en"
-        ? "End your current chat first."
-        : "اول چت فعلی را قطع کن.",
-    );
-    return;
-  }
   await ctx.reply(t(lang, "search_pick"), {
     reply_markup: searchPanelKeyboard(lang),
   });
@@ -103,6 +106,7 @@ menuHandler.hears(btnAll("SEARCH"), async (ctx) => {
 menuHandler.hears(btnAll("GUIDE"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   await ctx.reply(fullGuide(lang), {
     reply_markup: mainKeyboard(lang),
@@ -112,6 +116,7 @@ menuHandler.hears(btnAll("GUIDE"), async (ctx) => {
 menuHandler.hears(btnAll("DIAMONDS"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   await ctx.reply(coinsShopIntroText(lang, user.diamonds), {
     reply_markup: coinsShopKeyboard(user.lastDailyCoinAt, lang),
@@ -121,6 +126,7 @@ menuHandler.hears(btnAll("DIAMONDS"), async (ctx) => {
 menuHandler.hears(btnAll("EARN"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   const {
     earnIntroText,
@@ -149,6 +155,7 @@ menuHandler.hears(btnAll("EARN"), async (ctx) => {
 menuHandler.hears(btnAll("REFERRAL"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=ref_${user.referralCode}`;
@@ -177,6 +184,7 @@ menuHandler.hears(btnAll("REFERRAL"), async (ctx) => {
 menuHandler.hears(btnAll("ANON_LINK"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
@@ -204,6 +212,7 @@ menuHandler.hears(btnAll("ANON_LINK"), async (ctx) => {
 menuHandler.hears(btnAll("BOOST"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   const locale = lang === "en" ? "en-US" : "fa-IR";
   if (user.boostUntil && user.boostUntil > new Date()) {
@@ -259,6 +268,7 @@ menuHandler.hears(btnAll("BOOST"), async (ctx) => {
 menuHandler.hears(btnAll("PRO"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   if (user.isPro) {
     await ctx.reply(
@@ -300,6 +310,7 @@ menuHandler.hears(btnAll("PRO"), async (ctx) => {
 menuHandler.hears(btnAll("STATS"), async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   const totalUsers = await prisma.user.count({ where: { registered: true } });
   await ctx.reply(
@@ -327,6 +338,7 @@ menuHandler.hears(btnAll("STATS"), async (ctx) => {
 menuHandler.hears(btnAll("CANCEL_WAIT"), async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   await leaveQueueOrChat(ctx.api, user, false);
   await patchUser(user.id, { state: "idle" });
@@ -503,6 +515,8 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
 
 menuHandler.hears(btnAll("SEND_LOCATION"), async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
+  if (!user) return;
+  if (await blockIfChatting(ctx, user)) return;
   const lang = langOf(user);
   await ctx.reply(
     lang === "en"
