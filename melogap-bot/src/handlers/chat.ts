@@ -37,6 +37,29 @@ async function getChattingPair(userId: number) {
   return { user, partner };
 }
 
+/** پایان اجباری چت + اطلاع به ناظران (مسیرهای orphan در رله) */
+async function forceEndChatAndNotify(
+  api: Api,
+  userIds: number[],
+) {
+  const unique = [...new Set(userIds.filter((id) => Number.isFinite(id)))];
+  for (const id of unique) {
+    await patchUser(id, {
+      state: "idle",
+      chatPartnerId: null,
+      secureChat: false,
+    });
+  }
+  try {
+    const { notifyChatEndWatchers } = await import("../services/chatEndWatch.js");
+    for (const id of unique) {
+      await notifyChatEndWatchers(api, id);
+    }
+  } catch (err) {
+    console.error("chatEndWatch notify after force-end failed", err);
+  }
+}
+
 /** گزینه‌های رله — بدون reply_markup تا کیبورد پایین استاندارد تلگرام بماند */
 function partnerRelayOpts(
   user: ChatUser,
@@ -241,11 +264,7 @@ chatHandler.on("message:text", async (ctx, next) => {
     }
     const pair = await getChattingPair(user.id);
     if (!pair?.partner) {
-      await patchUser(user.id, {
-        state: "idle",
-        chatPartnerId: null,
-        secureChat: false,
-      });
+      await forceEndChatAndNotify(ctx.api, [user.id]);
       await ctx.reply(
         lang === "en"
           ? "Chat ended. Connect again from the menu."
@@ -256,16 +275,7 @@ chatHandler.on("message:text", async (ctx, next) => {
     }
     const partner = pair.partner;
     if (partner.telegramId >= 9000000000n) {
-      await patchUser(user.id, {
-        state: "idle",
-        chatPartnerId: null,
-        secureChat: false,
-      });
-      await patchUser(partner.id, {
-        state: "idle",
-        chatPartnerId: null,
-        secureChat: false,
-      });
+      await forceEndChatAndNotify(ctx.api, [user.id, partner.id]);
       await ctx.reply(
         lang === "en"
           ? "This is a demo contact — not a real chat."
@@ -289,16 +299,7 @@ chatHandler.on("message:text", async (ctx, next) => {
       );
     } catch (err) {
       console.error("chat relay failed", user.id, "->", partner.id, err);
-      await patchUser(user.id, {
-        state: "idle",
-        chatPartnerId: null,
-        secureChat: false,
-      });
-      await patchUser(partner.id, {
-        state: "idle",
-        chatPartnerId: null,
-        secureChat: false,
-      });
+      await forceEndChatAndNotify(ctx.api, [user.id, partner.id]);
       await ctx.reply(
         lang === "en" ? "Send failed — chat ended." : "ارسال نشد — چت قطع شد.",
         { reply_markup: mainKeyboard(lang) },
@@ -320,11 +321,7 @@ chatHandler.on("message:photo", async (ctx, next) => {
 
   const pair = await getChattingPair(user.id);
   if (!pair?.partner) {
-    await patchUser(user.id, {
-      state: "idle",
-      chatPartnerId: null,
-      secureChat: false,
-    });
+    await forceEndChatAndNotify(ctx.api, [user.id]);
     await ctx.reply(t(lang, "chat_ended"), { reply_markup: mainKeyboard(lang) });
     return;
   }
@@ -384,11 +381,7 @@ chatHandler.on("message:video", async (ctx, next) => {
 
   const pair = await getChattingPair(user.id);
   if (!pair?.partner) {
-    await patchUser(user.id, {
-      state: "idle",
-      chatPartnerId: null,
-      secureChat: false,
-    });
+    await forceEndChatAndNotify(ctx.api, [user.id]);
     await ctx.reply(t(lang, "chat_ended"), { reply_markup: mainKeyboard(lang) });
     return;
   }
@@ -446,11 +439,7 @@ chatHandler.on("message:video_note", async (ctx, next) => {
 
   const pair = await getChattingPair(user.id);
   if (!pair?.partner) {
-    await patchUser(user.id, {
-      state: "idle",
-      chatPartnerId: null,
-      secureChat: false,
-    });
+    await forceEndChatAndNotify(ctx.api, [user.id]);
     await ctx.reply(t(lang, "chat_ended"), { reply_markup: mainKeyboard(lang) });
     return;
   }
@@ -511,11 +500,7 @@ chatHandler.on(
 
     const pair = await getChattingPair(user.id);
     if (!pair?.partner) {
-      await patchUser(user.id, {
-        state: "idle",
-        chatPartnerId: null,
-        secureChat: false,
-      });
+      await forceEndChatAndNotify(ctx.api, [user.id]);
       await ctx.reply(t(lang, "chat_ended"), {
         reply_markup: mainKeyboard(lang),
       });

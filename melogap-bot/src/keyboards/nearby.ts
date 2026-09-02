@@ -49,6 +49,16 @@ export function nearbyUserKeyboard(
   }
   kb.row()
     .text(
+      tr(
+        L,
+        "🔔 به محض تموم شدن چت این کاربر به من اطلاع بده (+۱💰)",
+        "🔔 Notify me when their chat ends (+1💰)",
+      ),
+      `watchend:ask:${targetUserId}`,
+    )
+    .primary()
+    .row()
+    .text(
       tr(L, "💬 درخواست چت", "💬 Chat request"),
       `nearby_chat:${targetUserId}`,
     )

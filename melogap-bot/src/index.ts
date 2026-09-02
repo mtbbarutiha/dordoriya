@@ -155,16 +155,16 @@ async function main() {
   const filled = await backfillMissingUserCodes();
   if (filled) logger.info("db.backfill_codes", { count: filled });
 
-  const { repairOrphanChats, expireStaleChatRequests } = await import(
-    "./services/match.js"
-  );
-  const repaired = await repairOrphanChats();
-  if (repaired) logger.info("chat.orphans_repaired", { count: repaired });
+  const { expireStaleChatRequests } = await import("./services/match.js");
 
   const { initInlineThumbCache } = await import("./services/inlineList.js");
   await initInlineThumbCache();
 
   const bot = createBot(token);
+
+  const { repairOrphanChats } = await import("./services/match.js");
+  const repaired = await repairOrphanChats(bot.api);
+  if (repaired) logger.info("chat.orphans_repaired", { count: repaired });
 
   const { isDemoPayAllowed } = await import("./services/diamonds.js");
   if (isDemoPayAllowed()) {

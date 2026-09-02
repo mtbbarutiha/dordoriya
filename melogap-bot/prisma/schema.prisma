@@ -94,6 +94,8 @@ model User {
   reportsGiven      UserReport[]   @relation("ReportsGiven")
   reportsReceived   UserReport[]   @relation("ReportsReceived")
   coinSellRequests  CoinSellRequest[]
+  chatEndWatchesAsWatcher ChatEndWatch[] @relation("ChatEndWatchers")
+  chatEndWatchesAsTarget  ChatEndWatch[] @relation("ChatEndTargets")
 }
 
 /// بلاک کاربر — طرف بلاک‌شده در جستجو/چت/دایرکت دیده نمی‌شود
@@ -362,5 +364,20 @@ model CoinSellRequest {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+/// اطلاع‌رسانی یک‌باره وقتی چت هدف تمام شود (۱ سکه)
+model ChatEndWatch {
+  id         Int       @id @default(autoincrement())
+  watcherId  Int
+  targetId   Int
+  watcher    User      @relation("ChatEndWatchers", fields: [watcherId], references: [id])
+  target     User      @relation("ChatEndTargets", fields: [targetId], references: [id])
+  createdAt  DateTime  @default(now())
+  /// وقتی اطلاع ارسال شد پر می‌شود — قبل از آن فعال است
+  consumedAt DateTime?
+
+  @@index([targetId, consumedAt])
+  @@index([watcherId, targetId])
 }
 

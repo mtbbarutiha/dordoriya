@@ -1357,6 +1357,181 @@ featuresHandler.callbackQuery(/^gift:menu:(\d+)$/, async (ctx) => {
   );
 });
 
+featuresHandler.callbackQuery(/^watchend:ask:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const targetId = Number(ctx.match[1]);
+  const lang = user.language === "en" ? "en" : "fa";
+  if (targetId === user.id) {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "Can't watch yourself" : "برای خودت ممکن نیست",
+      show_alert: true,
+    });
+    return;
+  }
+
+  const {
+    chatEndWatchConfirmText,
+    CHAT_END_WATCH_COST,
+    isUserInChat,
+  } = await import("../services/chatEndWatch.js");
+  const { chatEndWatchConfirmKeyboard } = await import("../keyboards/main.js");
+
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (!target || target.deletedAt) {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "User not found" : "کاربر پیدا نشد",
+      show_alert: true,
+    });
+    return;
+  }
+
+  const inChat = await isUserInChat(targetId);
+  if (!inChat) {
+    await ctx.answerCallbackQuery({
+      text:
+        lang === "en"
+          ? "They're free now — not in a chat"
+          : "الان آزاد است — در چت نیست",
+      show_alert: true,
+    });
+    return;
+  }
+
+  const existing = await prisma.chatEndWatch.findFirst({
+    where: { watcherId: user.id, targetId, consumedAt: null },
+    select: { id: true },
+  });
+  if (existing) {
+    await ctx.answerCallbackQuery({
+      text:
+        lang === "en"
+          ? "Already watching this chat"
+          : "قبلاً برای پایان چت این کاربر ثبت‌نام کردی",
+      show_alert: true,
+    });
+    return;
+  }
+
+  if (user.diamonds < CHAT_END_WATCH_COST) {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "Not enough coins" : "سکه کافی نیست",
+      show_alert: true,
+    });
+    await ctx.reply(
+      lang === "en"
+        ? `Need ${formatNum(CHAT_END_WATCH_COST)} coin.\nBalance: ${formatNum(user.diamonds)} 💰`
+        : `برای این کار ${formatNum(CHAT_END_WATCH_COST)} سکه لازم است.\nموجودی: ${formatNum(user.diamonds)} 💰`,
+    );
+    return;
+  }
+
+  await ctx.answerCallbackQuery();
+  const name = target.displayName ?? (lang === "en" ? "this user" : "این کاربر");
+  await ctx.reply(chatEndWatchConfirmText(name, user.diamonds, lang), {
+    reply_markup: chatEndWatchConfirmKeyboard(targetId, lang),
+  });
+});
+
+featuresHandler.callbackQuery(/^watchend:no:(\d+)$/, async (ctx) => {
+  await ctx.answerCallbackQuery({ text: "لغو شد" });
+  await ctx.deleteMessage().catch(() => undefined);
+});
+
+featuresHandler.callbackQuery(/^watchend:yes:(\d+)$/, async (ctx) => {
+  const user = await requireRegistered(ctx);
+  if (!user) {
+    await ctx.answerCallbackQuery();
+    return;
+  }
+  const targetId = Number(ctx.match[1]);
+  const lang = user.language === "en" ? "en" : "fa";
+  const {
+    activateChatEndWatch,
+    CHAT_END_WATCH_COST,
+  } = await import("../services/chatEndWatch.js");
+
+  const result = await activateChatEndWatch(user.id, targetId);
+  if (result === "self") {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "Can't watch yourself" : "برای خودت ممکن نیست",
+      show_alert: true,
+    });
+    return;
+  }
+  if (result === "not_found") {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "User not found" : "کاربر پیدا نشد",
+      show_alert: true,
+    });
+    return;
+  }
+  if (result === "blocked") {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "Blocked" : "بلاک است — ممکن نیست",
+      show_alert: true,
+    });
+    return;
+  }
+  if (result === "not_in_chat") {
+    await ctx.answerCallbackQuery({
+      text:
+        lang === "en"
+          ? "They're already free"
+          : "الان آزاد است — سکه کم نشد",
+      show_alert: true,
+    });
+    await ctx.deleteMessage().catch(() => undefined);
+    return;
+  }
+  if (result === "already") {
+    await ctx.answerCallbackQuery({
+      text:
+        lang === "en"
+          ? "Already watching"
+          : "قبلاً ثبت شده — سکه دوباره کم نشد",
+      show_alert: true,
+    });
+    await ctx.deleteMessage().catch(() => undefined);
+    return;
+  }
+  if (result === "insufficient") {
+    await ctx.answerCallbackQuery({
+      text: lang === "en" ? "Not enough coins" : "سکه کافی نیست",
+      show_alert: true,
+    });
+    const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+    await ctx.reply(
+      lang === "en"
+        ? `Need ${formatNum(CHAT_END_WATCH_COST)} coin.\nBalance: ${formatNum(fresh?.diamonds ?? 0)} 💰`
+        : `سکه کافی نیست.\nنیاز: ${formatNum(CHAT_END_WATCH_COST)} | موجودی: ${formatNum(fresh?.diamonds ?? 0)}`,
+    );
+    return;
+  }
+
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  const fresh = await prisma.user.findUnique({ where: { id: user.id } });
+  const name = target?.displayName ?? (lang === "en" ? "user" : "کاربر");
+  await ctx.answerCallbackQuery({
+    text: lang === "en" ? "Watching ✓" : "ثبت شد ✓",
+  });
+  await ctx.deleteMessage().catch(() => undefined);
+  await ctx.reply(
+    lang === "en"
+      ? [
+          `✅ Done — we'll notify you when «${name}»'s chat ends.`,
+          `−${formatNum(CHAT_END_WATCH_COST)} coin · balance: ${formatNum(fresh?.diamonds ?? 0)} 💰`,
+        ].join("\n")
+      : [
+          `✅ ثبت شد — به محض تموم شدن چت «${name}» بهت خبر می‌دیم.`,
+          `−${formatNum(CHAT_END_WATCH_COST)} سکه · موجودی: ${formatNum(fresh?.diamonds ?? 0)} 💰`,
+        ].join("\n"),
+  );
+});
+
 featuresHandler.callbackQuery(/^gift:back:(\d+)$/, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {

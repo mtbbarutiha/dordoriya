@@ -152,8 +152,9 @@ export async function leaveQueueOrChat(
 ) {
   const partnerId = user.chatPartnerId;
   const wasChatting = user.state === "chatting" && partnerId != null;
+  const leftChatPair = wasChatting || partnerId != null;
 
-  if (wasChatting || partnerId != null) {
+  if (leftChatPair) {
     const partner = partnerId
       ? await prisma.user.findUnique({ where: { id: partnerId } })
       : null;
@@ -164,10 +165,12 @@ export async function leaveQueueOrChat(
     });
     const { syncIdleUserMenu } = await import("../botMenu.js");
     void syncIdleUserMenu(api, user.telegramId);
+    let partnerAlsoEnded = false;
     if (partner) {
       const partnerStillLinked =
         partner.chatPartnerId === user.id || partner.state === "chatting";
       if (partnerStillLinked) {
+        partnerAlsoEnded = true;
         await patchUser(partner.id, {
           state: "idle",
           chatPartnerId: null,
@@ -211,6 +214,16 @@ export async function leaveQueueOrChat(
         }
       }
     }
+    // یک‌باره: ناظران پایان چت این کاربر / شریک
+    try {
+      const { notifyChatEndWatchers } = await import("./chatEndWatch.js");
+      await notifyChatEndWatchers(api, user.id);
+      if (partnerAlsoEnded && partner) {
+        await notifyChatEndWatchers(api, partner.id);
+      }
+    } catch (err) {
+      console.error("chatEndWatch notify after leave failed", user.id, err);
+    }
     return;
   }
 
@@ -226,11 +239,12 @@ export async function leaveQueueOrChat(
 }
 
 /** تعمیر وضعیت‌های گیرکرده چت */
-export async function repairOrphanChats() {
+export async function repairOrphanChats(api?: Api) {
   const chatting = await prisma.user.findMany({
     where: { state: "chatting" },
   });
   let fixed = 0;
+  const endedIds: number[] = [];
   for (const u of chatting) {
     if (!u.chatPartnerId) {
       await patchUser(u.id, {
@@ -238,6 +252,7 @@ export async function repairOrphanChats() {
         chatPartnerId: null,
         secureChat: false,
       });
+      endedIds.push(u.id);
       fixed++;
       continue;
     }
@@ -251,6 +266,7 @@ export async function repairOrphanChats() {
         chatPartnerId: null,
         secureChat: false,
       });
+      endedIds.push(u.id);
       fixed++;
     }
   }
@@ -264,7 +280,18 @@ export async function repairOrphanChats() {
   });
   for (const u of stale) {
     await patchUser(u.id, { chatPartnerId: null, secureChat: false });
+    endedIds.push(u.id);
     fixed++;
+  }
+  if (api && endedIds.length > 0) {
+    try {
+      const { notifyChatEndWatchers } = await import("./chatEndWatch.js");
+      for (const id of endedIds) {
+        await notifyChatEndWatchers(api, id);
+      }
+    } catch (err) {
+      console.error("chatEndWatch notify after repair failed", err);
+    }
   }
   return fixed;
 }

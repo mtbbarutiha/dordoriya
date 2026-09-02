@@ -223,6 +223,16 @@ export function partnerInChatKeyboard(
     kb.text(tr(L, "🚫 بلاک", "🚫 Block"), `block:on:${targetId}`).danger();
   }
   kb.row()
+    .text(
+      tr(
+        L,
+        "🔔 به محض تموم شدن چت این کاربر به من اطلاع بده (+۱💰)",
+        "🔔 Notify me when their chat ends (+1💰)",
+      ),
+      `watchend:ask:${targetId}`,
+    )
+    .primary()
+    .row()
     .text(tr(L, "🚩 گزارش تخلف", "🚩 Report"), `report:start:${targetId}`)
     .danger();
   return kb;
@@ -555,6 +565,16 @@ export function exploreKeyboard(
     kb.text(tr(L, "🚫 بلاک", "🚫 Block"), `block:on:${targetId}`).danger();
   }
   kb.row()
+    .text(
+      tr(
+        L,
+        "🔔 به محض تموم شدن چت این کاربر به من اطلاع بده (+۱💰)",
+        "🔔 Notify me when their chat ends (+1💰)",
+      ),
+      `watchend:ask:${targetId}`,
+    )
+    .primary()
+    .row()
     .text(tr(L, "🚩 گزارش تخلف", "🚩 Report"), `report:start:${targetId}`)
     .danger();
   // درخواست چت — ردیف کامل، زیر لایک
@@ -565,6 +585,23 @@ export function exploreKeyboard(
     )
     .primary();
   return kb;
+}
+
+/** تأیید اطلاع پایان چت (+۱ سکه) */
+export function chatEndWatchConfirmKeyboard(
+  targetId: number,
+  lang: Lang | string | null = "fa",
+) {
+  const L = normalizeLang(lang);
+  return new InlineKeyboard()
+    .text(
+      tr(L, "✅ بله، اطلاع بده (+۱💰)", "✅ Yes, notify me (+1💰)"),
+      `watchend:yes:${targetId}`,
+    )
+    .success()
+    .row()
+    .text(tr(L, "↩️ انصراف", "↩️ Cancel"), `watchend:no:${targetId}`)
+    .primary();
 }
 
 

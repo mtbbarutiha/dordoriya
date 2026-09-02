@@ -53,14 +53,27 @@ const KEEP_CHAT_PARTNER_STATES = new Set([
 ]);
 
 /** تعمیر وضعیت‌های گیرکرده برای یک کاربر */
-export async function reconcileUserState(user: User): Promise<User> {
+export async function reconcileUserState(
+  user: User,
+  api?: Api,
+): Promise<User> {
   if (user.state === "chatting") {
     if (!user.chatPartnerId) {
-      return patchUser(user.id, {
+      const patched = await patchUser(user.id, {
         state: "idle",
         chatPartnerId: null,
         secureChat: false,
       });
+      if (api) {
+        void import("./chatEndWatch.js")
+          .then(({ notifyChatEndWatchers }) =>
+            notifyChatEndWatchers(api, user.id),
+          )
+          .catch((err) =>
+            console.error("chatEndWatch reconcile notify failed", user.id, err),
+          );
+      }
+      return patched;
     }
     const partner = await prisma.user.findUnique({
       where: { id: user.chatPartnerId },
@@ -70,11 +83,21 @@ export async function reconcileUserState(user: User): Promise<User> {
     // touch/reconcile during DM compose or brief races must not bounce
     // the user to idle + main menu mid-chat.
     if (!partner || partner.chatPartnerId !== user.id) {
-      return patchUser(user.id, {
+      const patched = await patchUser(user.id, {
         state: "idle",
         chatPartnerId: null,
         secureChat: false,
       });
+      if (api) {
+        void import("./chatEndWatch.js")
+          .then(({ notifyChatEndWatchers }) =>
+            notifyChatEndWatchers(api, user.id),
+          )
+          .catch((err) =>
+            console.error("chatEndWatch reconcile notify failed", user.id, err),
+          );
+      }
+      return patched;
     }
     return user;
   }
@@ -110,7 +133,7 @@ export async function restoreUserSession(
   user: User,
   opts: RestoreOptions = {},
 ): Promise<User> {
-  const fresh = await reconcileUserState(user);
+  const fresh = await reconcileUserState(user, ctx.api);
   await syncUserCommandMenu(ctx.api, fresh);
 
   if (!opts.announce) return fresh;
@@ -259,7 +282,7 @@ export async function touchUserFromContext(ctx: Context): Promise<User | null> {
   });
 
   const before = `${user.state}:${user.chatPartnerId}:${user.registered}`;
-  const reconciled = await reconcileUserState(user);
+  const reconciled = await reconcileUserState(user, ctx.api);
   const after = `${reconciled.state}:${reconciled.chatPartnerId}:${reconciled.registered}`;
 
   if (before !== after) {
