@@ -185,17 +185,25 @@ export const removeReplyKeyboard = {
   remove_keyboard: true,
 } as const;
 
-/** پروفایل طرف مقابل وسط چت — بدون دکمه درخواست چت */
-export function partnerInChatKeyboard(
+export type ProfileChatRequest = "explore" | "nearby" | false;
+
+/**
+ * کارت پروفایل دیگران — دکمه‌های فشرده:
+ * ❤️ {count} = لایک (اگر قبلاً لایک شده → نمایش تعداد)
+ * گزارش + مخاطب در یک ردیف با لیبل کوتاه
+ */
+export function userProfileActionKeyboard(
   targetId: number,
   likesCount: number,
   inContacts = false,
   lang: Lang | string | null = "fa",
   blocked = false,
+  chatRequest: ProfileChatRequest = false,
 ) {
   const L = normalizeLang(lang);
   const kb = new InlineKeyboard()
-    .text(`❤️ ${formatNum(likesCount)}`, `exp:likes:${targetId}`)
+    .text(`❤️ ${formatNum(likesCount)}`, `exp:like:${targetId}`)
+    .success()
     .text(threadGiftButtonLabel(L), `exp:thread:${targetId}`)
     .primary()
     .row()
@@ -206,36 +214,58 @@ export function partnerInChatKeyboard(
     .row()
     .text(
       inContacts
-        ? tr(L, "✅ در مخاطبین", "✅ In contacts")
-        : tr(L, "➕ افزودن به مخاطبین", "➕ Add to contacts"),
+        ? tr(L, "✅ مخاطب", "✅ Saved")
+        : tr(L, "👤 مخاطب", "👤 Contact"),
       inContacts ? `contact:remove:${targetId}` : `contact:add:${targetId}`,
     )
     .success()
-    .row()
-    .text(
-      tr(L, "❤️ لایک (+۱💰)", "❤️ Like (+1💰)"),
-      `exp:like:${targetId}`,
-    )
-    .success();
+    .text(tr(L, "🚩 گزارش", "🚩 Report"), `report:start:${targetId}`)
+    .danger()
+    .row();
   if (blocked) {
     kb.text(tr(L, "🔓 آنبلاک", "🔓 Unblock"), `block:off:${targetId}`).success();
   } else {
     kb.text(tr(L, "🚫 بلاک", "🚫 Block"), `block:on:${targetId}`).danger();
   }
-  kb.row()
-    .text(
-      tr(
-        L,
-        "🔔 اطلاع پایان چت (+۱💰)",
-        "🔔 Notify chat end (+1💰)",
-      ),
-      `watchend:ask:${targetId}`,
-    )
-    .primary()
-    .row()
-    .text(tr(L, "🚩 گزارش تخلف", "🚩 Report"), `report:start:${targetId}`)
-    .danger();
+  kb.text(
+    tr(L, "🔔 اطلاع پایان چت (۱💰)", "🔔 Chat end (1💰)"),
+    `watchend:ask:${targetId}`,
+  )
+    .primary();
+  if (chatRequest === "explore") {
+    kb.row()
+      .text(
+        tr(L, "💬 درخواست چت", "💬 Chat request"),
+        `exp:chat:${targetId}`,
+      )
+      .primary();
+  } else if (chatRequest === "nearby") {
+    kb.row()
+      .text(
+        tr(L, "💬 درخواست چت", "💬 Chat request"),
+        `nearby_chat:${targetId}`,
+      )
+      .primary();
+  }
   return kb;
+}
+
+/** پروفایل طرف مقابل وسط چت — بدون دکمه درخواست چت */
+export function partnerInChatKeyboard(
+  targetId: number,
+  likesCount: number,
+  inContacts = false,
+  lang: Lang | string | null = "fa",
+  blocked = false,
+) {
+  return userProfileActionKeyboard(
+    targetId,
+    likesCount,
+    inContacts,
+    lang,
+    blocked,
+    false,
+  );
 }
 
 export function locationKeyboard(lang: Lang | string | null = "fa") {
@@ -537,54 +567,14 @@ export function exploreKeyboard(
   lang: Lang | string | null = "fa",
   blocked = false,
 ) {
-  const L = normalizeLang(lang);
-  const kb = new InlineKeyboard()
-    .text(`❤️ ${formatNum(likesCount)}`, `exp:likes:${targetId}`)
-    .text(threadGiftButtonLabel(L), `exp:thread:${targetId}`)
-    .primary()
-    .row()
-    .text(tr(L, "🎁 هدیه سکه", "🎁 Gift coins"), `gift:menu:${targetId}`)
-    .primary()
-    .text(tr(L, "✉️ پیام دایرکت", "✉️ Direct message"), `dm:start:${targetId}`)
-    .primary()
-    .row()
-    .text(
-      inContacts
-        ? tr(L, "✅ در مخاطبین", "✅ In contacts")
-        : tr(L, "➕ افزودن به مخاطبین", "➕ Add to contacts"),
-      inContacts ? `contact:remove:${targetId}` : `contact:add:${targetId}`,
-    )
-    .success()
-    .row()
-    // لایک + بلاک/آنبلاک
-    .text(tr(L, "❤️ لایک (+۱💰)", "❤️ Like (+1💰)"), `exp:like:${targetId}`)
-    .success();
-  if (blocked) {
-    kb.text(tr(L, "🔓 آنبلاک", "🔓 Unblock"), `block:off:${targetId}`).success();
-  } else {
-    kb.text(tr(L, "🚫 بلاک", "🚫 Block"), `block:on:${targetId}`).danger();
-  }
-  kb.row()
-    .text(
-      tr(
-        L,
-        "🔔 اطلاع پایان چت (+۱💰)",
-        "🔔 Notify chat end (+1💰)",
-      ),
-      `watchend:ask:${targetId}`,
-    )
-    .primary()
-    .row()
-    .text(tr(L, "🚩 گزارش تخلف", "🚩 Report"), `report:start:${targetId}`)
-    .danger();
-  // درخواست چت — ردیف کامل، زیر لایک
-  kb.row()
-    .text(
-      tr(L, "💬 درخواست چت", "💬 Chat request"),
-      `exp:chat:${targetId}`,
-    )
-    .primary();
-  return kb;
+  return userProfileActionKeyboard(
+    targetId,
+    likesCount,
+    inContacts,
+    lang,
+    blocked,
+    "explore",
+  );
 }
 
 /** تأیید اطلاع پایان چت (+۱ سکه) */

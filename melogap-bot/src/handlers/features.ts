@@ -741,16 +741,8 @@ featuresHandler.callbackQuery("pro:buy", async (ctx) => {
   });
 });
 
-featuresHandler.callbackQuery(/^exp:likes:(\d+)$/, async (ctx) => {
-  const targetId = Number(ctx.match[1]);
-  const target = await prisma.user.findUnique({ where: { id: targetId } });
-  await ctx.answerCallbackQuery({
-    text: `❤️ ${formatNum(target?.likesCount ?? 0)} لایک`,
-    show_alert: true,
-  });
-});
-
-featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
+/** ❤️ {count} — اگر لایک نشده لایک می‌کند؛ اگر قبلاً لایک شده تعداد را نشان می‌دهد */
+featuresHandler.callbackQuery(/^exp:likes?:(\d+)$/, async (ctx) => {
   const user = await requireRegistered(ctx);
   if (!user) {
     await ctx.answerCallbackQuery();
@@ -758,7 +750,11 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
   }
   const targetId = Number(ctx.match[1]);
   if (targetId === user.id) {
-    await ctx.answerCallbackQuery({ text: "خودت را نمی‌توانی لایک کنی" });
+    const self = await prisma.user.findUnique({ where: { id: targetId } });
+    await ctx.answerCallbackQuery({
+      text: `❤️ ${formatNum(self?.likesCount ?? 0)} لایک`,
+      show_alert: true,
+    });
     return;
   }
 
@@ -772,7 +768,10 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
     where: { type: "like", fromUserId: user.id, toUserId: targetId },
   });
   if (already) {
-    await ctx.answerCallbackQuery({ text: "قبلاً لایک کردی" });
+    await ctx.answerCallbackQuery({
+      text: `❤️ ${formatNum(target.likesCount)} لایک`,
+      show_alert: true,
+    });
     return;
   }
 
@@ -814,7 +813,10 @@ featuresHandler.callbackQuery(/^exp:like:(\d+)$/, async (ctx) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/Unique constraint|unique/i.test(msg)) {
-      await ctx.answerCallbackQuery({ text: "قبلاً لایک کردی" });
+      await ctx.answerCallbackQuery({
+        text: `❤️ ${formatNum(target.likesCount)} لایک`,
+        show_alert: true,
+      });
       return;
     }
     throw err;
