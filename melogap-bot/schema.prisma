@@ -84,6 +84,7 @@ model User {
   blocksReceived    UserBlock[]    @relation("BlocksReceived")
   reportsGiven      UserReport[]   @relation("ReportsGiven")
   reportsReceived   UserReport[]   @relation("ReportsReceived")
+  coinSellRequests  CoinSellRequest[]
 }
 
 /// بلاک کاربر — طرف بلاک‌شده در جستجو/چت/دایرکت دیده نمی‌شود
@@ -332,3 +333,25 @@ model VoucherRedemption {
   @@unique([voucherId, userId])
   @@index([userId])
 }
+
+/// درخواست فروش سکه توسط کاربر (تسویه به کارت بانکی)
+model CoinSellRequest {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id])
+  coins       Int
+  /// نرخ تومان به‌ازای هر سکه در زمان ثبت (ثابت ادمین: COIN_SELL_PRICE_TOMAN)
+  rateToman   Int
+  amountToman Int
+  /// شماره کارت ۱۶ رقمی (فقط رقم)
+  cardNumber  String
+  /// open | paid | rejected
+  status      String    @default("open")
+  adminNote   String?
+  createdAt   DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
