@@ -226,8 +226,8 @@ export function partnerInChatKeyboard(
     .text(
       tr(
         L,
-        "🔔 به محض تموم شدن چت این کاربر به من اطلاع بده (+۱💰)",
-        "🔔 Notify me when their chat ends (+1💰)",
+        "🔔 اطلاع پایان چت (+۱💰)",
+        "🔔 Notify chat end (+1💰)",
       ),
       `watchend:ask:${targetId}`,
     )
@@ -568,8 +568,8 @@ export function exploreKeyboard(
     .text(
       tr(
         L,
-        "🔔 به محض تموم شدن چت این کاربر به من اطلاع بده (+۱💰)",
-        "🔔 Notify me when their chat ends (+1💰)",
+        "🔔 اطلاع پایان چت (+۱💰)",
+        "🔔 Notify chat end (+1💰)",
       ),
       `watchend:ask:${targetId}`,
     )
