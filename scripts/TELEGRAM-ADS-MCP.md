@@ -1,6 +1,6 @@
 # Telegram Ads MCP
 
-MCP server for managing [Telegram Ads](https://ads.telegram.org) from Cursor.
+MCP server for managing [Telegram Ads](https://ads.telegram.org) campaigns from Cursor.
 
 ## Install
 
@@ -11,40 +11,42 @@ bash scripts/setup-telegram-ads-mcp.sh
 ## Login (required once)
 
 ```bash
-tools/telegram_ads_mcp/.venv/bin/telegram-ads-auth
+/agent/tools/telegram_ads_mcp/.venv/bin/telegram-ads-auth
 ```
 
 1. Browser opens → log in with Telegram
-2. Choose your ads account
-3. Wait until the ads table loads (`/account`)
-4. Press Enter in the terminal
+2. Choose your ads account on the "Choose Account" screen
+3. Wait until you see the ads table (`/account`)
+4. Press Enter in the terminal to save session
 
-Session (never commit): `~/.config/telegram-ads-mcp/auth_state.json`
+Session file (never commit): `~/.config/telegram-ads-mcp/auth_state.json`
 
-## Cursor
+## Cursor config
 
-- Project config: `.cursor/mcp.json`
-- **Cloud Agents:** also add under Dashboard → Integrations & MCP
-- Restart Cursor / reload MCP after login
+Project MCP config: `.cursor/mcp.json`
 
-Optional:
+If using **Cloud Agents**, also register the same server under:
+**Dashboard → Integrations & MCP → Add server**
+
+Optional env:
 
 ```bash
 export TELEGRAM_ADS_ACCOUNT="AccountNameSubstring"
 ```
 
-## Tools
+## Available tools
 
 | Tool | Description |
 |------|-------------|
-| `list_accounts` | List ad accounts |
-| `list_ads` | List campaigns |
-| `create_ad` | New campaign (`confirm=True` spends TON) |
-| `set_cpm` / `set_status` | Edit CPM or pause/resume |
-| `increase_budget` | Add TON |
+| `list_accounts` | List ads accounts |
+| `list_ads` | List all campaigns |
+| `create_ad` | Create campaign (`confirm=True` to spend TON) |
+| `set_cpm` | Change CPM |
+| `set_status` | Active / On Hold |
+| `increase_budget` | Add TON budget |
 
-Financial tools dry-run until `confirm=True`.
+Financial tools default to dry-run until `confirm=True`.
 
 ## Security
 
-`auth_state.json` = full ads.telegram.org access including TON spend.
+`auth_state.json` equals your ads.telegram.org login — anyone with it can spend your TON budget.
