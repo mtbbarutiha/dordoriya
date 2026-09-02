@@ -5,3 +5,7 @@ prisma/*.db
 prisma/*.db-journal
 *.log
 .DS_Store
+
+# earn tutorial HQ build intermediates
+assets/banners/channel-posts/earn-tutorial-hq/clips/
+assets/banners/channel-posts/earn-tutorial-hq/video_silent.mp4
