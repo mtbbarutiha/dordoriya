@@ -1,3 +1,4 @@
+throw new Error("BLOCKED: publishing disabled until user approval");
 /**
  * پست کانال — ویدیوی آموزشی HQ «کسب درآمد» (با موسیقی پس‌زمینه)
  * Usage: npx tsx scripts/send-channel-earn-tutorial-hq.ts
