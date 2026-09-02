@@ -903,27 +903,49 @@ export async function connectUsers(
   const kbA = chattingInlineKeyboard(false, langA);
   const kbB = chattingInlineKeyboard(false, langB);
 
-  // اول ReplyKeyboard منوی اصلی را کامل بردار، بعد کنترل‌های Inline زیر پیام وصل
-  // (ReplyKeyboard هنگام اسکرول تاریخچه وسط صفحه شناور می‌ماند)
+  // Telegram: نمی‌شود remove_keyboard و Inline را روی یک پیام فرستاد.
+  // ۱) ReplyKeyboard منوی اصلی را کامل بردار (کیبورد فیکس/شناور نشود)
+  // ۲) پیام وصل + کنترل‌های Inline زیر همان پیام
+  const clearTextA =
+    langA === "en" ? "Keyboard cleared." : "کیبورد برداشته شد.";
+  const clearTextB =
+    langB === "en" ? "Keyboard cleared." : "کیبورد برداشته شد.";
+  const clearA = await api
+    .sendMessage(Number(a.telegramId), clearTextA, {
+      reply_markup: removeReplyKeyboard,
+    })
+    .catch(() => null);
+  const clearB = await api
+    .sendMessage(Number(b.telegramId), clearTextB, {
+      reply_markup: removeReplyKeyboard,
+    })
+    .catch(() => null);
+  if (clearA) {
+    await api
+      .deleteMessage(Number(a.telegramId), clearA.message_id)
+      .catch(() => undefined);
+  }
+  if (clearB) {
+    await api
+      .deleteMessage(Number(b.telegramId), clearB.message_id)
+      .catch(() => undefined);
+  }
+
   const ma = await api.sendMessage(
     Number(a.telegramId),
     t(langA, "chat_connected"),
-    { reply_markup: removeReplyKeyboard },
+    { reply_markup: kbA },
   );
   const mb = await api.sendMessage(
     Number(b.telegramId),
     t(langB, "chat_connected"),
-    { reply_markup: removeReplyKeyboard },
+    { reply_markup: kbB },
   );
   await api
-    .sendMessage(Number(a.telegramId), t(langA, "continue_chat"), {
-      reply_markup: kbA,
-    })
+    .sendMessage(Number(a.telegramId), t(langA, "continue_chat"))
     .catch(() => undefined);
   await api
-    .sendMessage(Number(b.telegramId), t(langB, "continue_chat"), {
-      reply_markup: kbB,
-    })
+    .sendMessage(Number(b.telegramId), t(langB, "continue_chat"))
     .catch(() => undefined);
   await logPairMessages({
     aUserId: a.id,
