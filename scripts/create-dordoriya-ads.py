@@ -94,8 +94,11 @@ async def main() -> None:
     try:
         accounts = await client.list_accounts()
         print("accounts:", json.dumps(accounts, ensure_ascii=False, indent=2))
-        ads_before = await client.list_ads()
-        print(f"existing ads: {len(ads_before)}")
+        try:
+            ads_before = await client.list_ads()
+            print(f"existing ads: {len(ads_before)}")
+        except Exception as e:
+            print(f"list_ads skipped ({type(e).__name__}: {e})")
 
         for i, camp in enumerate(CAMPAIGNS, 1):
             print(f"\n--- campaign {i}/{len(CAMPAIGNS)}: {camp['title']} ---")
