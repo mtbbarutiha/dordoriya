@@ -6,10 +6,10 @@ import { reportReasonKeyboard, mainKeyboard } from "../keyboards/main.js";
 import { createUserReport, isReportReason, notifyAdminsNewReport, reasonLabel, } from "../services/report.js";
 export const reportHandler = new Composer();
 const REPORT_OTHER_PREFIX = "report_other:";
-function cancelReportKb(lang) {
+function cancelReportKb(lang: "fa" | "en") {
     return new InlineKeyboard().text(lang === "en" ? "↩️ Cancel" : "↩️ انصراف", "report:cancel");
 }
-function parseReportOtherPending(pending) {
+function parseReportOtherPending(pending: string | null | undefined) {
     if (!pending || !pending.startsWith(REPORT_OTHER_PREFIX))
         return null;
     const id = Number(pending.slice(REPORT_OTHER_PREFIX.length));
@@ -64,7 +64,7 @@ reportHandler.callbackQuery(/^report:reason:(\d+):([a-z_]+)$/, async (ctx) => {
     const targetId = Number(ctx.match[1]);
     const reason = ctx.match[2];
     const lang = user.language === "en" ? "en" : "fa";
-    if (!isReportReason(reason)) {
+    if (!reason || !isReportReason(reason)) {
         await ctx.answerCallbackQuery({
             text: lang === "en" ? "Invalid reason" : "دلیل نامعتبر",
             show_alert: true,

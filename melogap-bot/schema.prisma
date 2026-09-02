@@ -28,6 +28,8 @@ model User {
   referredById      Int?
   referredBy        User?     @relation("Referrals", fields: [referredById], references: [id])
   referrals         User[]    @relation("Referrals")
+  /// پاداش معرفی برای این کاربر به معرف پرداخت شده (ضد double-credit)
+  referralBonusGranted Boolean @default(false)
   latitude          Float?
   longitude         Float?
   locationAt        DateTime?
