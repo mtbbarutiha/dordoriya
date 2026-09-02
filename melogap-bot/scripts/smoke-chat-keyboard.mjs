@@ -53,6 +53,21 @@ function chatActionForText(state, text) {
   return "relay";
 }
 
+/** Mirror of partnerRelayOpts — every chat relay must re-pin reply keyboard. */
+function partnerRelayOpts(user, partner, chattingKeyboard, extra = {}) {
+  const secure = user.secureChat || partner.secureChat;
+  return {
+    ...extra,
+    protect_content: secure,
+    reply_markup: chattingKeyboard,
+  };
+}
+
+function connectKeyboardSequence() {
+  // 1) remove tall main menu, 2) pin compact chatting keyboard
+  return ["remove_keyboard", "chattingKeyboard"];
+}
+
 // --- reconcile / connect race ---
 assert(
   shouldWipeChatting(
@@ -104,6 +119,28 @@ assert(
 assert(
   chatActionForText("idle", "راهنما 🤔") === "menu_or_other",
   "idle uses menu",
+);
+
+// --- relay must carry chat keyboard (scroll-pin fix) ---
+const opts = partnerRelayOpts(
+  { secureChat: false },
+  { secureChat: true },
+  {
+    keyboard: [["🔚"]],
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: "پیامت را بنویس…",
+  },
+  { caption: "hi" },
+);
+assert(opts.protect_content === true, "secure content when either side secure");
+assert(opts.reply_markup?.resize_keyboard === true, "relay resize_keyboard");
+assert(opts.reply_markup?.is_persistent === true, "relay is_persistent");
+assert(opts.caption === "hi", "extra fields preserved");
+assert(
+  JSON.stringify(connectKeyboardSequence()) ===
+    JSON.stringify(["remove_keyboard", "chattingKeyboard"]),
+  "connect removes then pins chat kb",
 );
 
 console.log("smoke-chat-keyboard: OK");

@@ -1,7 +1,7 @@
 import { Composer, type Api } from "grammy";
 import { findByTelegram, patchUser } from "../db/users.js";
 import { prisma } from "../db/prisma.js";
-import { mainKeyboard } from "../keyboards/main.js";
+import { chattingKeyboard, mainKeyboard } from "../keyboards/main.js";
 import { allMenuButtonTexts, btnAll, langOf, t } from "../i18n/index.js";
 import { logChatMessage } from "../services/chatLog.js";
 import { setSecureChat } from "../services/match.js";
@@ -16,6 +16,14 @@ const MENU = allMenuButtonTexts();
 const SECURE_ON = new Set(btnAll("SECURE_CHAT_ON"));
 const SECURE_OFF = new Set(btnAll("SECURE_CHAT_OFF"));
 
+type ChatUser = {
+  id: number;
+  telegramId: bigint;
+  secureChat: boolean;
+  language?: string | null;
+  lang?: string | null;
+};
+
 async function getChattingPair(userId: number) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.state !== "chatting" || !user.chatPartnerId) return null;
@@ -27,6 +35,20 @@ async function getChattingPair(userId: number) {
     return { user, partner: null as null };
   }
   return { user, partner };
+}
+
+/** گزینه‌های ارسال به طرف مقابل — همیشه کیبورد چت را دوباره پین کن */
+function partnerRelayOpts(
+  user: ChatUser,
+  partner: ChatUser,
+  extra: Record<string, unknown> = {},
+) {
+  const secure = user.secureChat || partner.secureChat;
+  return {
+    ...extra,
+    protect_content: secure,
+    reply_markup: chattingKeyboard(partner.secureChat, langOf(partner)),
+  };
 }
 
 async function logRelay(
@@ -255,7 +277,6 @@ chatHandler.on("message:text", async (ctx, next) => {
       );
       return;
     }
-    const secure = user.secureChat || partner.secureChat;
     try {
       await relayMessage(
         ctx.api,
@@ -263,9 +284,11 @@ chatHandler.on("message:text", async (ctx, next) => {
         partner,
         ctx.message.message_id,
         () =>
-          ctx.api.sendMessage(Number(partner.telegramId), text, {
-            protect_content: secure,
-          }),
+          ctx.api.sendMessage(
+            Number(partner.telegramId),
+            text,
+            partnerRelayOpts(user, partner),
+          ),
       );
     } catch (err) {
       console.error("chat relay failed", user.id, "->", partner.id, err);
@@ -336,13 +359,18 @@ chatHandler.on("message:photo", async (ctx, next) => {
       partner,
       ctx.message.message_id,
       () =>
-        ctx.api.sendPhoto(Number(partner.telegramId), best.file_id, {
-          ...(ctx.message.caption ? { caption: ctx.message.caption } : {}),
-          protect_content: secure,
-        }),
+        ctx.api.sendPhoto(
+          Number(partner.telegramId),
+          best.file_id,
+          partnerRelayOpts(user, partner, {
+            ...(ctx.message.caption ? { caption: ctx.message.caption } : {}),
+          }),
+        ),
     );
     if (secure) {
-      const ack = await ctx.reply("🔒 عکس با چت امن ارسال شد.");
+      const ack = await ctx.reply("🔒 عکس با چت امن ارسال شد.", {
+        reply_markup: chattingKeyboard(user.secureChat, lang),
+      });
       await logChatMessage(user.id, partner.id, user.telegramId, ack.message_id);
     }
   } catch (err) {
@@ -395,13 +423,18 @@ chatHandler.on("message:video", async (ctx, next) => {
       partner,
       ctx.message.message_id,
       () =>
-        ctx.api.sendVideo(Number(partner.telegramId), ctx.message.video.file_id, {
-          ...(ctx.message.caption ? { caption: ctx.message.caption } : {}),
-          protect_content: secure,
-        }),
+        ctx.api.sendVideo(
+          Number(partner.telegramId),
+          ctx.message.video.file_id,
+          partnerRelayOpts(user, partner, {
+            ...(ctx.message.caption ? { caption: ctx.message.caption } : {}),
+          }),
+        ),
     );
     if (secure) {
-      const ack = await ctx.reply("🔒 ویدیو با چت امن ارسال شد.");
+      const ack = await ctx.reply("🔒 ویدیو با چت امن ارسال شد.", {
+        reply_markup: chattingKeyboard(user.secureChat, lang),
+      });
       await logChatMessage(user.id, partner.id, user.telegramId, ack.message_id);
     }
   } catch (err) {
@@ -434,7 +467,6 @@ chatHandler.on("message:video_note", async (ctx, next) => {
     return;
   }
 
-  const secure = user.secureChat || partner.secureChat;
   try {
     await relayMessage(
       ctx.api,
@@ -445,7 +477,7 @@ chatHandler.on("message:video_note", async (ctx, next) => {
         ctx.api.sendVideoNote(
           Number(partner.telegramId),
           ctx.message.video_note.file_id,
-          { protect_content: secure },
+          partnerRelayOpts(user, partner),
         ),
     );
   } catch (err) {
@@ -502,7 +534,6 @@ chatHandler.on(
       return;
     }
 
-    const secure = user.secureChat || partner.secureChat;
     const msg = ctx.message;
 
     if (
@@ -525,42 +556,46 @@ chatHandler.on(
         ctx.message.message_id,
         async () => {
           if (msg.voice) {
-            return ctx.api.sendVoice(Number(partner.telegramId), msg.voice.file_id, {
-              ...(msg.caption ? { caption: msg.caption } : {}),
-              protect_content: secure,
-            });
+            return ctx.api.sendVoice(
+              Number(partner.telegramId),
+              msg.voice.file_id,
+              partnerRelayOpts(user, partner, {
+                ...(msg.caption ? { caption: msg.caption } : {}),
+              }),
+            );
           }
           if (msg.sticker) {
             return ctx.api.sendSticker(
               Number(partner.telegramId),
               msg.sticker.file_id,
-              { protect_content: secure },
+              partnerRelayOpts(user, partner),
             );
           }
           if (msg.animation) {
             return ctx.api.sendAnimation(
               Number(partner.telegramId),
               msg.animation.file_id,
-              {
+              partnerRelayOpts(user, partner, {
                 ...(msg.caption ? { caption: msg.caption } : {}),
-                protect_content: secure,
-              },
+              }),
             );
           }
           if (msg.audio) {
-            return ctx.api.sendAudio(Number(partner.telegramId), msg.audio.file_id, {
-              ...(msg.caption ? { caption: msg.caption } : {}),
-              protect_content: secure,
-            });
+            return ctx.api.sendAudio(
+              Number(partner.telegramId),
+              msg.audio.file_id,
+              partnerRelayOpts(user, partner, {
+                ...(msg.caption ? { caption: msg.caption } : {}),
+              }),
+            );
           }
           if (msg.document) {
             return ctx.api.sendDocument(
               Number(partner.telegramId),
               msg.document.file_id,
-              {
+              partnerRelayOpts(user, partner, {
                 ...(msg.caption ? { caption: msg.caption } : {}),
-                protect_content: secure,
-              },
+              }),
             );
           }
           throw new Error("unsupported media relay");

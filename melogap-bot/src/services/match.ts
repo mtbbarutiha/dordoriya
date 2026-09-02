@@ -7,6 +7,7 @@ import {
   chattingKeyboard,
   mainKeyboard,
   waitingKeyboard,
+  removeReplyKeyboard,
 } from "../keyboards/main.js";
 import { langOf, t, tr, normalizeLang, type Lang } from "../i18n/index.js";
 import { cityLabel, provinceLabel } from "../data/locations.js";
@@ -902,17 +903,18 @@ export async function connectUsers(
   const kbA = chattingKeyboard(false, langA);
   const kbB = chattingKeyboard(false, langB);
 
+  // اول منوی بلند را بردار، بعد کیبورد فشردهٔ چت را پین کن
+  // (کلاینت تلگرام کیبورد را به آخرین پیامِ دارای reply_markup لنگر می‌زند)
   const ma = await api.sendMessage(
     Number(a.telegramId),
     t(langA, "chat_connected"),
-    { reply_markup: kbA },
+    { reply_markup: removeReplyKeyboard },
   );
   const mb = await api.sendMessage(
     Number(b.telegramId),
     t(langB, "chat_connected"),
-    { reply_markup: kbB },
+    { reply_markup: removeReplyKeyboard },
   );
-  // Re-assert chat reply keyboard so main-menu keyboard always switches away
   await api
     .sendMessage(Number(a.telegramId), t(langA, "continue_chat"), {
       reply_markup: kbA,

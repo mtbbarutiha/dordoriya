@@ -129,6 +129,12 @@ export function cardReceiptReplyKeyboard(lang: Lang | string | null = "fa") {
     .persistent();
 }
 
+/**
+ * کیبورد فشردهٔ حین چت — همیشه resize + persistent تا روی کلاینت
+ * به ناحیهٔ ورودی بچسبد و هنگام اسکرول وسط صفحه شناور نماند.
+ * (تلگرام گاهی کیبورد را به آخرین پیام دارای reply_markup لنگر می‌زند؛
+ *  پس این کیبورد باید روی پیام‌های رلهٔ چت هم دوباره ارسال شود.)
+ */
 export function chattingKeyboard(
   secure = false,
   lang: Lang | string | null = "fa",
@@ -140,9 +146,15 @@ export function chattingKeyboard(
     .row()
     .text(btn(L, "ADD_CONTACT"), "success")
     .text(secure ? btn(L, "SECURE_CHAT_OFF") : btn(L, "SECURE_CHAT_ON"), "primary")
-    .resized()
-    .persistent();
+    .resized(true)
+    .persistent(true)
+    .placeholder(L === "en" ? "Type a message…" : "پیامت را بنویس…");
 }
+
+/** حذف کیبورد قبلی (مثلاً منوی ۵ردیفه) قبل از ست‌کردن کیبورد چت */
+export const removeReplyKeyboard = {
+  remove_keyboard: true,
+} as const;
 
 /** پروفایل طرف مقابل وسط چت — بدون دکمه درخواست چت */
 export function partnerInChatKeyboard(
