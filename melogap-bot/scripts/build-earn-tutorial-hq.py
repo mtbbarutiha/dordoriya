@@ -36,9 +36,18 @@ CREAM = (248, 244, 236)
 MUTED = (180, 190, 195)
 NIGHT = (6, 18, 24)
 
-FONT_REG = "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf"
-FONT_BOLD = "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf"
-FONT_NASKH = "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf"
+# Vazirmatn preferred (covers em dash / Persian digits; no tofu). Fallback: Noto Sans Arabic.
+_VAZIR_DIR = ROOT / "assets" / "banners" / "channel-posts" / "earn-teaser-pro" / "fonts"
+_VAZIR_BOLD = _VAZIR_DIR / "Vazirmatn-Bold.ttf"
+_VAZIR_REG = _VAZIR_DIR / "Vazirmatn-Regular.ttf"
+if _VAZIR_BOLD.is_file():
+    FONT_REG = str(_VAZIR_REG)
+    FONT_BOLD = str(_VAZIR_BOLD)
+    FONT_NASKH = str(_VAZIR_BOLD)
+else:
+    FONT_REG = "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf"
+    FONT_BOLD = "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf"
+    FONT_NASKH = "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf"
 FONT_LATIN = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
 # (source, duration_sec, zoom_end, caption_lines, badge)
@@ -47,7 +56,7 @@ SPECS: list[tuple[str, float, float, list[str], str | None]] = [
         "hq_01_title.png",
         4.5,
         1.08,
-        ["دوردوریا", "آموزش کسب درآمد", "فروش سکه به تومان — گام‌به‌گام"],
+        ["دوردوریا", "آموزش کسب درآمد", "فروش سکه به تومان – گام‌به‌گام"],
         None,
     ),
     (
