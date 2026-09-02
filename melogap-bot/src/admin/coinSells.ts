@@ -158,12 +158,11 @@ adminCoinSellsHandler.callbackQuery(
     const id = Number(ctx.match![2]);
     try {
       if (action === "paid") {
-        const row = await getCoinSellById(id);
-        if (!row || row.status !== "open") {
+        const row = await markCoinSellPaid(id);
+        if (!row) {
           await ctx.answerCallbackQuery({ text: "قابل پرداخت نیست", show_alert: true });
           return;
         }
-        await markCoinSellPaid(id);
         await ctx.answerCallbackQuery({ text: "پرداخت شد ✅" });
         // اطلاع به کاربر
         await ctx.api

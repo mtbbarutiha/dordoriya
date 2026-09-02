@@ -255,7 +255,10 @@ earnHandler.on("message:text", async (ctx, next) => {
           "",
           "ممنون! پرداخت پس از بررسی ادمین انجام می‌شود.",
         ].join("\n"),
-    { reply_markup: mainKeyboard(lang) },
+    // اگر وسط چت/انتظار بودیم، منوی اصلی را دوباره نفرست
+    user.state === "chatting" || user.state === "await_direct_msg"
+      ? undefined
+      : { reply_markup: mainKeyboard(lang) },
   );
 
   await notifyAdminsNewCoinSell(ctx.api, result.requestId);

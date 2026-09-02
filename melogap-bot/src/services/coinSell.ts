@@ -168,6 +168,12 @@ export async function submitCoinSell(input: {
 
   try {
     const requestId = await prisma.$transaction(async (tx) => {
+      const open = await tx.coinSellRequest.count({
+        where: { userId: input.userId, status: "open" },
+      });
+      if (open > 0) {
+        throw new Error("PENDING");
+      }
       const debited = await tx.user.updateMany({
         where: {
           id: input.userId,
@@ -195,18 +201,26 @@ export async function submitCoinSell(input: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg === "BALANCE") return { ok: false, reason: "balance" };
+    if (msg === "PENDING") return { ok: false, reason: "pending" };
     throw err;
   }
 }
 
 export async function markCoinSellPaid(id: number, note?: string | null) {
-  return prisma.coinSellRequest.update({
-    where: { id },
+  const updated = await prisma.coinSellRequest.updateMany({
+    where: { id, status: "open" },
     data: {
       status: "paid",
       reviewedAt: new Date(),
       adminNote: note?.trim() || null,
     },
+  });
+  if (updated.count !== 1) {
+    return null;
+  }
+  return prisma.coinSellRequest.findUnique({
+    where: { id },
+    include: { user: true },
   });
 }
 

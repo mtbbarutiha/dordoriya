@@ -865,32 +865,56 @@ export async function connectUsers(
   if (!a || !b) return "missing";
   if (b.telegramId >= 9000000000n || a.telegramId >= 9000000000n) return "demo";
   if (a.state === "chatting" || b.state === "chatting") return "busy";
+  if (aId === bId) return "busy";
 
   await leaveQueueOrChat(api, a, true);
   await leaveQueueOrChat(api, b, true);
 
-  // Atomic pair link — avoids reconcile wiping one side when the other
-  // is briefly still idle between sequential patches.
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: a.id },
+  // Atomic pair claim — both sides must still be free after leaveQueue.
+  // Prevents A↔B and A↔C races from leaving mismatched partners.
+  const linked = await prisma.$transaction(async (tx) => {
+    const claimA = await tx.user.updateMany({
+      where: {
+        id: a.id,
+        state: { not: "chatting" },
+        OR: [{ chatPartnerId: null }, { chatPartnerId: b.id }],
+      },
       data: {
         state: "chatting",
         chatPartnerId: b.id,
         chatsCount: { increment: 1 },
         secureChat: false,
       },
-    }),
-    prisma.user.update({
-      where: { id: b.id },
+    });
+    if (claimA.count !== 1) return false;
+    const claimB = await tx.user.updateMany({
+      where: {
+        id: b.id,
+        state: { not: "chatting" },
+        OR: [{ chatPartnerId: null }, { chatPartnerId: a.id }],
+      },
       data: {
         state: "chatting",
         chatPartnerId: a.id,
         chatsCount: { increment: 1 },
         secureChat: false,
       },
-    }),
-  ]);
+    });
+    if (claimB.count !== 1) {
+      await tx.user.update({
+        where: { id: a.id },
+        data: {
+          state: "idle",
+          chatPartnerId: null,
+          secureChat: false,
+          chatsCount: { decrement: 1 },
+        },
+      });
+      return false;
+    }
+    return true;
+  });
+  if (!linked) return "busy";
 
   // لغو درخواست‌های pending باقی‌مانده از هر دو طرف
   await cancelPendingFromUser(a.id);
