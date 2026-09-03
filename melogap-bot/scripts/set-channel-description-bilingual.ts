@@ -1,8 +1,6 @@
 /**
- * Set @dordoriabot description (FA+EN). Safe to re-run; does not post or pin.
- *
- * Live pin (do not republish): https://t.me/dordoriabot/223
- * Button: «ورود به ربات / Open Bot» → https://t.me/Dordoriya_bot
+ * Set @dordoriabot description (FA+EN) with tappable bot link in the body.
+ * Does not post or pin — bot entry lives in the description, not a stub message.
  *
  * Usage: npx tsx scripts/set-channel-description-bilingual.ts
  * Requires: bot admin with can_change_info.
@@ -15,12 +13,12 @@ const CHAT =
   process.env.FORCE_JOIN_CHANNEL ||
   "@dordoriabot";
 
+/** Keep ≤255 chars. URL/@username are clickable in Telegram channel descriptions. */
 const CHANNEL_DESCRIPTION = [
   "دوردوریا — جایی برای گپ ناشناس با نزدیک‌ها، دایرکت و ویس.",
   "سکه بگیر و دوستات رو دعوت کن.",
-  "",
+  "ربات: https://t.me/Dordoriya_bot · @Dordoriya_bot",
   "Dordoriya — anonymous chat, nearby, coins & invites.",
-  "@Dordoriya_bot",
 ].join("\n");
 
 async function main() {
@@ -52,6 +50,14 @@ async function main() {
   const chat = await bot.api.getChat(CHAT);
   if ("description" in chat) {
     console.log("description:\n" + chat.description);
+  }
+  if ("pinned_message" in chat && chat.pinned_message) {
+    console.log(
+      "warning: still pinned message_id=",
+      chat.pinned_message.message_id,
+    );
+  } else {
+    console.log("pinned: none");
   }
 }
 

@@ -1,8 +1,12 @@
 /**
- * HARD BLOCK — do not publish channel/private test posts without explicit user approval.
- * Teaser already live: https://t.me/dordoriabot/218 — keep 176/178/218.
- * Real send scripts live in .channel-mutations-DISABLED-20260902/
+ * HARD BLOCK stub — use the channel publish gateway instead.
+ *
+ * Always: npx tsx scripts/channel-publish.ts
+ * Never:  raw sendPhoto / sendVideo / sendMessage to @dordoriabot
+ *
+ * See CHANNEL_PUBLISH.md
  */
 throw new Error(
-  "BLOCKED: channel/private publish scripts are disabled. Do not send media to channel or ADMIN DMs.",
+  "BLOCKED: use scripts/channel-publish.ts (channelPublish gateway). " +
+    "Raw channel/private publish scripts are disabled. See CHANNEL_PUBLISH.md",
 );
