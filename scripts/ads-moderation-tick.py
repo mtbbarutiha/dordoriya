@@ -134,9 +134,11 @@ async def fetch_decline_reason(page, ad_id: int) -> str:
     body = await page.locator("body").inner_text()
     reason = ""
     for pat in (
+        r"Deceptive, misleading, or predatory advertising[^\n]*",
         r"(?:Reason|Decline reason|Rejection reason|علت|دلیل)[:\s]*([^\n]{5,300})",
         r"(Editorial[^\n]{0,200})",
         r"(Language mismatch[^\n]{0,200})",
+        r"(Irrelevant[^\n]{0,200})",
         r"(Policy[^\n]{0,200})",
     ):
         m = re.search(pat, body, re.I)
