@@ -675,10 +675,8 @@ export async function answerInlineUserList(ctx: Context) {
   const raw = (q.query ?? "").trim();
   const m = /^search_([A-Za-z0-9_-]+)$/.exec(raw);
   if (!m) {
-    await ctx.answerInlineQuery([], {
-      cache_time: 1,
-      is_personal: true,
-    });
+    const { answerInlineBotIntro } = await import("./inlineBotCard.js");
+    await answerInlineBotIntro(ctx);
     return;
   }
 
