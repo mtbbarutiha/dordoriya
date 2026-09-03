@@ -23,7 +23,7 @@ import {
 /**
  * حالت سایلنت درخواست‌چت (chatSilentUntil) هرگز نباید دایرکت را قطع کند.
  * فقط بلاک دوطرفه / نبودن chat با ربات / سکه ناکافی مانع است.
- * پیش‌چک sendChatAction حذف شد — فقط خطای واقعی ارسال پیام ملاک است.
+ * هیچ پیش‌چک deliverability (مثل sendChatAction) قبل از ارسال واقعی نداریم.
  */
 function dmDeliveryBlockedMessage(
   reason: BotDeliveryBlockReason,
@@ -32,10 +32,11 @@ function dmDeliveryBlockedMessage(
   const L = normalizeLang(lang);
   switch (reason) {
     case "blocked_bot":
+      // فقط بعد از 403 واقعی تلگرام با «blocked by the user»
       return tr(
         L,
-        "ارسال نشد: طرف مقابل ربات را در تلگرام بلاک کرده است. سکه کسر نشد.",
-        "Not sent: the recipient blocked this bot on Telegram. No coins were deducted.",
+        "ارسال نشد؛ این کاربر فعلاً پیام ربات را نمی‌پذیرد.",
+        "Not sent; this user currently won't accept bot messages.",
       );
     case "never_started":
       return tr(
@@ -255,7 +256,7 @@ export async function beginDirectCompose(
   }
 
   // No must-message-first gate. Silent chat-request mode never blocks DM.
-  // Delivery probe only at send time so mid-chat compose stays open.
+  // No deliverability probe here — mid-chat compose stays open; real send decides.
 
   if (user.diamonds < DIRECT_MSG_COST) {
     await ctx.reply(
@@ -1013,8 +1014,8 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
     return;
   }
 
-  // No sendChatAction pre-check — it false-positived on chatting users.
-  // Deliver the real DM; only show blocked copy on explicit Telegram 403 wording.
+  // No pre-send deliverability gate (sendChatAction false-positived on chatting users).
+  // Attempt the real DM; blocked copy only if Telegram 403 says "blocked by the user".
 
   if (user.diamonds < DIRECT_MSG_COST) {
     await ctx.answerCallbackQuery({ text: tr(lang, "سکه کافی نیست", "Not enough coins") });
