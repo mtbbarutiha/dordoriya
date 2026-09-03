@@ -1,5 +1,13 @@
 import type { Context } from "grammy";
 
+/**
+ * chat_id برای Bot API — همان مسیر امن برای رله چت و دایرکت.
+ * String از دست رفتن دقت BigInt در Number() جلوگیری می‌کند.
+ */
+export function telegramChatId(id: bigint | number | string): string {
+  return String(id);
+}
+
 /** خطاهای بی‌ضرر تلگرام که نباید کل هندلر را بشکنند */
 export function isIgnorableTelegramError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);

@@ -17,6 +17,7 @@ import { langOf, tr, normalizeLang, type Lang } from "../i18n/index.js";
 import { rejectForbiddenContact } from "./contactGuard.js";
 import {
   classifyBotDeliveryError,
+  telegramChatId,
   type BotDeliveryBlockReason,
 } from "../lib/telegramSafe.js";
 
@@ -35,8 +36,8 @@ function dmDeliveryBlockedMessage(
       // فقط بعد از 403 واقعی تلگرام با «blocked by the user»
       return tr(
         L,
-        "ارسال نشد؛ این کاربر فعلاً پیام ربات را نمی‌پذیرد.",
-        "Not sent; this user currently won't accept bot messages.",
+        "ارسال نشد؛ این کاربر ربات را در تلگرام بلاک کرده. تا وقتی آنبلاک نکند پیام دایرکت به او نمی‌رسد.",
+        "Not sent; this user has blocked the bot on Telegram. DMs can't arrive until they unblock it.",
       );
     case "never_started":
       return tr(
@@ -53,14 +54,14 @@ function dmDeliveryBlockedMessage(
     case "forbidden":
       return tr(
         L,
-        "تلگرام اجازه ارسال پیام به این کاربر را نمی‌دهد؛ ارسال دایرکت ممکن نیست.",
-        "Telegram won't allow messaging this user; a DM can't be delivered.",
+        "ارسال نشد؛ تلگرام اجازه پیام به این کاربر را نداد.",
+        "Not sent; Telegram refused messaging this user.",
       );
     default:
       return tr(
         L,
-        "ارسال به طرف مقابل ممکن نشد. سکه کسر نشد.",
-        "Couldn't deliver it to the recipient. No coins were deducted.",
+        "ارسال نشد. سکه کسر نشد.",
+        "Not sent. No coins were deducted.",
       );
   }
 }
@@ -90,8 +91,8 @@ async function deliverDmNotify(
   photo: unknown,
   opts?: { treatAsReachable?: boolean },
 ): Promise<{ ok: true } | { ok: false; reason: BotDeliveryBlockReason }> {
-  // Prefer string chat id — avoids Number precision issues on large telegramIds.
-  const chatId = String(targetTelegramId);
+  // Same chat_id resolution as anonymous chat relay (string — safe for large telegramIds).
+  const chatId = telegramChatId(targetTelegramId);
   try {
     if (photo) {
       await api.sendPhoto(chatId, photo as never, {
@@ -694,13 +695,14 @@ export async function sendListBlast(ctx: Context, userId: number, token: string)
     );
 
     try {
+      const chatId = telegramChatId(target.telegramId);
       if (photo) {
-        await ctx.api.sendPhoto(Number(target.telegramId), photo, {
+        await ctx.api.sendPhoto(chatId, photo, {
           caption: notifyText,
           reply_markup: dmNotifyKeyboard(msg.id, targetLang),
         });
       } else {
-        await ctx.api.sendMessage(Number(target.telegramId), notifyText, {
+        await ctx.api.sendMessage(chatId, notifyText, {
           reply_markup: dmNotifyKeyboard(msg.id, targetLang),
         });
       }

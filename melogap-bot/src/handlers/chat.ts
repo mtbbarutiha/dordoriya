@@ -10,6 +10,7 @@ import {
   rejectForbiddenContact,
 } from "../services/contactGuard.js";
 import { checkProfileCompletionRewards } from "../services/profileCompletion.js";
+import { telegramChatId } from "../lib/telegramSafe.js";
 export const chatHandler = new Composer();
 
 const MENU = allMenuButtonTexts();
@@ -241,7 +242,7 @@ chatHandler.on("message:text", async (ctx, next) => {
       data: { toUserId: target.id, fromUserId: user.id, text },
     });
     await ctx.api.sendMessage(
-      Number(target.telegramId),
+      telegramChatId(target.telegramId),
       ["🕵️‍♂️ پیام ناشناس جدید:", "", text].join("\n"),
     );
     await patchUser(user.id, { state: "idle", pendingAnonTo: null });
@@ -293,7 +294,7 @@ chatHandler.on("message:text", async (ctx, next) => {
         ctx.message.message_id,
         () =>
           ctx.api.sendMessage(
-            Number(partner.telegramId),
+            telegramChatId(partner.telegramId),
             text,
             partnerRelayOpts(user, partner),
           ),
@@ -355,7 +356,7 @@ chatHandler.on("message:photo", async (ctx, next) => {
       ctx.message.message_id,
       () =>
         ctx.api.sendPhoto(
-          Number(partner.telegramId),
+          telegramChatId(partner.telegramId),
           best.file_id,
           partnerRelayOpts(user, partner, {
             ...(ctx.message.caption ? { caption: ctx.message.caption } : {}),
@@ -413,7 +414,7 @@ chatHandler.on("message:video", async (ctx, next) => {
       ctx.message.message_id,
       () =>
         ctx.api.sendVideo(
-          Number(partner.telegramId),
+          telegramChatId(partner.telegramId),
           ctx.message.video.file_id,
           partnerRelayOpts(user, partner, {
             ...(ctx.message.caption ? { caption: ctx.message.caption } : {}),
@@ -458,7 +459,7 @@ chatHandler.on("message:video_note", async (ctx, next) => {
       ctx.message.message_id,
       () =>
         ctx.api.sendVideoNote(
-          Number(partner.telegramId),
+          telegramChatId(partner.telegramId),
           ctx.message.video_note.file_id,
           partnerRelayOpts(user, partner),
         ),
@@ -536,7 +537,7 @@ chatHandler.on(
         async () => {
           if (msg.voice) {
             return ctx.api.sendVoice(
-              Number(partner.telegramId),
+              telegramChatId(partner.telegramId),
               msg.voice.file_id,
               partnerRelayOpts(user, partner, {
                 ...(msg.caption ? { caption: msg.caption } : {}),
@@ -545,14 +546,14 @@ chatHandler.on(
           }
           if (msg.sticker) {
             return ctx.api.sendSticker(
-              Number(partner.telegramId),
+              telegramChatId(partner.telegramId),
               msg.sticker.file_id,
               partnerRelayOpts(user, partner),
             );
           }
           if (msg.animation) {
             return ctx.api.sendAnimation(
-              Number(partner.telegramId),
+              telegramChatId(partner.telegramId),
               msg.animation.file_id,
               partnerRelayOpts(user, partner, {
                 ...(msg.caption ? { caption: msg.caption } : {}),
@@ -561,7 +562,7 @@ chatHandler.on(
           }
           if (msg.audio) {
             return ctx.api.sendAudio(
-              Number(partner.telegramId),
+              telegramChatId(partner.telegramId),
               msg.audio.file_id,
               partnerRelayOpts(user, partner, {
                 ...(msg.caption ? { caption: msg.caption } : {}),
@@ -570,7 +571,7 @@ chatHandler.on(
           }
           if (msg.document) {
             return ctx.api.sendDocument(
-              Number(partner.telegramId),
+              telegramChatId(partner.telegramId),
               msg.document.file_id,
               partnerRelayOpts(user, partner, {
                 ...(msg.caption ? { caption: msg.caption } : {}),

@@ -634,7 +634,11 @@ export async function showProfileByUserCode(
     skipDuplicates: true,
   });
   if (viewCreated.count > 0) {
-    await patchUser(candidate.id, { viewsCount: { increment: 1 } });
+    // Do NOT use patchUser — it bumps lastActiveAt and falsely marks the viewee "online".
+    await prisma.user.update({
+      where: { id: candidate.id },
+      data: { viewsCount: { increment: 1 } },
+    });
   }
 
   const loc = [candidate.city, candidate.province].filter(Boolean).join(" - ");

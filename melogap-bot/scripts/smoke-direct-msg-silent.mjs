@@ -66,7 +66,8 @@ assert.equal(dmSrc.includes("probeBotCanMessage"), false);
 assert.equal(/\bapi\.sendChatAction\b|\.sendChatAction\(/.test(dmSrc), false);
 assert.match(dmSrc, /targetClearlyReceivesBot/);
 assert.match(dmSrc, /treatAsReachable/);
-assert.match(dmSrc, /ارسال نشد؛ این کاربر فعلاً پیام ربات را نمی‌پذیرد/);
+assert.match(dmSrc, /این کاربر ربات را در تلگرام بلاک کرده/);
+assert.match(dmSrc, /telegramChatId/);
 // Old false-positive / long parenthetical copies must not remain
 assert.equal(
   dmSrc.includes("امکان ارسال دایرکت نیست؛ این کاربر دریافت پیام از ربات را بسته است"),
@@ -74,7 +75,7 @@ assert.equal(
 );
 assert.equal(dmSrc.includes("سایلنت بودن درخواست‌چت مانع دایرکت نیست"), false);
 assert.equal(dmSrc.includes("بلاک کرده و الان نمی‌تواند پیام دایرکت بگیرد"), false);
-assert.equal(dmSrc.includes("طرف مقابل ربات را در تلگرام بلاک کرده است"), false);
+assert.equal(dmSrc.includes("این کاربر فعلاً پیام ربات را نمی‌پذیرد"), false);
 assert.equal(/\bapi\.sendChatAction\b|\.sendChatAction\(/.test(fs.readFileSync(path.join(root, "dist/services/directMsg.js"), "utf8")), false);
 assert.equal(fs.readFileSync(path.join(root, "dist/services/directMsg.js"), "utf8").includes("سایلنت بودن درخواست‌چت مانع دایرکت نیست"), false);
 
