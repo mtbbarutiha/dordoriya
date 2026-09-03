@@ -1689,6 +1689,13 @@ featuresHandler.callbackQuery(/^chatreq:(ok|no):(\d+)$/, async (ctx) => {
     });
     return;
   }
+  if (result === "no_coins") {
+    await ctx.reply(
+      "وصل نشد — سکه کافی برای چت سریع نیست (یا طرف مقابل سکه ندارد).",
+      { reply_markup: mainKeyboard() },
+    );
+    return;
+  }
   await ctx
     .editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } })
     .catch(() => undefined);

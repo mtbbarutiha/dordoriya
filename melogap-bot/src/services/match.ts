@@ -11,7 +11,14 @@ import {
 } from "../keyboards/main.js";
 import { langOf, t, tr, normalizeLang, type Lang } from "../i18n/index.js";
 import { cityLabel, provinceLabel } from "../data/locations.js";
+import { formatNum, QUICK_MATCH_COST, QUICK_MATCH_REFUND_MS } from "../data/packages.js";
 import { logPairMessages, logChatMessage } from "./chatLog.js";
+import {
+  debitQuickMatchPayersInTx,
+  notifyQuickMatchCharged,
+  quickMatchInsufficientCoinsText,
+  settleQuickMatchOnChatEnd,
+} from "./quickMatchPay.js";
 
 export type QuickMatchGender = "female" | "male" | "any";
 
@@ -84,17 +91,31 @@ export async function promptQuickMatchGender(ctx: Context, userId: number) {
     await tryQuickMatch(ctx, userId);
     return;
   }
+  // پیش‌بررسی سکه — کسر واقعی فقط هنگام وصل موفق
+  if (me.diamonds < QUICK_MATCH_COST) {
+    await ctx.reply(quickMatchInsufficientCoinsText(lang, me.diamonds), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+  const refundSec = Math.round(QUICK_MATCH_REFUND_MS / 1000);
   await ctx.reply(
     tr(
       lang,
       [
         "⚡ چت سریع — به یه ناشناس وصل شو",
         "",
+        `💰 هزینه وصل: ${formatNum(QUICK_MATCH_COST)} سکه (فقط وقتی وصل شدید کسر می‌شود).`,
+        `♻️ اگر طرف مقابل زیر ${formatNum(refundSec)} ثانیه قطع کند، سکه برمی‌گردد.`,
+        "",
         "می‌خوای با کی چت کنی؟",
         "درخواست‌ها فقط برای همین انتخاب ارسال می‌شود.",
       ].join("\n"),
       [
         "⚡ Quick chat — connect to a stranger",
+        "",
+        `💰 Connect cost: ${QUICK_MATCH_COST} coins (charged only when matched).`,
+        `♻️ If the other person leaves within ${refundSec}s, coins are refunded.`,
         "",
         "Who do you want to chat with?",
         "Requests will only go to people matching your choice.",
@@ -212,6 +233,14 @@ export async function leaveQueueOrChat(
             console.error("notify partner end-chat failed", partner.id, err);
           }
         }
+      }
+    }
+    // بازپرداخت وصل ناشناس اگر طرف مقابل زیر ۲۰ثانیه قطع کرده باشد
+    if (partnerId != null) {
+      try {
+        await settleQuickMatchOnChatEnd(api, user.id, partnerId);
+      } catch (err) {
+        console.error("quickMatch settle after leave failed", user.id, err);
       }
     }
     // یک‌باره: ناظران پایان چت این کاربر / شریک
@@ -344,6 +373,14 @@ export async function tryQuickMatch(ctx: Context, userId: number) {
     return;
   }
 
+  // پیش‌بررسی سکه — کسر واقعی فقط در connectUsers هنگام وصل
+  if (me.diamonds < QUICK_MATCH_COST) {
+    await ctx.reply(quickMatchInsufficientCoinsText(lang, me.diamonds), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return;
+  }
+
   // ۱) اگر کسی در صف منتظر است → وصل فوری (مثل ملوگپ)
   const peer = await findWaitingPeer(me.id);
   if (peer) {
@@ -354,8 +391,33 @@ export async function tryQuickMatch(ctx: Context, userId: number) {
       },
       data: { status: "cancelled" },
     });
-    const result = await connectUsers(ctx.api, me.id, peer.id);
+    // هر دو جستجوگر ناشناس‌اند → هر کدام ۲ سکه هنگام وصل
+    const result = await connectUsers(ctx.api, me.id, peer.id, {
+      quickPayers: [me.id, peer.id],
+    });
     if (result === "ok") return;
+    if (result === "no_coins") {
+      await ctx.reply(quickMatchInsufficientCoinsText(lang, me.diamonds), {
+        reply_markup: mainKeyboard(lang),
+      });
+      // اگر طرف مقابل سکه نداشت از صف بیرونش کن تا گیر نکند
+      const peerNow = await prisma.user.findUnique({ where: { id: peer.id } });
+      if (peerNow && peerNow.state === "waiting" && peerNow.diamonds < QUICK_MATCH_COST) {
+        await leaveQueueOrChat(ctx.api, peerNow, false);
+        if (peerNow.telegramId < 9000000000n) {
+          try {
+            await ctx.api.sendMessage(
+              Number(peerNow.telegramId),
+              quickMatchInsufficientCoinsText(langOf(peerNow), peerNow.diamonds),
+              { reply_markup: mainKeyboard(langOf(peerNow)) },
+            );
+          } catch (err) {
+            console.error("notify peer no_coins failed", peer.id, err);
+          }
+        }
+      }
+      return;
+    }
     if (result === "busy") {
       await ctx.reply(
         lang === "en"
@@ -863,7 +925,7 @@ export async function respondChatRequest(
   requestId: number,
   toUserId: number,
   accept: boolean,
-): Promise<"ok" | "missing" | "gone" | "busy" | "demo"> {
+): Promise<"ok" | "missing" | "gone" | "busy" | "demo" | "no_coins"> {
   const req = await prisma.chatRequest.findUnique({ where: { id: requestId } });
   if (!req || req.toUserId !== toUserId) return "missing";
   if (req.status !== "pending") return "gone";
@@ -937,7 +999,41 @@ export async function respondChatRequest(
   });
   // بقیه درخواست‌های باز همین فرستنده لغو شود
   await cancelPendingFromUser(req.fromUserId, req.id);
-  const result = await connectUsers(api, req.fromUserId, req.toUserId);
+  const result =
+    req.source === "quick"
+      ? await connectUsers(api, req.fromUserId, req.toUserId, {
+          quickPayers: [req.fromUserId],
+        })
+      : await connectUsers(api, req.fromUserId, req.toUserId);
+  if (result === "no_coins" && req.source === "quick") {
+    // جستجوگر سکه نداشت — به گیرنده بگو وصل نشد
+    const to = await prisma.user.findUnique({ where: { id: req.toUserId } });
+    if (to && to.telegramId < 9000000000n) {
+      const toLang = langOf(to);
+      await api
+        .sendMessage(
+          Number(to.telegramId),
+          toLang === "en"
+            ? "Couldn't connect — the other person doesn't have enough coins."
+            : "وصل نشد — طرف مقابل سکه کافی ندارد.",
+          { reply_markup: mainKeyboard(toLang) },
+        )
+        .catch(() => undefined);
+    }
+    const from = await prisma.user.findUnique({ where: { id: req.fromUserId } });
+    if (from && from.telegramId < 9000000000n) {
+      await api
+        .sendMessage(
+          Number(from.telegramId),
+          quickMatchInsufficientCoinsText(langOf(from), from.diamonds),
+          { reply_markup: mainKeyboard(langOf(from)) },
+        )
+        .catch(() => undefined);
+      if (from.state === "waiting") {
+        await leaveQueueOrChat(api, from, false);
+      }
+    }
+  }
   return result;
 }
 
@@ -945,7 +1041,8 @@ export async function connectUsers(
   api: Api,
   aId: number,
   bId: number,
-): Promise<"ok" | "busy" | "missing" | "demo"> {
+  options?: { quickPayers?: number[] },
+): Promise<"ok" | "busy" | "missing" | "demo" | "no_coins"> {
   const a = await prisma.user.findUnique({ where: { id: aId } });
   const b = await prisma.user.findUnique({ where: { id: bId } });
   if (!a || !b) return "missing";
@@ -953,53 +1050,88 @@ export async function connectUsers(
   if (a.state === "chatting" || b.state === "chatting") return "busy";
   if (aId === bId) return "busy";
 
+  const quickPayers = [
+    ...new Set((options?.quickPayers ?? []).filter((id) => id === aId || id === bId)),
+  ];
+
+  // Soft pre-check — hard atomic debit happens inside the claim transaction
+  if (quickPayers.length) {
+    for (const payerId of quickPayers) {
+      const u = payerId === aId ? a : b;
+      if (u.diamonds < QUICK_MATCH_COST) return "no_coins";
+    }
+  }
+
   await leaveQueueOrChat(api, a, true);
   await leaveQueueOrChat(api, b, true);
 
   // Atomic pair claim — both sides must still be free after leaveQueue.
   // Prevents A↔B and A↔C races from leaving mismatched partners.
-  const linked = await prisma.$transaction(async (tx) => {
-    const claimA = await tx.user.updateMany({
-      where: {
-        id: a.id,
-        state: { not: "chatting" },
-        OR: [{ chatPartnerId: null }, { chatPartnerId: b.id }],
-      },
-      data: {
-        state: "chatting",
-        chatPartnerId: b.id,
-        chatsCount: { increment: 1 },
-        secureChat: false,
-      },
-    });
-    if (claimA.count !== 1) return false;
-    const claimB = await tx.user.updateMany({
-      where: {
-        id: b.id,
-        state: { not: "chatting" },
-        OR: [{ chatPartnerId: null }, { chatPartnerId: a.id }],
-      },
-      data: {
-        state: "chatting",
-        chatPartnerId: a.id,
-        chatsCount: { increment: 1 },
-        secureChat: false,
-      },
-    });
-    if (claimB.count !== 1) {
-      await tx.user.update({
-        where: { id: a.id },
+  // Quick-match coin debit + QuickMatchCharge rows live in the same txn.
+  let linked = false;
+  try {
+    linked = await prisma.$transaction(async (tx) => {
+      const claimA = await tx.user.updateMany({
+        where: {
+          id: a.id,
+          state: { not: "chatting" },
+          OR: [{ chatPartnerId: null }, { chatPartnerId: b.id }],
+        },
         data: {
-          state: "idle",
-          chatPartnerId: null,
+          state: "chatting",
+          chatPartnerId: b.id,
+          chatsCount: { increment: 1 },
           secureChat: false,
-          chatsCount: { decrement: 1 },
         },
       });
-      return false;
+      if (claimA.count !== 1) return false;
+      const claimB = await tx.user.updateMany({
+        where: {
+          id: b.id,
+          state: { not: "chatting" },
+          OR: [{ chatPartnerId: null }, { chatPartnerId: a.id }],
+        },
+        data: {
+          state: "chatting",
+          chatPartnerId: a.id,
+          chatsCount: { increment: 1 },
+          secureChat: false,
+        },
+      });
+      if (claimB.count !== 1) {
+        await tx.user.update({
+          where: { id: a.id },
+          data: {
+            state: "idle",
+            chatPartnerId: null,
+            secureChat: false,
+            chatsCount: { decrement: 1 },
+          },
+        });
+        return false;
+      }
+
+      if (quickPayers.length) {
+        const paid = await debitQuickMatchPayersInTx(
+          tx,
+          quickPayers,
+          a.id,
+          b.id,
+          QUICK_MATCH_COST,
+        );
+        if (!paid) {
+          // rollback claims by throwing — transaction aborts
+          throw new Error("QUICK_MATCH_NO_COINS");
+        }
+      }
+      return true;
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "QUICK_MATCH_NO_COINS") {
+      return "no_coins";
     }
-    return true;
-  });
+    throw err;
+  }
   if (!linked) return "busy";
 
   // لغو درخواست‌های pending باقی‌مانده از هر دو طرف
@@ -1048,6 +1180,12 @@ export async function connectUsers(
   const { syncChattingUserMenu } = await import("../botMenu.js");
   void syncChattingUserMenu(api, a.telegramId);
   void syncChattingUserMenu(api, b.telegramId);
+
+  if (quickPayers.length) {
+    void notifyQuickMatchCharged(api, quickPayers).catch((err) =>
+      console.error("quickMatch charge notify batch failed", err),
+    );
+  }
   return "ok";
 }
 

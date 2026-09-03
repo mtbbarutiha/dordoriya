@@ -155,6 +155,10 @@ export const THREAD_GIFT_COST = 5;
 export const THREAD_GIFT_RECIPIENT = 3;
 /** هزینه ارسال پیام دایرکت از روی پروفایل */
 export const DIRECT_MSG_COST = 1;
+/** هزینه وصل ناشناس (چت سریع) — کسر هنگام وصل موفق، نه ورود به صف */
+export const QUICK_MATCH_COST = 2;
+/** اگر طرف مقابل زودتر از این بازه قطع کند، سکه به پرداخت‌کننده برمی‌گردد */
+export const QUICK_MATCH_REFUND_MS = 20_000;
 
 /** پیام گروهی از لیست سرچ: ۱۰ نفر اول، هزینه ثابت ۱۰ سکه */
 export const LIST_BLAST_LIMIT = 10;

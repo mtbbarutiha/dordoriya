@@ -98,6 +98,8 @@ model User {
   chatEndWatchesAsTarget  ChatEndWatch[] @relation("ChatEndTargets")
   profileViewsAsViewer ProfileViewNotify[] @relation("ProfileViewViewers")
   profileViewsAsViewee ProfileViewNotify[] @relation("ProfileViewViewees")
+  quickMatchChargesAsPayer   QuickMatchCharge[] @relation("QuickMatchPayers")
+  quickMatchChargesAsPartner QuickMatchCharge[] @relation("QuickMatchPartners")
 }
 
 /// بلاک کاربر — طرف بلاک‌شده در جستجو/چت/دایرکت دیده نمی‌شود
@@ -394,5 +396,24 @@ model ChatEndWatch {
 
   @@index([targetId, consumedAt])
   @@index([watcherId, targetId])
+}
+
+/// کسر سکه وصل ناشناس — برای بازپرداخت اگر طرف مقابل زود قطع کند
+model QuickMatchCharge {
+  id          Int       @id @default(autoincrement())
+  payerId     Int
+  partnerId   Int
+  payer       User      @relation("QuickMatchPayers", fields: [payerId], references: [id])
+  partner     User      @relation("QuickMatchPartners", fields: [partnerId], references: [id])
+  amount      Int       @default(2)
+  connectedAt DateTime  @default(now())
+  /// پایان چت (با یا بدون بازپرداخت)
+  endedAt     DateTime?
+  /// اگر پر باشد، سکه برگردانده شده (ضد double-refund)
+  refundedAt  DateTime?
+
+  @@index([payerId, partnerId, refundedAt])
+  @@index([partnerId, endedAt])
+  @@index([connectedAt])
 }
 
