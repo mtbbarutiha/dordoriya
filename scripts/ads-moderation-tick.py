@@ -24,27 +24,23 @@ BOTS = ["melogap", "Melochat_bot", "NashenasBot"]
 CPM = "0.20"
 BUDGET = "3.00"
 PROMOTE = "https://t.me/Dordoriya_bot"
+# Watch window: original batch 88–105 plus recreates (extend max as needed)
+AD_ID_MIN = 88
+AD_ID_MAX = 200
 
-# Editorial-safe creatives (same pool as recreate-editorial-v3-ads.py)
+# Editorial-v4 creatives (factual; no free/security/nearby/age claims — deceptive fix)
 CAMPAIGNS = [
-    ("معرفی ربات دوردوریا", "دوردوریا رباتی برای گفت‌وگوی اجتماعی در تلگرام است. پس از ثبت‌نام می‌توانید پیام خصوصی ارسال کنید."),
-    ("ارتباط متنی امن", "اگر به دنبال ارتباط متنی امن و منظم هستید، ربات دوردوریا را باز کنید و گفتگو را آغاز نمایید."),
-    ("پیدا کردن افراد نزدیک", "با دوردوریا افراد نزدیک به محل زندگی خود را پیدا کنید و گفتگوی خصوصی یک‌به‌یک داشته باشید."),
-    ("گفت‌وگو بر اساس استان", "در دوردوریا می‌توانید بر اساس استان گفتگو کنید تا ارتباط با کاربران هم‌منطقه آسان‌تر شود."),
-    ("پیام صوتی در گفتگو", "دوردوریا افزون بر پیام متنی، امکان ارسال پیام صوتی خصوصی را نیز فراهم می‌کند. استفاده رایگان است."),
-    ("ثبت‌نام آسان و رایگان", "ثبت‌نام در ربات دوردوریا ساده و رایگان است. پس از ورود، گفتگوی خصوصی را بدون هزینه شروع کنید."),
-    ("حریم خصوصی در گفتگو", "دوردوریا با تأکید بر حریم خصوصی طراحی شده است تا گفتگوی یک‌به‌یک در فضای کنترل‌شده انجام شود."),
-    ("ارتباط اجتماعی در تلگرام", "برای ارتباط اجتماعی سریع در تلگرام، دوردوریا را امتحان کنید. پیام‌رسانی خصوصی و فیلتر موقعیت در دسترس است."),
-    ("گفتگوی خصوصی یک نفره", "گفتگوی خصوصی یک نفره در دوردوریا امکان‌پذیر است. ربات را باز کنید، پروفایل بسازید و شروع کنید."),
-    ("پروفایل کاربری ساده", "با ساخت پروفایل کاربری ساده در دوردوریا، دیگران شما را راحت‌تر پیدا می‌کنند و گفتگو شکل می‌گیرد."),
-    ("جستجو با فیلتر سن", "دوردوریا امکان جستجو با فیلتر سن و استان را دارد تا گفتگو با افراد مناسب‌تر انجام شود."),
-    ("شروع سریع گفتگو", "ربات دوردوریا را در تلگرام باز کنید و گفتگوی اجتماعی را به‌سرعت و بدون هزینه اولیه آغاز کنید."),
-    ("ربات پیام‌رسان اجتماعی", "دوردوریا یک ربات پیام‌رسان اجتماعی است برای گفتگو، پیام متنی، پیام صوتی و ارتباط محلی."),
-    ("کاربران محلی و همسایه", "در دوردوریا با کاربران محلی و هم‌استان آشنا شوید و پیام خصوصی رد و بدل کنید. ثبت‌نام رایگان است."),
-    ("فضای گفتگوی محترمانه", "دوردوریا فضای گفتگوی اجتماعی محترمانه فراهم می‌کند. مناسب کسانی که ارتباط ساده و امن می‌خواهند."),
-    ("ارتباط بدون هزینه اولیه", "شروع کار با دوردوریا بدون هزینه اولیه است. گفتگوی خصوصی و فیلتر موقعیت در یک ربات تلگرامی."),
-    ("دوردوریا برای گفتگو", "دوردوریا برای گفتگوی اجتماعی و پیام خصوصی ساخته شده است. مناسب ارتباط منظم بین کاربران تلگرام."),
-    ("باز کردن ربات دوردوریا", "برای باز کردن ربات دوردوریا و آغاز گفتگوی خصوصی با کاربران نزدیک، لینک تبلیغ را در تلگرام دنبال کنید."),
+    ("ربات چت دوردوریا", "دوردوریا یک ربات چت در تلگرام است. برای شروع، ربات را باز کنید و گزینه Start را بزنید."),
+    ("شروع گفتگو در دوردوریا", "با باز کردن ربات دوردوریا می‌توانید گفتگوی متنی را طبق راهنمای داخل ربات آغاز کنید."),
+    ("دوردوریا در تلگرام", "دوردوریا رباتی برای چت متنی در تلگرام است. امکانات قابل استفاده پس از ورود به ربات دیده می‌شود."),
+    ("ورود به دوردوریا", "برای ورود به ربات دوردوریا روی لینک بزنید. راهنمای استفاده همین‌جا داخل ربات در دسترس است."),
+    ("چت با ربات دوردوریا", "ربات دوردوریا برای چت در تلگرام ساخته شده است. پس از Start می‌توانید از منوی ربات استفاده کنید."),
+    ("معرفی کوتاه دوردوریا", "دوردوریا ربات چت تلگرامی است. جزئیات سرویس و گزینه‌ها را پس از باز کردن ربات مشاهده کنید."),
+    ("فعال‌سازی دوردوریا", "ربات دوردوریا را در تلگرام باز کنید، Start را بزنید و طبق پیام‌های ربات ادامه دهید."),
+    ("گفتگوی متنی دوردوریا", "اگر به دنبال یک ربات چت متنی در تلگرام هستید، دوردوریا را باز کنید و از منوی آن استفاده کنید."),
+    ("مسیر دسترسی دوردوریا", "این لینک شما را به ربات دوردوریا می‌رساند. مراحل بعدی داخل خود ربات نمایش داده می‌شود."),
+    ("دوردوریا بات تلگرام", "دوردوریا یک بات تلگرام برای چت است. برای دیدن امکانات فعلی، ربات را باز و شروع کنید."),
+    ("راهنمای شروع دوردوریا", "برای شروع کار با دوردوریا، ربات را باز کنید و دستورهای داخل ربات را دنبال نمایید."),
 ]
 
 STATUS_RE = re.compile(
@@ -128,6 +124,57 @@ async def parse_ads(page) -> list[dict]:
             }
         )
     return out
+
+
+async def fetch_decline_reason(page, ad_id: int) -> str:
+    await page.goto(
+        f"https://ads.telegram.org/account/ad/{ad_id}", wait_until="domcontentloaded"
+    )
+    await page.wait_for_timeout(600)
+    body = await page.locator("body").inner_text()
+    reason = ""
+    for pat in (
+        r"(?:Reason|Decline reason|Rejection reason|علت|دلیل)[:\s]*([^\n]{5,300})",
+        r"(Editorial[^\n]{0,200})",
+        r"(Language mismatch[^\n]{0,200})",
+        r"(Policy[^\n]{0,200})",
+    ):
+        m = re.search(pat, body, re.I)
+        if m:
+            reason = m.group(0).strip()[:400]
+            break
+    if not reason:
+        bits = await page.evaluate(
+            """() => {
+              const texts = [];
+              const nodes = Array.from(document.querySelectorAll(
+                '.decline, .declined, .alert, .notice, .warning, .error, .pr-alert, [class*=decline]'
+              ));
+              for (const n of nodes) {
+                const t = (n.innerText || '').trim();
+                if (t && t.length < 800) texts.push(t.slice(0, 500));
+              }
+              return texts.slice(0, 10);
+            }"""
+        )
+        reason = " | ".join(bits)[:400] if bits else ""
+    return reason
+
+
+async def parse_free_balance(page) -> str | None:
+    await page.goto("https://ads.telegram.org/account", wait_until="domcontentloaded")
+    await page.wait_for_timeout(800)
+    overview = await page.locator("body").inner_text()
+    for pat in (
+        r"(?:Free(?:\s+balance)?|Available|Balance|Budget|موجودی)[^\d]*([\d.]+)\s*(?:TON|💎)?",
+        r"Budget:\s*💎?\s*([\d.]+)",
+        r"💎\s*([\d.]+)",
+        r"([\d.]+)\s*TON",
+    ):
+        m = re.search(pat, overview, re.I)
+        if m:
+            return f"{m.group(1)} TON"
+    return None
 
 
 async def delete_ad(page, ad_id: int) -> bool:
@@ -241,7 +288,11 @@ async def main() -> None:
         await page.goto(ACCOUNT, wait_until="domcontentloaded")
         await page.wait_for_timeout(1000)
 
-        ads = await parse_ads(page)
+        free_balance = await parse_free_balance(page)
+        all_ads = await parse_ads(page)
+        ads = [a for a in all_ads if AD_ID_MIN <= a["id"] <= AD_ID_MAX]
+        if not ads:
+            ads = all_ads  # fallback if window empty
         await page.screenshot(path="/tmp/ads-moderation-overview.png", full_page=True)
 
         statuses: dict[str, int] = {}
@@ -254,8 +305,16 @@ async def main() -> None:
 
         created: list[dict] = []
         deleted_ids: list[int] = []
+        declined_reasons: list[dict] = []
 
         if declined:
+            for a in declined:
+                reason = await fetch_decline_reason(page, a["id"])
+                declined_reasons.append(
+                    {"id": a["id"], "title": a.get("title", ""), "reason": reason}
+                )
+                print(f"  declined {a['id']}: {reason[:120]}")
+
             actions.append(f"delete_declined:{len(declined)}")
             for a in declined:
                 ok = await delete_ad(page, a["id"])
@@ -279,7 +338,8 @@ async def main() -> None:
                             break
                 created.append(r)
 
-            # Re-parse after recreate
+            # Re-parse after recreate (new ids may be > AD_ID_MAX)
+            free_balance = await parse_free_balance(page)
             ads = await parse_ads(page)
             statuses = {}
             for a in ads:
@@ -294,6 +354,7 @@ async def main() -> None:
         if all_active:
             action = "all_active_unsubscribe"
             actions.append("unsubscribe_timer")
+            actions.append("persian_approved")
             timer = "unsubscribe"
         elif any_in_review or declined:
             action = "still_waiting"
@@ -307,9 +368,11 @@ async def main() -> None:
 
         out = {
             "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "free_balance": free_balance,
             "statuses": statuses,
             "total": len(ads),
             "declined": [a["id"] for a in declined],
+            "declined_reasons": declined_reasons,
             "active": len(active),
             "in_review": len(in_review),
             "ids": [a["id"] for a in ads],
@@ -325,7 +388,19 @@ async def main() -> None:
         Path("/tmp/ads-moderation-tick.json").write_text(
             json.dumps(out, ensure_ascii=False, indent=2)
         )
-        print(json.dumps({k: out[k] for k in ("statuses", "total", "action", "timer", "actions", "declined", "active", "in_review")}, ensure_ascii=False, indent=2))
+        summary_keys = (
+            "statuses",
+            "total",
+            "free_balance",
+            "action",
+            "timer",
+            "actions",
+            "declined",
+            "declined_reasons",
+            "active",
+            "in_review",
+        )
+        print(json.dumps({k: out[k] for k in summary_keys}, ensure_ascii=False, indent=2))
         await ctx.storage_state(path=str(AUTH))
         await browser.close()
 
