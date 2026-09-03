@@ -205,6 +205,12 @@ export async function showPartnerProfileInChat(
     ),
   });
   rememberPhotoFromMessage(publicPhotoCacheKey(partner), sent);
+  try {
+    const { notifyProfileViewSafe } = await import("./profileViewNotify.js");
+    notifyProfileViewSafe(ctx.api, viewerId, partner.id);
+  } catch {
+    /* fail soft — viewing still succeeded */
+  }
   // کیبورد چت را دوباره نشان بده تا گم نشود
   await ctx.reply(t(lang, "chat_still_open"), {
     reply_markup: chattingKeyboard(me.secureChat, me.language),

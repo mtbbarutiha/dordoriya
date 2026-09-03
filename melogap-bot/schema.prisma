@@ -96,6 +96,8 @@ model User {
   coinSellRequests  CoinSellRequest[]
   chatEndWatchesAsWatcher ChatEndWatch[] @relation("ChatEndWatchers")
   chatEndWatchesAsTarget  ChatEndWatch[] @relation("ChatEndTargets")
+  profileViewsAsViewer ProfileViewNotify[] @relation("ProfileViewViewers")
+  profileViewsAsViewee ProfileViewNotify[] @relation("ProfileViewViewees")
 }
 
 /// بلاک کاربر — طرف بلاک‌شده در جستجو/چت/دایرکت دیده نمی‌شود
@@ -364,6 +366,19 @@ model CoinSellRequest {
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+/// اطلاع بازدید پروفایل (رایگان) — یک ردیف per viewer→viewee برای کول‌داون
+model ProfileViewNotify {
+  id         Int      @id @default(autoincrement())
+  viewerId   Int
+  vieweeId   Int
+  viewer     User     @relation("ProfileViewViewers", fields: [viewerId], references: [id])
+  viewee     User     @relation("ProfileViewViewees", fields: [vieweeId], references: [id])
+  lastSentAt DateTime @default(now())
+
+  @@unique([viewerId, vieweeId])
+  @@index([vieweeId, lastSentAt])
 }
 
 /// اطلاع‌رسانی یک‌باره وقتی چت هدف تمام شود (۱ سکه)

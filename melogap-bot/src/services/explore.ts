@@ -704,6 +704,13 @@ export async function showProfileByUserCode(
     console.error("showProfileByUserCode send photo failed", candidate.id, err);
     await ctx.reply(text, { reply_markup: kb });
   }
+
+  try {
+    const { notifyProfileViewSafe } = await import("./profileViewNotify.js");
+    notifyProfileViewSafe(ctx.api, viewerId, candidate.id);
+  } catch {
+    /* fail soft — viewing still succeeded */
+  }
 }
 
 /** بعدی/رد — یک پروفایل تصادفی با همان فیلتر (از فوتر لیست) */
