@@ -33,8 +33,8 @@ function dmDeliveryBlockedMessage(
     case "blocked_bot":
       return tr(
         L,
-        "این کاربر ربات را بلاک کرده و الان نمی‌تواند پیام دایرکت بگیرد.\n(سایلنت بودن درخواست‌چت مانع دایرکت نیست — مشکل از بلاک ربات است.)",
-        "This user blocked the bot, so they can't receive direct messages right now.\n(Chat-request silent mode does not block DMs — the bot is blocked.)",
+        "امکان ارسال دایرکت نیست؛ این کاربر دریافت پیام از ربات را بسته است (ربات را Block کرده).",
+        "Can't send a DM; this user blocked messages from the bot (blocked the bot).",
       );
     case "never_started":
       return tr(

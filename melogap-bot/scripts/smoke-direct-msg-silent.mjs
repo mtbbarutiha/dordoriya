@@ -29,6 +29,12 @@ assert.equal(
   "blocked_bot",
 );
 assert.equal(
+  classifyBotDeliveryError(
+    new Error("Call to 'sendChatAction' failed! (403: Forbidden: bot was blocked by the user)"),
+  ),
+  "blocked_bot",
+);
+assert.equal(
   classifyBotDeliveryError(new Error("403: Forbidden: user is deactivated")),
   "deactivated",
 );
@@ -36,7 +42,22 @@ assert.equal(
   classifyBotDeliveryError(new Error("400: Bad Request: chat not found")),
   "never_started",
 );
+assert.equal(
+  classifyBotDeliveryError(
+    new Error("403: Forbidden: bot can't initiate conversation with a user"),
+  ),
+  "forbidden",
+);
+// Silent mode is app-side only — no Telegram error string → never blocked_bot
+assert.equal(classifyBotDeliveryError(new Error("silent")), null);
 assert.equal(classifyBotDeliveryError(new Error("timeout")), null);
+
+// Copy must name Block clearly; no defensive silent parenthetical
+const dmSrc = await import("node:fs").then((fs) =>
+  fs.readFileSync(path.join(root, "src/services/directMsg.ts"), "utf8"),
+);
+assert.match(dmSrc, /امکان ارسال دایرکت نیست؛ این کاربر دریافت پیام از ربات را بسته است \(ربات را Block کرده\)\./);
+assert.equal(dmSrc.includes("سایلنت بودن درخواست‌چت مانع دایرکت نیست"), false);
 
 const forever = new Date("9999-12-31T23:59:59.000Z");
 assert.equal(silent.isChatSilent({ chatSilentUntil: forever }), true);
