@@ -910,6 +910,8 @@ featuresHandler.callbackQuery(/^dm:start:(\d+)$/, async (ctx) => {
     await ctx.answerCallbackQuery({ text: "به خودت نمی‌توانی پیام بدهی" });
     return;
   }
+  // Mid-chat DM allowed — never blockIfChatting / never end anon chat.
+  // Silent targets allowed (chatSilentUntil only blocks chat requests).
   const lang = user.language === "en" ? "en" : "fa";
   const { hasBlocked } = await import("../services/block.js");
   if (await hasBlocked(user.id, targetId)) {

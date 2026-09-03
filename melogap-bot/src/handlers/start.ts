@@ -163,7 +163,7 @@ startHandler.command("cancel", async (ctx) => {
     });
     return;
   }
-  if (user.state === "await_direct_msg") {
+  if (user.state === "await_direct_msg" || user.pendingDirectTo) {
     const { chattingKeyboard } = await import("../keyboards/main.js");
     const { cancelDirectCompose } = await import("../services/directMsg.js");
     await cancelDirectCompose(user.id);

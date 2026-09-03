@@ -252,7 +252,8 @@ chatHandler.on("message:text", async (ctx, next) => {
     return;
   }
 
-  if (user.state === "await_direct_msg" && user.pendingDirectTo) {
+  // DM compose works mid-chat (state may stay chatting with pendingDirectTo)
+  if (user.pendingDirectTo) {
     const { handleDirectMsgTyped } = await import("../services/directMsg.js");
     await handleDirectMsgTyped(ctx, user.id, text);
     return;
@@ -468,12 +469,12 @@ chatHandler.on("message:video_note", async (ctx, next) => {
   }
 });
 
-/** ویس در حالت نوشتن پیام دایرکت */
+/** ویس در حالت نوشتن پیام دایرکت (حتی وسط چت ناشناس با pendingDirectTo) */
 chatHandler.on("message:voice", async (ctx, next) => {
   const from = ctx.from;
   if (!from) return next();
   const user = await findByTelegram(from.id);
-  if (!user || user.state !== "await_direct_msg" || !user.pendingDirectTo) {
+  if (!user || !user.pendingDirectTo) {
     return next();
   }
   const voice = ctx.message.voice;

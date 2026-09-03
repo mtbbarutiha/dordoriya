@@ -151,6 +151,17 @@ export async function restoreUserSession(
   }
 
   if (fresh.state === "chatting" && fresh.chatPartnerId != null) {
+    if (fresh.pendingDirectTo) {
+      await ctx.reply(
+        tr(
+          lang,
+          "✉️ در حال نوشتن پیام دایرکت هستی (چت ناشناس باز است).\nمتن بنویس یا ویس بفرست 🎤 — یا بازگشت / /cancel",
+          "✉️ Composing a direct message (anonymous chat still open).\nSend text or voice 🎤 — or Back / /cancel",
+        ),
+        { reply_markup: cancelKeyboard(lang) },
+      );
+      return fresh;
+    }
     await ctx.reply(t(lang, "welcome_back_chat"), {
       reply_markup: chattingKeyboard(fresh.secureChat, lang),
     });
@@ -176,19 +187,14 @@ export async function restoreUserSession(
     return fresh;
   }
 
-  if (fresh.state === "await_direct_msg") {
+  if (fresh.state === "await_direct_msg" || fresh.pendingDirectTo) {
     await ctx.reply(
       tr(
         lang,
         "✉️ در حال نوشتن پیام دایرکت هستی.\nمتن بنویس یا ویس بفرست 🎤 — یا /cancel",
         "✉️ Composing a direct message.\nSend text or voice 🎤 — or /cancel",
       ),
-      {
-        reply_markup:
-          fresh.chatPartnerId != null
-            ? chattingKeyboard(fresh.secureChat, lang)
-            : mainKeyboard(lang),
-      },
+      { reply_markup: cancelKeyboard(lang) },
     );
     return fresh;
   }

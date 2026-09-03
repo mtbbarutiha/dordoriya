@@ -529,7 +529,8 @@ menuHandler.hears(btnAll("BACK"), async (ctx) => {
   const user = await findByTelegram(ctx.from!.id);
   if (!user) return;
   const lang = langOf(user);
-  if (user.state === "await_direct_msg") {
+  // Cancel DM even when mid-chat kept state=chatting + pendingDirectTo
+  if (user.pendingDirectTo || user.state === "await_direct_msg") {
     const nextState = user.chatPartnerId ? "chatting" : "idle";
     const { cancelDirectCompose } = await import("../services/directMsg.js");
     await cancelDirectCompose(user.id);

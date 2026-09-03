@@ -138,6 +138,32 @@ assert(
   "idle clears stale partner",
 );
 
+
+/** Mid-chat DM: keep chatting state while pendingDirectTo is set (report_other style). */
+function dmComposeState(chatPartnerId) {
+  return chatPartnerId ? "chatting" : "await_direct_msg";
+}
+function dmTextRoute(state, pendingDirectTo) {
+  if (pendingDirectTo) return "dm_compose";
+  if (state === "chatting") return "relay";
+  return "other";
+}
+function restoreAfterDm(chatPartnerId) {
+  return chatPartnerId ? "chatting" : "idle";
+}
+assert(dmComposeState(42) === "chatting", "mid-chat DM keeps chatting");
+assert(dmComposeState(null) === "await_direct_msg", "idle DM uses await_direct_msg");
+assert(
+  dmTextRoute("chatting", "99") === "dm_compose",
+  "pendingDirectTo steals text before relay",
+);
+assert(
+  dmTextRoute("chatting", null) === "relay",
+  "without pendingDirectTo chat relays",
+);
+assert(restoreAfterDm(7) === "chatting", "after DM stay chatting");
+assert(restoreAfterDm(null) === "idle", "after DM idle when no partner");
+
 // --- menu vs chat ---
 assert(
   chatActionForText("chatting", "راهنما 🤔") === "block_keep_chat_kb",

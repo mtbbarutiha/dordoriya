@@ -152,11 +152,13 @@ export function dmViewKeyboard(msgId: number, lang: Lang | string | null = "fa")
 function restoreAfterDm(user: {
   chatPartnerId: number | null;
   secureChat: boolean;
+  language?: string | null;
 }) {
+  const lang = langOf(user);
   const state = user.chatPartnerId ? "chatting" : "idle";
   const keyboard = user.chatPartnerId
-    ? chattingKeyboard(user.secureChat)
-    : mainKeyboard();
+    ? chattingKeyboard(user.secureChat, lang)
+    : mainKeyboard(lang);
   return { state, keyboard };
 }
 
@@ -168,11 +170,14 @@ export async function beginDirectCompose(
     chatPartnerId: number | null;
     secureChat: boolean;
     language?: string | null;
+    state?: string | null;
   },
   targetId: number,
   opts?: { replyToId?: number },
 ) {
   const lang = langOf(user);
+  const { keyboard: contextKeyboard } = restoreAfterDm(user);
+  const midChat = Boolean(user.chatPartnerId);
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target || target.deletedAt || !target.registered) {
     await ctx.reply(tr(lang, "کاربر پیدا نشد.", "User not found."));
@@ -225,14 +230,8 @@ export async function beginDirectCompose(
     return false;
   }
 
-  // سایلنت بودن گیرنده مانع دایرکت نیست — فقط تحویل‌پذیری ربات مهم است
-  const canMsg = await probeBotCanMessage(ctx.api, target.telegramId);
-  if (canMsg !== "ok") {
-    await ctx.reply(dmDeliveryBlockedMessage(canMsg, lang), {
-      reply_markup: mainKeyboard(lang),
-    });
-    return false;
-  }
+  // No must-message-first gate. Silent chat-request mode never blocks DM.
+  // Delivery probe only at send time so mid-chat compose stays open.
 
   if (user.diamonds < DIRECT_MSG_COST) {
     await ctx.reply(
@@ -244,12 +243,11 @@ export async function beginDirectCompose(
         ),
         tr(lang, `موجودی: ${formatNum(user.diamonds)} 💰`, `Balance: ${formatNum(user.diamonds)} 💰`),
       ].join("\n"),
-      { reply_markup: mainKeyboard(lang) },
+      { reply_markup: contextKeyboard },
     );
     return false;
   }
 
-  // پیش‌نویس‌های قبلی همین مسیر را پاک کن
   await prisma.directMessage.deleteMany({
     where: { fromUserId: user.id, status: "draft" },
   });
@@ -258,8 +256,9 @@ export async function beginDirectCompose(
     ? `reply:${opts.replyToId}`
     : String(target.id);
 
+  // Like report_other: mid-chat keeps chatting + chatPartnerId; only pendingDirectTo flips.
   await patchUser(user.id, {
-    state: "await_direct_msg",
+    state: midChat ? "chatting" : "await_direct_msg",
     pendingDirectTo: pending,
   });
 
@@ -276,6 +275,13 @@ export async function beginDirectCompose(
           "\n🔇 This user muted chat requests — DM still works.",
         )
       : "";
+  const midChatNote = midChat
+    ? tr(
+        lang,
+        "\n💬 چت ناشناس باز می‌ماند — بعد از ارسال/انصراف به همان چت برمی‌گردی.",
+        "\n💬 Anonymous chat stays open — you'll return to it after send/cancel.",
+      )
+    : "";
 
   await ctx.reply(
     [
@@ -285,6 +291,7 @@ export async function beginDirectCompose(
       "",
       `${tr(lang, "گیرنده", "Recipient")}: ${targetName}${target.userCode ? ` (/user_${target.userCode})` : ""}`,
       silentNote,
+      midChatNote,
       tr(
         lang,
         `هزینه ارسال: ${formatNum(DIRECT_MSG_COST)} سکه`,
@@ -299,7 +306,13 @@ export async function beginDirectCompose(
         "بعداً پیش‌نمایش می‌بینی و می‌توانی ویرایش یا ارسال کنی.",
         "You'll see a preview next and can edit or send it.",
       ),
-      tr(lang, "انصراف: بازگشت به منو یا /cancel", "Cancel: go back to menu or /cancel"),
+      midChat
+        ? tr(
+            lang,
+            "انصراف: بازگشت یا /cancel (چت قطع نمی‌شود)",
+            "Cancel: Back or /cancel (chat stays open)",
+          )
+        : tr(lang, "انصراف: بازگشت به منو یا /cancel", "Cancel: go back to menu or /cancel"),
     ]
       .filter(Boolean)
       .join("\n"),
@@ -916,8 +929,9 @@ export async function editDirectDraft(ctx: Context, userId: number, draftId: num
     ? `reply:${draft.replyToId}`
     : String(draft.toUserId);
 
+  const midChat = Boolean(user.chatPartnerId);
   await patchUser(user.id, {
-    state: "await_direct_msg",
+    state: midChat ? "chatting" : "await_direct_msg",
     pendingDirectTo: pending,
   });
 
