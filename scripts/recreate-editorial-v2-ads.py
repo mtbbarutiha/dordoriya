@@ -16,9 +16,10 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 AUTH = Path.home() / ".config/telegram-ads-mcp/auth_state.json"
+# @Dordoriya_bot — Organization (not Mohammad personal)
 ACCOUNT = (
     "https://ads.telegram.org/choose_account/"
-    "3VQIGO7L1hpg1h1agS2rHCCKDrfwYsC6nRk3BrB71Jw8IhaTIyjfb6s_6x_4mT7A"
+    "1yQ7Qf4ZBdN6UNKr_se_mbjPAvIVxquj7Z2SmtLCVxw5Q-yZvduUIjnM8EVFA90o"
 )
 
 BOTS = ["melogap", "Melochat_bot", "NashenasBot"]

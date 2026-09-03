@@ -28,11 +28,17 @@ Project MCP config: `.cursor/mcp.json`
 If using **Cloud Agents**, also register the same server under:
 **Dashboard → Integrations & MCP → Add server**
 
-Optional env:
+Optional env (prefer the **@Dordoriya_bot Organization**, not Mohammad personal):
 
 ```bash
-export TELEGRAM_ADS_ACCOUNT="AccountNameSubstring"
+export TELEGRAM_ADS_ACCOUNT="@Dordoriya_bot"
 ```
+
+Canonical `choose_account` for scripts / ads-moderation-watch:
+
+`https://ads.telegram.org/choose_account/1yQ7Qf4ZBdN6UNKr_se_mbjPAvIVxquj7Z2SmtLCVxw5Q-yZvduUIjnM8EVFA90o`
+
+Budgets are **per account**. Funds on Mohammad personal do not apply to the Organization; top up the org via Fragment when recreating ads there.
 
 ## Available tools
 

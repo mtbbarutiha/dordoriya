@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Create 6 additional clean editorial Telegram Ads (do not delete existing)."""
+"""Delete declined ads and recreate with Telegram Ads editorial-compliant copy.
+
+Avoid: excessive emoji, gimmicky symbols, line breaks, vague spammy text.
+Keep: clear Persian, 0–1 emoji in title, ≤2 in body, same Persian bot targets.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -15,43 +19,67 @@ ACCOUNT = (
     "1yQ7Qf4ZBdN6UNKr_se_mbjPAvIVxquj7Z2SmtLCVxw5Q-yZvduUIjnM8EVFA90o"
 )
 
+# Verified FA anon-chat bots
 BOTS = [
     "melogap",
     "Melochat_bot",
     "NashenasBot",
 ]
 
-# Distinct from the 12 already In Review — zero emoji, single-line, ≤160 chars
+# Clean editorial copy: short title, clear body, max ~2 emoji total, no newlines
 CAMPAIGNS = [
     (
-        "گفتگوی ناشناس روزانه",
-        "هر روز با افراد جدید گفتگو کن. چت ناشناس و امن در دوردوریا با حفظ هویت. شروع رایگان: @Dordoriya_bot",
+        "چت ناشناس رایگان",
+        "چت ناشناس و امن در دوردوریا. هویتت محفوظ می‌ماند. دوست و هم‌صحبت جدید پیدا کن. شروع رایگان: @Dordoriya_bot",
     ),
     (
-        "هم‌صحبت تازه پیدا کن",
-        "هم‌صحبت تازه برای حرف زدن پیدا کن. چت ناشناس، پیام خصوصی و فیلتر شهر در دوردوریا: @Dordoriya_bot",
+        "دوست جدید پیدا کن",
+        "در دوردوریا با افراد نزدیک آشنا شو. چت ناشناس، پیام و ویس خصوصی. ثبت‌نام رایگان در @Dordoriya_bot",
     ),
     (
-        "چت با فیلتر شهر",
-        "با فیلتر شهر و سن، افراد نزدیک‌تر را پیدا کن. چت ناشناس رایگان در دوردوریا. ورود: @Dordoriya_bot",
+        "گپ ناشناس امن",
+        "بدون لو رفتن هویت حرف بزن. چت ناشناس رایگان با فیلتر شهر و سن. وارد دوردوریا شو: @Dordoriya_bot",
     ),
     (
-        "دوست‌یابی ناشناس",
-        "دوست‌یابی ناشناس بدون لو رفتن هویت. پیام و ویس خصوصی در دوردوریا. ثبت‌نام رایگان: @Dordoriya_bot",
+        "افراد نزدیک آنلاین",
+        "هم‌محلی و هم‌استانی‌هایت را پیدا کن. چت ناشناس و آشنایی راحت در دوردوریا. شروع از @Dordoriya_bot",
     ),
     (
-        "ورود سریع به گپ",
-        "سریع وارد گپ شو و با یک ناشناس حرف بزن. هویت محفوظ و شروع رایگان در دوردوریا: @Dordoriya_bot",
+        "پیام و ویس خصوصی",
+        "پیام دایرکت و ویس خصوصی بفرست. چت ناشناس بدون استرس در دوردوریا. همین الان شروع کن: @Dordoriya_bot",
     ),
     (
-        "آشنایی بدون هویت",
-        "بدون نمایش هویت واقعی آشنا شو. چت ناشناس امن و افراد نزدیک در دوردوریا. شروع: @Dordoriya_bot",
+        "هم‌استانی پیدا کن",
+        "با هم‌استانی‌ها آشنا شو. زبان مشترک، چت ناشناس و فیلتر شهر. دوردوریا را باز کن: @Dordoriya_bot",
+    ),
+    (
+        "وصل شو به ناشناس",
+        "چت سریع با یک ناشناس جدید. هویت مخفی و شروع رایگان در دوردوریا. ورود: @Dordoriya_bot",
+    ),
+    (
+        "سکه هدیه ورود",
+        "ثبت‌نام کن و سکه هدیه بگیر. چت ناشناس، دوست‌یابی و افراد نزدیک در دوردوریا: @Dordoriya_bot",
+    ),
+    (
+        "پروفایل بساز",
+        "پروفایلت را بساز تا بیشتر دیده شوی. چت ناشناس و دوستیابی در دوردوریا. شروع رایگان: @Dordoriya_bot",
+    ),
+    (
+        "شروع در دوردوریا",
+        "دوردوریا برای چت ناشناس و آشنایی واقعی. هویت محفوظ، افراد نزدیک، پیام و ویس. @Dordoriya_bot",
+    ),
+    (
+        "امشب تنها نباش",
+        "امشب با یک هم‌صحبت جدید گپ بزن. چت ناشناس رایگان در دوردوریا. شروع کن: @Dordoriya_bot",
+    ),
+    (
+        "آشنایی نزدیک‌تر",
+        "هم‌شهری و افراد اطرافت را پیدا کن. چت ناشناس امن در دوردوریا. ورود رایگان: @Dordoriya_bot",
     ),
 ]
 
 CPM = "0.20"
 BUDGET = "3.00"
-OUT = Path("/tmp/clean-extra6-ads.json")
 
 
 async def js_check(page, selector: str) -> None:
@@ -65,6 +93,45 @@ async def js_check(page, selector: str) -> None:
         }""",
         selector,
     )
+
+
+async def list_ad_ids(page) -> list[int]:
+    await page.goto("https://ads.telegram.org/account", wait_until="domcontentloaded")
+    await page.wait_for_timeout(1200)
+    hrefs = await page.locator("a[href*='/account/ad/']").evaluate_all(
+        "els => els.map(e => e.getAttribute('href') || '')"
+    )
+    ids: set[int] = set()
+    for h in hrefs:
+        m = re.search(r"/account/ad/(\d+)(?:/|$)", h)
+        if m:
+            ids.add(int(m.group(1)))
+    return sorted(ids)
+
+
+async def delete_ad(page, ad_id: int) -> bool:
+    await page.goto(
+        f"https://ads.telegram.org/account/ad/{ad_id}", wait_until="domcontentloaded"
+    )
+    await page.wait_for_timeout(600)
+    btn = page.locator("a.delete-ad-btn")
+    if await btn.count() == 0:
+        print(f"  skip {ad_id}: no delete")
+        return False
+    await btn.first.click()
+    await page.wait_for_timeout(500)
+    confirm = page.locator(
+        ".pr-layer-delete-ad .popup-primary-btn, .alert-popup-container .popup-primary-btn"
+    )
+    if await confirm.count() == 0:
+        confirm = page.locator("div.popup-button.popup-primary-btn")
+    if await confirm.count() == 0:
+        print(f"  skip {ad_id}: no confirm")
+        return False
+    await confirm.first.click()
+    await page.wait_for_timeout(1400)
+    print(f"  deleted {ad_id} -> {page.url}")
+    return True
 
 
 async def clear_bot_field(page) -> None:
@@ -138,16 +205,10 @@ async def create_bot_ad(page, title: str, text: str, bot_query: str, idx: int) -
 
     selected = await add_bot_target(page, bot_query)
     if not selected:
-        return {
-            "title": title,
-            "text": text,
-            "bot": bot_query,
-            "ok": False,
-            "reason": "bot_not_found",
-        }
+        return {"title": title, "bot": bot_query, "ok": False, "reason": "bot_not_found"}
 
     await js_check(page, "input[name=confirmed]")
-    await page.screenshot(path=f"/tmp/clean-extra6-before-{idx}.png", full_page=True)
+    await page.screenshot(path=f"/tmp/clean-ad-before-{idx}.png", full_page=True)
     await page.evaluate(
         """() => {
           const btn = Array.from(document.querySelectorAll('button,a,input[type=submit]'))
@@ -164,55 +225,22 @@ async def create_bot_ad(page, title: str, text: str, bot_query: str, idx: int) -
         ok = False
     if "balance is too low" in body.lower():
         ok = False
-    m = re.search(r"/account/ad/(\d+)", page.url)
-    ad_id = int(m.group(1)) if m and "/new" not in page.url else None
     print(("OK" if ok else "FAIL"), idx, title, "chars", len(text), page.url)
     if not ok:
         print(body[:700])
-        await page.screenshot(path=f"/tmp/clean-extra6-fail-{idx}.png", full_page=True)
+        await page.screenshot(path=f"/tmp/clean-ad-fail-{idx}.png", full_page=True)
     return {
         "title": title,
-        "text": text,
         "bot": bot_query,
         "selected": selected,
         "chars": len(text),
         "ok": ok,
-        "ad_id": ad_id,
         "url": page.url,
-        "cpm": CPM,
-        "budget": BUDGET,
     }
-
-
-async def extract_account_summary(page) -> dict:
-    await page.goto("https://ads.telegram.org/account", wait_until="domcontentloaded")
-    await page.wait_for_timeout(1500)
-    body = await page.locator("body").inner_text()
-    free = None
-    m = re.search(r"Free Grams?\s*[^\d]*([\d.]+)", body, re.I)
-    if m:
-        free = m.group(1)
-    else:
-        m2 = re.search(r"([\d.]+)\s*Free", body, re.I)
-        if m2:
-            free = m2.group(1)
-    ads = []
-    rows = page.locator("a[href*='/account/ad/']")
-    n = await rows.count()
-    for i in range(n):
-        a = rows.nth(i)
-        href = await a.get_attribute("href") or ""
-        text = (await a.inner_text()).strip()
-        mid = re.search(r"/account/ad/(\d+)", href)
-        if mid:
-            ads.append({"id": int(mid.group(1)), "href": href, "text": text[:120]})
-    return {"free_grams": free, "body_preview": body[:3500], "ads_links": ads}
 
 
 async def main() -> None:
     for t, x in CAMPAIGNS:
-        assert "\n" not in x
-        assert len(x) <= 160
         print(f"len={len(x)} title={t}")
 
     async with async_playwright() as p:
@@ -222,18 +250,25 @@ async def main() -> None:
         )
         page = await ctx.new_page()
         await page.goto(ACCOUNT, wait_until="domcontentloaded")
+
+        print("=== DELETE ALL ===")
+        ids = await list_ad_ids(page)
+        print("ids", ids)
+        for ad_id in ids:
+            await delete_ad(page, ad_id)
+        ids2 = await list_ad_ids(page)
+        for ad_id in ids2:
+            await delete_ad(page, ad_id)
+        print("remaining", await list_ad_ids(page))
+        await page.goto("https://ads.telegram.org/account", wait_until="domcontentloaded")
         await page.wait_for_timeout(1000)
+        print((await page.locator("body").inner_text())[:500])
 
-        before = await extract_account_summary(page)
-        print("\n=== BEFORE ===")
-        print("free", before.get("free_grams"))
-        print(before["body_preview"][:800])
-
-        print("\n=== CREATE 6 EXTRA CLEAN ADS ===")
+        print("\n=== CREATE CLEAN ADS ===")
         results = []
         for i, (title, text) in enumerate(CAMPAIGNS, 1):
             bot = BOTS[(i - 1) % len(BOTS)]
-            print(f"\n--- {i}/6 {title} -> {bot} ---")
+            print(f"\n--- {i}/{len(CAMPAIGNS)} {title} -> {bot} ---")
             created = await create_bot_ad(page, title, text, bot, i)
             if not created.get("ok") and created.get("reason") == "bot_not_found":
                 for alt in BOTS:
@@ -245,22 +280,16 @@ async def main() -> None:
             results.append(created)
             await page.wait_for_timeout(600)
 
-        after = await extract_account_summary(page)
-        print("\n=== AFTER ACCOUNT ===")
-        print(after["body_preview"][:3200])
-        await page.screenshot(path="/tmp/clean-extra6-account.png", full_page=True)
-
-        payload = {
-            "campaigns": results,
-            "ok_count": sum(1 for r in results if r.get("ok")),
-            "before_free_grams": before.get("free_grams"),
-            "after_free_grams": after.get("free_grams"),
-            "account_preview": after["body_preview"],
-            "ads_links": after["ads_links"],
-        }
-        OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
         print("\nRESULTS")
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+        Path("/tmp/clean-editorial-ads.json").write_text(
+            json.dumps(results, ensure_ascii=False, indent=2)
+        )
+        await page.goto("https://ads.telegram.org/account", wait_until="domcontentloaded")
+        await page.wait_for_timeout(1200)
+        print("\nACCOUNT")
+        print((await page.locator("body").inner_text())[:3200])
+        await page.screenshot(path="/tmp/clean-editorial-account.png", full_page=True)
         await ctx.storage_state(path=str(AUTH))
         await browser.close()
 
