@@ -251,12 +251,14 @@ export function silentRejectMessage(
       "",
       `«${targetName}» الان درخواست چت قبول نمی‌کند.`,
       "ولی می‌تونی بهش پیام دایرکت بفرستی ✉️",
+      "(سایلنت فقط درخواست‌چت را قطع می‌کند، نه دایرکت.)",
     ].join("\n"),
     [
       "🔇 This user is in silent mode.",
       "",
       `«${targetName}» is not accepting chat requests right now.`,
       "You can still send them a direct message ✉️",
+      "(Silent mode only blocks chat requests, not DMs.)",
     ].join("\n"),
   );
 }

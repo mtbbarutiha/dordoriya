@@ -168,7 +168,7 @@ startHandler.command("cancel", async (ctx) => {
     const { cancelDirectCompose } = await import("../services/directMsg.js");
     await cancelDirectCompose(user.id);
     const nextState = user.chatPartnerId ? "chatting" : "idle";
-    await patchUser(user.id, { state: nextState, pendingAnonTo: null });
+    await patchUser(user.id, { state: nextState, pendingDirectTo: null });
     await ctx.reply(
       lang === "en"
         ? "Direct message cancelled."
@@ -190,6 +190,7 @@ startHandler.command("cancel", async (ctx) => {
   await patchUser(user.id, {
     state: "idle",
     pendingAnonTo: null,
+    pendingDirectTo: null,
     chatPartnerId: null,
   });
   await ctx.reply(t(lang, "cancelled"), { reply_markup: mainKeyboard(lang) });

@@ -1403,11 +1403,8 @@ featuresHandler.callbackQuery(/^exp:chat:(\d+)$/, async (ctx) => {
     return;
   }
   if (result === "silent") {
-    await ctx.reply(
-      lang === "en"
-        ? "User is silent — no chat requests."
-        : "کاربر سایلنت است — درخواست نمی‌پذیرد.",
-    );
+    const { replySilentReject } = await import("../services/chatSilent.js");
+    await replySilentReject(ctx, targetId, lang);
     return;
   }
   if (result !== "ok") {
@@ -1985,13 +1982,8 @@ featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
     return;
   }
   if (result === "silent") {
-    await ctx.answerCallbackQuery({
-      text:
-        lang === "en"
-          ? "User is silent — no chat requests"
-          : "کاربر سایلنت است — درخواست نمی‌پذیرد",
-      show_alert: true,
-    });
+    const { replySilentReject } = await import("../services/chatSilent.js");
+    await replySilentReject(ctx, targetId, lang, { asAlert: true });
     return;
   }
   if (result !== "ok") {

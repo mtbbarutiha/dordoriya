@@ -1,4 +1,4 @@
-import type { Context } from "grammy";
+import type { Api, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { prisma } from "../db/prisma.js";
 import { patchUser } from "../db/users.js";
@@ -15,6 +15,101 @@ import {
 } from "../keyboards/main.js";
 import { langOf, tr, normalizeLang, type Lang } from "../i18n/index.js";
 import { rejectForbiddenContact } from "./contactGuard.js";
+import {
+  classifyBotDeliveryError,
+  type BotDeliveryBlockReason,
+} from "../lib/telegramSafe.js";
+
+/**
+ * حالت سایلنت درخواست‌چت (chatSilentUntil) هرگز نباید دایرکت را قطع کند.
+ * فقط بلاک دوطرفه / نبودن chat با ربات / سکه ناکافی مانع است.
+ */
+function dmDeliveryBlockedMessage(
+  reason: BotDeliveryBlockReason,
+  lang: Lang | string | null,
+): string {
+  const L = normalizeLang(lang);
+  switch (reason) {
+    case "blocked_bot":
+      return tr(
+        L,
+        "این کاربر ربات را بلاک کرده و الان نمی‌تواند پیام دایرکت بگیرد.\n(سایلنت بودن درخواست‌چت مانع دایرکت نیست — مشکل از بلاک ربات است.)",
+        "This user blocked the bot, so they can't receive direct messages right now.\n(Chat-request silent mode does not block DMs — the bot is blocked.)",
+      );
+    case "never_started":
+      return tr(
+        L,
+        "این کاربر هنوز ربات را استارت نکرده یا چت ربات برایش موجود نیست؛ ارسال دایرکت ممکن نیست.",
+        "This user hasn't started the bot (or has no chat with it), so a DM can't be delivered.",
+      );
+    case "deactivated":
+      return tr(
+        L,
+        "حساب تلگرام این کاربر غیرفعال است؛ ارسال دایرکت ممکن نیست.",
+        "This user's Telegram account is deactivated; a DM can't be delivered.",
+      );
+    case "forbidden":
+      return tr(
+        L,
+        "تلگرام اجازه ارسال پیام به این کاربر را نمی‌دهد؛ ارسال دایرکت ممکن نیست.",
+        "Telegram won't allow messaging this user; a DM can't be delivered.",
+      );
+    default:
+      return tr(
+        L,
+        "ارسال به طرف مقابل ممکن نشد. سکه کسر نشد.",
+        "Couldn't deliver it to the recipient. No coins were deducted.",
+      );
+  }
+}
+
+/** قبل از نوشتن/ارسال دایرکت: آیا ربات می‌تواند به گیرنده پیام بدهد؟ */
+async function probeBotCanMessage(
+  api: Api,
+  telegramId: bigint | number,
+): Promise<BotDeliveryBlockReason | "ok"> {
+  try {
+    await api.sendChatAction(Number(telegramId), "typing");
+    return "ok";
+  } catch (err) {
+    return classifyBotDeliveryError(err) ?? "forbidden";
+  }
+}
+
+async function deliverDmNotify(
+  api: Api,
+  targetTelegramId: bigint | number,
+  notifyText: string,
+  replyMarkup: InlineKeyboard,
+  photo: unknown,
+): Promise<{ ok: true } | { ok: false; reason: BotDeliveryBlockReason }> {
+  const chatId = Number(targetTelegramId);
+  try {
+    if (photo) {
+      await api.sendPhoto(chatId, photo as never, {
+        caption: notifyText,
+        reply_markup: replyMarkup,
+      });
+      return { ok: true };
+    }
+  } catch (err) {
+    const classified = classifyBotDeliveryError(err);
+    if (classified) return { ok: false, reason: classified };
+    // خطای عکس — متن را امتحان کن
+  }
+  try {
+    await api.sendMessage(chatId, notifyText, {
+      reply_markup: replyMarkup,
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error("direct message notify failed", err);
+    return {
+      ok: false,
+      reason: classifyBotDeliveryError(err),
+    };
+  }
+}
 
 export function dmPreviewKeyboard(draftId: number, lang: Lang | string | null = "fa") {
   const L = normalizeLang(lang);
@@ -130,6 +225,15 @@ export async function beginDirectCompose(
     return false;
   }
 
+  // سایلنت بودن گیرنده مانع دایرکت نیست — فقط تحویل‌پذیری ربات مهم است
+  const canMsg = await probeBotCanMessage(ctx.api, target.telegramId);
+  if (canMsg !== "ok") {
+    await ctx.reply(dmDeliveryBlockedMessage(canMsg, lang), {
+      reply_markup: mainKeyboard(lang),
+    });
+    return false;
+  }
+
   if (user.diamonds < DIRECT_MSG_COST) {
     await ctx.reply(
       [
@@ -164,6 +268,14 @@ export async function beginDirectCompose(
     : "";
 
   const targetName = target.displayName ?? tr(lang, "کاربر", "user");
+  const silentNote =
+    target.chatSilentUntil && target.chatSilentUntil.getTime() > Date.now()
+      ? tr(
+          lang,
+          "\n🔇 این کاربر سایلنت درخواست‌چت است — دایرکت همچنان ارسال می‌شود.",
+          "\n🔇 This user muted chat requests — DM still works.",
+        )
+      : "";
 
   await ctx.reply(
     [
@@ -172,6 +284,7 @@ export async function beginDirectCompose(
         : tr(lang, "✉️ پیام دایرکت", "✉️ Direct message"),
       "",
       `${tr(lang, "گیرنده", "Recipient")}: ${targetName}${target.userCode ? ` (/user_${target.userCode})` : ""}`,
+      silentNote,
       tr(
         lang,
         `هزینه ارسال: ${formatNum(DIRECT_MSG_COST)} سکه`,
@@ -862,6 +975,16 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
     return;
   }
 
+  // دوباره چک تحویل — سایلنت مانع نیست؛ بلاک ربات / استارت‌نکردن مانع است
+  const canMsg = await probeBotCanMessage(ctx.api, target.telegramId);
+  if (canMsg !== "ok") {
+    await ctx.answerCallbackQuery({ text: tr(lang, "ارسال نشد", "Not sent") });
+    await ctx.reply(dmDeliveryBlockedMessage(canMsg, lang), {
+      reply_markup: restoreKeyboard,
+    });
+    return;
+  }
+
   if (user.diamonds < DIRECT_MSG_COST) {
     await ctx.answerCallbackQuery({ text: tr(lang, "سکه کافی نیست", "Not enough coins") });
     await ctx.reply(
@@ -935,14 +1058,23 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
       .join("\n"),
   );
 
+  let photo: unknown = null;
   try {
     const { publicPhotoWithBadge } = await import("../lib/faceBadgePhoto.js");
-    const photo = await publicPhotoWithBadge(ctx.api, user);
-    await ctx.api.sendPhoto(Number(target.telegramId), photo, {
-      caption: notifyText,
-      reply_markup: dmNotifyKeyboard(sent.id, targetLang),
-    });
-  } catch (err) {
+    photo = await publicPhotoWithBadge(ctx.api, user);
+  } catch {
+    photo = null;
+  }
+
+  const delivered = await deliverDmNotify(
+    ctx.api,
+    target.telegramId,
+    notifyText,
+    dmNotifyKeyboard(sent.id, targetLang),
+    photo,
+  );
+
+  if (!delivered.ok) {
     await prisma.user.update({
       where: { id: user.id },
       data: { diamonds: { increment: DIRECT_MSG_COST } },
@@ -951,16 +1083,10 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
       where: { id: draft.id },
       data: { status: "draft" },
     });
-    console.error("direct message notify failed", err);
     await ctx.answerCallbackQuery({ text: tr(lang, "ارسال نشد", "Not sent") });
-    await ctx.reply(
-      tr(
-        lang,
-        "ارسال به طرف مقابل ممکن نشد. سکه کسر نشد.",
-        "Couldn't deliver it to the recipient. No coins were deducted.",
-      ),
-      { reply_markup: restoreKeyboard },
-    );
+    await ctx.reply(dmDeliveryBlockedMessage(delivered.reason, lang), {
+      reply_markup: restoreKeyboard,
+    });
     return;
   }
 
