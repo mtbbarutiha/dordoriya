@@ -54,6 +54,11 @@ model User {
   facePendingKind   String?
   /// none | pending | approved | rejected
   faceStatus        String    @default("none")
+  /// امتیاز احراز خودکار (۰–۱)
+  faceVerifyScore   Float?
+  /// manual | auto | hybrid
+  faceVerifyMethod  String?
+  faceVerifiedAt    DateTime?
   registered        Boolean   @default(false)
   /// حساب فعال برای اکسپلور/چت
   isActive          Boolean   @default(true)

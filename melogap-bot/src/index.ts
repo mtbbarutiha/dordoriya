@@ -173,8 +173,8 @@ async function main() {
     });
   }
 
-  // صف قدیمی را خالی کن تا callback/messageهای گیرکرده ربات را قفل نکنند
-  await bot.api.deleteWebhook({ drop_pending_updates: true });
+  // فقط webhook را بردار — پیام‌های در صف را دور نریز (deploy/409 کوتاه نباید آپدیت کاربر را ببلعد)
+  await bot.api.deleteWebhook({ drop_pending_updates: false });
   await setupBotMenu(bot);
   logger.info("bot.menu_ready");
 
@@ -209,12 +209,18 @@ async function main() {
     try {
       await safeStop(handle);
       // تلگرام getUpdates قبلی را باید آزاد کند وگرنه 409 می‌آید
-      const waitMs = /409|Conflict/i.test(reason) ? 4000 : 2000;
+      const waitMs = /409|Conflict/i.test(reason) ? 6000 : 2000;
       await sleep(waitMs);
       if (shuttingDown) return;
+      // فقط وقتی واقعاً گیر کرده (pending stall و مشابه) صف را خالی کن —
+      // روی 409 عادی drop نکن تا پیام کاربر در deploy از بین نرود
       if (dropPending) {
         await bot.api
           .deleteWebhook({ drop_pending_updates: true })
+          .catch((err) => noteApiError(err));
+      } else {
+        await bot.api
+          .deleteWebhook({ drop_pending_updates: false })
           .catch((err) => noteApiError(err));
       }
       handle = startRunner(bot);
@@ -415,7 +421,8 @@ async function main() {
         : endedWithError
           ? `task failed: ${errMessage(endedWithError)}`
           : "task ended unexpectedly",
-      conflict,
+      // 409 = رقیب موقت؛ صف را نگه دار. بقیه شکست‌های ناشناخته → drop برای آن‌لاک
+      conflict ? false : true,
     );
   }
 }
