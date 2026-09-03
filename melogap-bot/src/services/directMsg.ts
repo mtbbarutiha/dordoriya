@@ -18,6 +18,7 @@ import { rejectForbiddenContact } from "./contactGuard.js";
 import {
   classifyBotDeliveryError,
   telegramChatId,
+  telegramErrorText,
   type BotDeliveryBlockReason,
 } from "../lib/telegramSafe.js";
 
@@ -25,10 +26,22 @@ import {
  * حالت سایلنت درخواست‌چت (chatSilentUntil) هرگز نباید دایرکت را قطع کند.
  * فقط بلاک دوطرفه / نبودن chat با ربات / سکه ناکافی مانع است.
  * هیچ پیش‌چک deliverability (مثل sendChatAction) قبل از ارسال واقعی نداریم.
+ *
+ * «پیام ربات را نمی‌پذیرد / بلاک کرده» فقط وقتی description تلگرام
+ * شامل «bot was blocked by the user» باشد — نه 403 مبهم و نه mid-chat partner.
  */
+function shortTelegramError(err: unknown): string {
+  const raw = telegramErrorText(err);
+  // Grammy: "Call to 'sendMessage' failed! (403: Forbidden: …)"
+  const m = raw.match(/\(([^)]+)\)\s*$/);
+  const core = (m?.[1] ?? raw).replace(/\s+/g, " ").trim();
+  return core.slice(0, 160);
+}
+
 function dmDeliveryBlockedMessage(
   reason: BotDeliveryBlockReason,
   lang: Lang | string | null,
+  detail?: string | null,
 ): string {
   const L = normalizeLang(lang);
   switch (reason) {
@@ -42,27 +55,31 @@ function dmDeliveryBlockedMessage(
     case "never_started":
       return tr(
         L,
-        "این کاربر هنوز ربات را استارت نکرده یا چت ربات برایش موجود نیست؛ ارسال دایرکت ممکن نیست.",
-        "This user hasn't started the bot (or has no chat with it), so a DM can't be delivered.",
+        "ارسال نشد؛ این کاربر هنوز ربات را استارت نکرده یا چت ربات برایش موجود نیست.",
+        "Not sent; this user hasn't started the bot (or has no chat with it).",
       );
     case "deactivated":
       return tr(
         L,
-        "حساب تلگرام این کاربر غیرفعال است؛ ارسال دایرکت ممکن نیست.",
-        "This user's Telegram account is deactivated; a DM can't be delivered.",
+        "ارسال نشد؛ حساب تلگرام این کاربر غیرفعال است.",
+        "Not sent; this user's Telegram account is deactivated.",
       );
-    case "forbidden":
-      return tr(
-        L,
-        "ارسال نشد؛ تلگرام اجازه پیام به این کاربر را نداد.",
-        "Not sent; Telegram refused messaging this user.",
-      );
-    default:
-      return tr(
-        L,
-        "ارسال نشد. سکه کسر نشد.",
-        "Not sent. No coins were deducted.",
-      );
+    case "forbidden": {
+      const why = detail?.trim();
+      return why
+        ? tr(L, `ارسال نشد؛ ${why}`, `Not sent; ${why}`)
+        : tr(
+            L,
+            "ارسال نشد؛ تلگرام اجازه پیام به این کاربر را نداد.",
+            "Not sent; Telegram refused messaging this user.",
+          );
+    }
+    default: {
+      const why = detail?.trim();
+      return why
+        ? tr(L, `ارسال نشد؛ ${why}`, `Not sent; ${why}`)
+        : tr(L, "ارسال نشد. سکه کسر نشد.", "Not sent. No coins were deducted.");
+    }
   }
 }
 
@@ -83,15 +100,19 @@ async function partnerHasThisAsChatPartner(targetId: number): Promise<boolean> {
   return n > 0;
 }
 
+type DmDeliverResult =
+  | { ok: true }
+  | { ok: false; reason: BotDeliveryBlockReason; detail?: string };
+
 async function deliverDmNotify(
   api: Api,
-  targetTelegramId: bigint | number,
+  targetTelegramId: bigint | number | string,
   notifyText: string,
   replyMarkup: InlineKeyboard,
   photo: unknown,
   opts?: { treatAsReachable?: boolean },
-): Promise<{ ok: true } | { ok: false; reason: BotDeliveryBlockReason }> {
-  // Same chat_id resolution as anonymous chat relay (string — safe for large telegramIds).
+): Promise<DmDeliverResult> {
+  // Exact same chat_id resolution as anonymous chat relay (string — BigInt-safe).
   const chatId = telegramChatId(targetTelegramId);
   try {
     if (photo) {
@@ -105,11 +126,14 @@ async function deliverDmNotify(
     const classified = classifyBotDeliveryError(err);
     // Only abort early on hard delivery blocks; photo errors otherwise fall through to text.
     if (classified === "blocked_bot" || classified === "deactivated" || classified === "never_started") {
-      // If user is actively chatting via the bot, a "blocked" classification is a false positive.
-      if (classified === "blocked_bot" && opts?.treatAsReachable) {
-        // fall through to text send
+      // Mid-chat / clearly-reachable: never abort on photo "blocked" — try text like relay.
+      if (opts?.treatAsReachable) {
+        console.warn(
+          "DM photo hard-fail ignored (treatAsReachable); falling through to text",
+          { chatId, classified, err: shortTelegramError(err) },
+        );
       } else {
-        return { ok: false, reason: classified };
+        return { ok: false, reason: classified, detail: shortTelegramError(err) };
       }
     }
     // خطای عکس — متن را امتحان کن
@@ -120,12 +144,17 @@ async function deliverDmNotify(
     });
     return { ok: true };
   } catch (err) {
-    console.error("direct message notify failed", err);
+    console.error("direct message notify failed", {
+      chatId,
+      treatAsReachable: Boolean(opts?.treatAsReachable),
+      err,
+      short: shortTelegramError(err),
+    });
     let reason = classifyBotDeliveryError(err);
-    // False-positive guard: chatting / chat-partner users can receive bot messages.
+    // If relay would already reach this chat_id, "blocked_bot" is a false UX label.
     if (reason === "blocked_bot" && opts?.treatAsReachable) {
       console.warn(
-        "DM blocked_bot ignored — target clearly receives bot messages; treating as transient",
+        "DM blocked_bot ignored — target clearly receives bot messages; showing raw reason",
         err,
       );
       reason = null;
@@ -133,6 +162,7 @@ async function deliverDmNotify(
     return {
       ok: false,
       reason,
+      detail: shortTelegramError(err),
     };
   }
 }
@@ -1100,12 +1130,16 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
     photo = null;
   }
 
+  // Mid-chat partner: same reachability as anonymous relay — never pessimistically block.
+  const isCurrentChatPartner = user.chatPartnerId === target.id;
   const treatAsReachable =
+    isCurrentChatPartner ||
     targetClearlyReceivesBot(target) ||
     (await partnerHasThisAsChatPartner(target.id));
 
   const delivered = await deliverDmNotify(
     ctx.api,
+    // Same BigInt→string path as chat relay (never Number() — precision-safe).
     target.telegramId,
     notifyText,
     dmNotifyKeyboard(sent.id, targetLang),
@@ -1122,10 +1156,16 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
       where: { id: draft.id },
       data: { status: "draft" },
     });
+    // Never label mid-chat partner as "blocked bot" — relay already proves delivery.
+    const failReason =
+      isCurrentChatPartner && delivered.reason === "blocked_bot"
+        ? null
+        : delivered.reason;
     await ctx.answerCallbackQuery({ text: tr(lang, "ارسال نشد", "Not sent") });
-    await ctx.reply(dmDeliveryBlockedMessage(delivered.reason, lang), {
-      reply_markup: restoreKeyboard,
-    });
+    await ctx.reply(
+      dmDeliveryBlockedMessage(failReason, lang, delivered.detail),
+      { reply_markup: restoreKeyboard },
+    );
     return;
   }
 
