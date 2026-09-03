@@ -23,6 +23,7 @@ import {
 /**
  * حالت سایلنت درخواست‌چت (chatSilentUntil) هرگز نباید دایرکت را قطع کند.
  * فقط بلاک دوطرفه / نبودن chat با ربات / سکه ناکافی مانع است.
+ * پیش‌چک sendChatAction حذف شد — فقط خطای واقعی ارسال پیام ملاک است.
  */
 function dmDeliveryBlockedMessage(
   reason: BotDeliveryBlockReason,
@@ -33,8 +34,8 @@ function dmDeliveryBlockedMessage(
     case "blocked_bot":
       return tr(
         L,
-        "امکان ارسال دایرکت نیست؛ این کاربر دریافت پیام از ربات را بسته است (ربات را Block کرده).",
-        "Can't send a DM; this user blocked messages from the bot (blocked the bot).",
+        "ارسال نشد: طرف مقابل ربات را در تلگرام بلاک کرده است. سکه کسر نشد.",
+        "Not sent: the recipient blocked this bot on Telegram. No coins were deducted.",
       );
     case "never_started":
       return tr(
@@ -63,17 +64,21 @@ function dmDeliveryBlockedMessage(
   }
 }
 
-/** قبل از نوشتن/ارسال دایرکت: آیا ربات می‌تواند به گیرنده پیام بدهد؟ */
-async function probeBotCanMessage(
-  api: Api,
-  telegramId: bigint | number,
-): Promise<BotDeliveryBlockReason | "ok"> {
-  try {
-    await api.sendChatAction(Number(telegramId), "typing");
-    return "ok";
-  } catch (err) {
-    return classifyBotDeliveryError(err) ?? "forbidden";
-  }
+/** کاربرهایی که الان با ربات چت می‌کنند قطعاً پیام ربات را می‌گیرند. */
+function targetClearlyReceivesBot(target: {
+  state?: string | null;
+  chatPartnerId?: number | null;
+}): boolean {
+  if (target.state === "chatting") return true;
+  if (target.chatPartnerId != null) return true;
+  return false;
+}
+
+async function partnerHasThisAsChatPartner(targetId: number): Promise<boolean> {
+  const n = await prisma.user.count({
+    where: { chatPartnerId: targetId, state: "chatting" },
+  });
+  return n > 0;
 }
 
 async function deliverDmNotify(
@@ -82,8 +87,10 @@ async function deliverDmNotify(
   notifyText: string,
   replyMarkup: InlineKeyboard,
   photo: unknown,
+  opts?: { treatAsReachable?: boolean },
 ): Promise<{ ok: true } | { ok: false; reason: BotDeliveryBlockReason }> {
-  const chatId = Number(targetTelegramId);
+  // Prefer string chat id — avoids Number precision issues on large telegramIds.
+  const chatId = String(targetTelegramId);
   try {
     if (photo) {
       await api.sendPhoto(chatId, photo as never, {
@@ -94,7 +101,15 @@ async function deliverDmNotify(
     }
   } catch (err) {
     const classified = classifyBotDeliveryError(err);
-    if (classified) return { ok: false, reason: classified };
+    // Only abort early on hard delivery blocks; photo errors otherwise fall through to text.
+    if (classified === "blocked_bot" || classified === "deactivated" || classified === "never_started") {
+      // If user is actively chatting via the bot, a "blocked" classification is a false positive.
+      if (classified === "blocked_bot" && opts?.treatAsReachable) {
+        // fall through to text send
+      } else {
+        return { ok: false, reason: classified };
+      }
+    }
     // خطای عکس — متن را امتحان کن
   }
   try {
@@ -104,9 +119,18 @@ async function deliverDmNotify(
     return { ok: true };
   } catch (err) {
     console.error("direct message notify failed", err);
+    let reason = classifyBotDeliveryError(err);
+    // False-positive guard: chatting / chat-partner users can receive bot messages.
+    if (reason === "blocked_bot" && opts?.treatAsReachable) {
+      console.warn(
+        "DM blocked_bot ignored — target clearly receives bot messages; treating as transient",
+        err,
+      );
+      reason = null;
+    }
     return {
       ok: false,
-      reason: classifyBotDeliveryError(err),
+      reason,
     };
   }
 }
@@ -989,15 +1013,8 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
     return;
   }
 
-  // دوباره چک تحویل — سایلنت مانع نیست؛ بلاک ربات / استارت‌نکردن مانع است
-  const canMsg = await probeBotCanMessage(ctx.api, target.telegramId);
-  if (canMsg !== "ok") {
-    await ctx.answerCallbackQuery({ text: tr(lang, "ارسال نشد", "Not sent") });
-    await ctx.reply(dmDeliveryBlockedMessage(canMsg, lang), {
-      reply_markup: restoreKeyboard,
-    });
-    return;
-  }
+  // No sendChatAction pre-check — it false-positived on chatting users.
+  // Deliver the real DM; only show blocked copy on explicit Telegram 403 wording.
 
   if (user.diamonds < DIRECT_MSG_COST) {
     await ctx.answerCallbackQuery({ text: tr(lang, "سکه کافی نیست", "Not enough coins") });
@@ -1080,12 +1097,17 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
     photo = null;
   }
 
+  const treatAsReachable =
+    targetClearlyReceivesBot(target) ||
+    (await partnerHasThisAsChatPartner(target.id));
+
   const delivered = await deliverDmNotify(
     ctx.api,
     target.telegramId,
     notifyText,
     dmNotifyKeyboard(sent.id, targetLang),
     photo,
+    { treatAsReachable },
   );
 
   if (!delivered.ok) {

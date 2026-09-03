@@ -1,10 +1,12 @@
 /**
  * Smoke: silent mode must not gate DM; delivery errors must classify clearly.
+ * No sendChatAction pre-check; blocked_bot only on explicit Telegram wording.
  */
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 
@@ -48,15 +50,28 @@ assert.equal(
   ),
   "forbidden",
 );
+// Loose "forbidden"+"blocked" must NOT be blocked_bot (false positive source)
+assert.equal(
+  classifyBotDeliveryError(new Error("403: Forbidden: Something was blocked elsewhere")),
+  "forbidden",
+);
 // Silent mode is app-side only — no Telegram error string → never blocked_bot
 assert.equal(classifyBotDeliveryError(new Error("silent")), null);
 assert.equal(classifyBotDeliveryError(new Error("timeout")), null);
+assert.equal(classifyBotDeliveryError(new Error("429: Too Many Requests: retry after 3")), null);
 
-// Copy must name Block clearly; no defensive silent parenthetical
-const dmSrc = await import("node:fs").then((fs) =>
-  fs.readFileSync(path.join(root, "src/services/directMsg.ts"), "utf8"),
+const dmSrc = fs.readFileSync(path.join(root, "src/services/directMsg.ts"), "utf8");
+// Aggressive sendChatAction pre-check must be gone (comments may still mention it)
+assert.equal(dmSrc.includes("probeBotCanMessage"), false);
+assert.equal(/\bapi\.sendChatAction\b|\.sendChatAction\(/.test(dmSrc), false);
+assert.match(dmSrc, /targetClearlyReceivesBot/);
+assert.match(dmSrc, /treatAsReachable/);
+assert.match(dmSrc, /ارسال نشد: طرف مقابل ربات را در تلگرام بلاک کرده است/);
+// Old harsh false-positive copy must not remain
+assert.equal(
+  dmSrc.includes("امکان ارسال دایرکت نیست؛ این کاربر دریافت پیام از ربات را بسته است"),
+  false,
 );
-assert.match(dmSrc, /امکان ارسال دایرکت نیست؛ این کاربر دریافت پیام از ربات را بسته است \(ربات را Block کرده\)\./);
 assert.equal(dmSrc.includes("سایلنت بودن درخواست‌چت مانع دایرکت نیست"), false);
 
 const forever = new Date("9999-12-31T23:59:59.000Z");

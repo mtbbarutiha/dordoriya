@@ -25,14 +25,25 @@ export type BotDeliveryBlockReason =
   | "forbidden"
   | null;
 
+/**
+ * فقط وقتی تلگرام صریحاً می‌گوید کاربر ربات را بلاک کرده، blocked_bot برگردان.
+ * خطاهای مبهم 403 / rate-limit / chat action نباید «بلاک ربات» تلقی شوند.
+ */
 export function classifyBotDeliveryError(err: unknown): BotDeliveryBlockReason {
   const msg = err instanceof Error ? err.message : String(err);
   const lower = msg.toLowerCase();
-  if (lower.includes("bot was blocked by the user")) return "blocked_bot";
+  // Telegram wording (EN): "Forbidden: bot was blocked by the user"
+  if (
+    lower.includes("bot was blocked by the user") ||
+    lower.includes("bot was blocked by the the user") // rare typo variant
+  ) {
+    return "blocked_bot";
+  }
   if (lower.includes("user is deactivated")) return "deactivated";
   if (lower.includes("chat not found")) return "never_started";
   if (lower.includes("have no rights to send a message")) return "forbidden";
-  if (lower.includes("forbidden") && lower.includes("blocked")) return "blocked_bot";
+  // Do NOT treat generic "forbidden"+"blocked" as bot-block — too many false positives.
+  // Generic 403 Forbidden without explicit block wording → unknown (null), not blocked_bot.
   if (lower.includes("403") && lower.includes("forbidden")) return "forbidden";
   return null;
 }
