@@ -174,7 +174,12 @@ commandsHandler.command("anon", async (ctx) => {
   }
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
-  await ctx.reply([t(lang, "anon_title"), "", link].join("\n"));
+  const { sendBotShareCard } = await import("../services/botShare.js");
+  await sendBotShareCard(ctx, {
+    lang: lang === "en" ? "en" : "fa",
+    kind: "anon",
+    link,
+  });
 });
 
 commandsHandler.command("diamonds", async (ctx) => {

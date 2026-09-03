@@ -158,25 +158,16 @@ menuHandler.hears(btnAll("REFERRAL"), async (ctx) => {
   const lang = langOf(user);
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=ref_${user.referralCode}`;
-  await ctx.reply(
-    lang === "en"
-      ? [
-          t(lang, "referral_title"),
-          "",
-          `Each successful invite: ${formatNum(REFERRAL_BONUS)} free coins 💰`,
-          "",
-          "Your invite link:",
-          link,
-        ].join("\n")
-      : [
-          t(lang, "referral_title"),
-          "",
-          `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} سکه رایگان برای تو 💰`,
-          "",
-          "لینک دعوتت:",
-          link,
-        ].join("\n"),
-  );
+  const { sendBotShareCard } = await import("../services/botShare.js");
+  await sendBotShareCard(ctx, {
+    lang: lang === "en" ? "en" : "fa",
+    kind: "referral",
+    link,
+    bonusLabel:
+      lang === "en"
+        ? `Each successful invite: ${formatNum(REFERRAL_BONUS)} free coins 💰`
+        : `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} سکه رایگان برای تو 💰`,
+  });
 });
 
 menuHandler.hears(btnAll("ANON_LINK"), async (ctx) => {
@@ -186,23 +177,12 @@ menuHandler.hears(btnAll("ANON_LINK"), async (ctx) => {
   const lang = langOf(user);
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
-  await ctx.reply(
-    lang === "en"
-      ? [
-          t(lang, "anon_title"),
-          "",
-          "Share this link in your story or bio so others can send you anonymous messages:",
-          "",
-          link,
-        ].join("\n")
-      : [
-          t(lang, "anon_title"),
-          "",
-          "این لینک را در استوری یا بیو بگذار تا بقیه ناشناس برایت پیام بفرستند:",
-          "",
-          link,
-        ].join("\n"),
-  );
+  const { sendBotShareCard } = await import("../services/botShare.js");
+  await sendBotShareCard(ctx, {
+    lang: lang === "en" ? "en" : "fa",
+    kind: "anon",
+    link,
+  });
 });
 
 /** سازگاری دستورات قدیمی */

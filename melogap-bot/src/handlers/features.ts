@@ -1875,16 +1875,13 @@ featuresHandler.callbackQuery("more:ref", async (ctx) => {
   await ctx.answerCallbackQuery();
   const me = await ctx.api.getMe();
   const link = `https://t.me/${me.username}?start=ref_${user.referralCode}`;
-  await ctx.reply(
-    [
-      "🎁 دعوت دوستان",
-      "",
-      `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} سکه برای تو`,
-      "",
-      link,
-    ].join("\n"),
-    { reply_markup: mainKeyboard() },
-  );
+  const { sendBotShareCard } = await import("../services/botShare.js");
+  await sendBotShareCard(ctx, {
+    lang: "fa",
+    kind: "referral",
+    link,
+    bonusLabel: `هر دعوت موفق: ${formatNum(REFERRAL_BONUS)} سکه برای تو 💰`,
+  });
 });
 
 featuresHandler.callbackQuery("more:nearby", async (ctx) => {
@@ -1940,10 +1937,13 @@ featuresHandler.callbackQuery("more:anonlink", async (ctx) => {
   }
   await ctx.answerCallbackQuery();
   const me = await ctx.api.getMe();
-  await ctx.reply(
-    `🔗 لینک پیام ناشناس تو:\nhttps://t.me/${me.username}?start=anon_${user.anonCode}`,
-    { reply_markup: mainKeyboard() },
-  );
+  const link = `https://t.me/${me.username}?start=anon_${user.anonCode}`;
+  const { sendBotShareCard } = await import("../services/botShare.js");
+  await sendBotShareCard(ctx, {
+    lang: "fa",
+    kind: "anon",
+    link,
+  });
 });
 
 featuresHandler.callbackQuery("edit:name", async (ctx) => {
