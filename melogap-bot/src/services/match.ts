@@ -1,7 +1,7 @@
 import type { Api, Context } from "grammy";
 import { InlineKeyboard } from "grammy";
 import { prisma } from "../db/prisma.js";
-import { patchUser } from "../db/users.js";
+import { ensureUserCode, patchUser } from "../db/users.js";
 import { haversineKm } from "../lib/geo.js";
 import {
   chattingKeyboard,
@@ -764,6 +764,21 @@ export async function sendChatRequest(
   return "ok";
 }
 
+/** خط آیدی طرف مقابل برای پیام انقضای درخواست چت */
+async function counterpartIdLine(
+  lang: Lang,
+  userId: number,
+  currentCode?: string | null,
+): Promise<string | null> {
+  const code = await ensureUserCode(userId, currentCode);
+  if (!code) return null;
+  return tr(lang, `آیدی: /user_${code}`, `ID: /user_${code}`);
+}
+
+function withCounterpartId(base: string, idLine: string | null): string {
+  return idLine ? `${base}\n${idLine}` : base;
+}
+
 /** منقضی‌کردن درخواست‌های pending قدیمی + اطلاع به فرستنده */
 export async function expireStaleChatRequests(api: Api) {
   const now = new Date();
@@ -787,11 +802,18 @@ export async function expireStaleChatRequests(api: Api) {
       data: { status: "expired" },
     });
     n++;
+    const from = await prisma.user.findUnique({
+      where: { id: req.fromUserId },
+    });
+    const recipient = await prisma.user.findUnique({
+      where: { id: req.toUserId },
+    });
     if (req.toChatId != null && req.toMessageId != null) {
-      const recipient = await prisma.user.findUnique({
-        where: { id: req.toUserId },
-      });
       const recipientLang = langOf(recipient);
+      // برای گیرنده: آیدی فرستنده (طرف مقابل)
+      const fromIdLine = from
+        ? await counterpartIdLine(recipientLang, from.id, from.userCode)
+        : null;
       await api
         .editMessageReplyMarkup(Number(req.toChatId), req.toMessageId, {
           reply_markup: { inline_keyboard: [] },
@@ -799,27 +821,34 @@ export async function expireStaleChatRequests(api: Api) {
         .catch(() => undefined);
       await api
         .editMessageCaption(Number(req.toChatId), req.toMessageId, {
-          caption: tr(
-            recipientLang,
-            "⏰ این درخواست چت منقضی شد.",
-            "⏰ This chat request has expired.",
+          caption: withCounterpartId(
+            tr(
+              recipientLang,
+              "⏰ این درخواست چت منقضی شد.",
+              "⏰ This chat request has expired.",
+            ),
+            fromIdLine,
           ),
         })
         .catch(() => undefined);
     }
     // برای quick اسپم نده؛ فقط direct
     if (req.source !== "quick") {
-      const from = await prisma.user.findUnique({
-        where: { id: req.fromUserId },
-      });
       if (from && from.telegramId < 9000000000n) {
         const fromLang = langOf(from);
+        // برای فرستنده: آیدی گیرنده (طرف مقابل)
+        const toIdLine = recipient
+          ? await counterpartIdLine(fromLang, recipient.id, recipient.userCode)
+          : null;
         await api
           .sendMessage(
             Number(from.telegramId),
-            fromLang === "en"
-              ? "⏰ Chat request expired (2 minutes passed without acceptance)."
-              : "⏰ درخواست چت منقضی شد (۲ دقیقه گذشت و قبول نشد).",
+            withCounterpartId(
+              fromLang === "en"
+                ? "⏰ Chat request expired (2 minutes passed without acceptance)."
+                : "⏰ درخواست چت منقضی شد (۲ دقیقه گذشت و قبول نشد).",
+              toIdLine,
+            ),
             { reply_markup: mainKeyboard(fromLang) },
           )
           .catch(() => undefined);
@@ -843,6 +872,36 @@ export async function respondChatRequest(
       where: { id: req.id },
       data: { status: "expired" },
     });
+    // اگر هنوز کپشن درخواست روی پیام گیرنده است، با آیدی فرستنده به‌روز کن
+    if (req.toChatId != null && req.toMessageId != null) {
+      const recipient = await prisma.user.findUnique({
+        where: { id: req.toUserId },
+      });
+      const from = await prisma.user.findUnique({
+        where: { id: req.fromUserId },
+      });
+      const recipientLang = langOf(recipient);
+      const fromIdLine = from
+        ? await counterpartIdLine(recipientLang, from.id, from.userCode)
+        : null;
+      await api
+        .editMessageReplyMarkup(Number(req.toChatId), req.toMessageId, {
+          reply_markup: { inline_keyboard: [] },
+        })
+        .catch(() => undefined);
+      await api
+        .editMessageCaption(Number(req.toChatId), req.toMessageId, {
+          caption: withCounterpartId(
+            tr(
+              recipientLang,
+              "⏰ این درخواست چت منقضی شد.",
+              "⏰ This chat request has expired.",
+            ),
+            fromIdLine,
+          ),
+        })
+        .catch(() => undefined);
+    }
     return "gone";
   }
 
