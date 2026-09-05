@@ -1,0 +1,44 @@
+To: ads@telegram.org
+From: mtbbarutiha@gmail.com
+Subject: Telegram Ads stuck In Review — please explain why ads are not approved (account Mohammad Personal)
+
+Hello Telegram Ads Support,
+
+I am writing again about my Telegram Ads account (Mohammad Personal). Several campaigns have been stuck in "In Review" for a long time and are not being approved or activated.
+
+Promote URL: https://t.me/Dordoriya_bot
+
+Current campaigns still In Review:
+
+Bot-targeted ads (IDs 152–166):
+152 ورود به دوردوریا
+153 دوردوریا در تلگرام
+154 باز کردن دوردوریا
+155 راهنمای دوردوریا
+156 گفتگو در دوردوریا
+157 مسیر دوردوریا
+158 بات تلگرام دوردوریا
+159 آشنایی با دوردوریا
+160 ادامه در ربات
+161 گزینه Start دوردوریا
+162 دوردوریا برای چت
+163 لینک ربات دوردوریا
+164 استفاده از دوردوریا
+165 معرفی ربات دوردوریا
+166 شروع گفتگو دوردوریا
+
+New channel-targeted ads (Persian language channels), just submitted for comparison:
+167 ربات چت دوردوریا
+168 شروع کار با دوردوریا
+169 منوی ربات دوردوریا
+
+All creatives are plain, factual product copy about opening our Telegram bot and pressing Start. We removed previous risky wording. Budgets are locked while ads remain In Review (free balance is 0).
+
+Please tell us:
+1) Why these ads are not being approved
+2) Whether there is a specific policy issue with the creatives, targeting, or account
+3) If possible, please manually review and activate the ads that comply with the guidelines, or tell us exactly what must be changed
+
+Thank you,
+Mohammad
+mtbbarutiha@gmail.com

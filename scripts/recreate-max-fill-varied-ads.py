@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""One-shot Telegram Ads moderation tick for Dordoriya bot-targeted ads.
+"""Delete ALL ads, then fill max balance with varied safe creatives.
 
-Parses account table statuses (authoritative), optionally deletes/recreates Declined,
-writes /tmp/ads-moderation-tick.json.
+Uses full unlocked budget at 💎3.00 each → up to 18 ads when balance is 💎54.
+Styles vary (intro / start / menu / link / guide) but stay policy-safe:
+no dating, free, secure, nearby, location, voice, income claims.
 """
 from __future__ import annotations
 
@@ -15,20 +16,15 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 AUTH = Path.home() / ".config/telegram-ads-mcp/auth_state.json"
-# Mohammad — Personal Account (funded; org @Dordoriya_bot currently 0)
 ACCOUNT = (
     "https://ads.telegram.org/choose_account/"
     "3VQIGO7L1hpg1h1agS2rHCCKDrfwYsC6nRk3BrB71Jw8IhaTIyjfb6s_6x_4mT7A"
 )
 BOTS = ["melogap", "Melochat_bot", "NashenasBot"]
+PROMOTE = "https://t.me/Dordoriya_bot"
 CPM = "0.20"
 BUDGET = "3.00"
-PROMOTE = "https://t.me/Dordoriya_bot"
-# Watch window: max-fill varied batch 149+ 
-AD_ID_MIN = 149
-AD_ID_MAX = 400
 
-# Varied safe creatives (no dating/free/secure/nearby)
 CAMPAIGNS = [
     ("ربات چت دوردوریا", "دوردوریا یک ربات چت در تلگرام است. ربات را باز کنید و Start را بزنید."),
     ("شروع کار با دوردوریا", "برای شروع کار با دوردوریا، ربات را باز کنید و پیام‌های داخل ربات را دنبال کنید."),
@@ -57,21 +53,17 @@ STATUS_RE = re.compile(
 
 
 def normalize_status(s: str) -> str:
-    s = s.strip().title() if s else "Unknown"
     mapping = {
-        "In Review": "In Review",
-        "On Hold": "On Hold",
-        "Declined": "Declined",
-        "Rejected": "Declined",
-        "Active": "Active",
-        "Completed": "Completed",
-        "Stopped": "Stopped",
-        "Pending": "In Review",
+        "in review": "In Review",
+        "on hold": "On Hold",
+        "declined": "Declined",
+        "rejected": "Declined",
+        "active": "Active",
+        "completed": "Completed",
+        "stopped": "Stopped",
+        "pending": "In Review",
     }
-    for k, v in mapping.items():
-        if s.lower() == k.lower():
-            return v
-    return s
+    return mapping.get((s or "").strip().lower(), s or "Unknown")
 
 
 async def js_check(page, selector: str) -> None:
@@ -93,22 +85,19 @@ async def parse_ads(page) -> list[dict]:
     ads = await page.evaluate(
         """() => {
           const results = [];
-          const links = Array.from(document.querySelectorAll("a[href*='/account/ad/']"));
           const seen = new Set();
-          for (const a of links) {
+          for (const a of document.querySelectorAll("a[href*='/account/ad/']")) {
             const m = (a.getAttribute('href') || '').match(/\\/account\\/ad\\/(\\d+)/);
-            if (!m) continue;
-            const id = m[1];
-            if (seen.has(id)) continue;
-            seen.add(id);
-            let row = a.closest('tr, .ad-row, .table-row, .pr-table-row, li, .item') || a.parentElement;
+            if (!m || seen.has(m[1])) continue;
+            seen.add(m[1]);
+            let row = a.closest('tr') || a.parentElement;
             for (let i = 0; i < 6 && row; i++) {
               const t = (row.innerText || '').trim();
               if (t.length > 20 && t.length < 2000) break;
               row = row.parentElement;
             }
             const text = ((row && row.innerText) || a.innerText || '').replace(/\\s+/g, ' ').trim();
-            results.push({ id: Number(id), href: a.getAttribute('href'), rowText: text.slice(0, 500) });
+            results.push({ id: Number(m[1]), rowText: text.slice(0, 500) });
           }
           return results;
         }"""
@@ -117,92 +106,45 @@ async def parse_ads(page) -> list[dict]:
     for ad in ads:
         m = STATUS_RE.search(ad["rowText"] or "")
         status = normalize_status(m.group(1)) if m else "Unknown"
-        # title: text before t.me/
-        title = ad["rowText"]
-        tm = re.search(r"^(.*?)\s+t\.me/", ad["rowText"])
-        if tm:
-            title = tm.group(1).strip()
-        out.append(
-            {
-                "id": ad["id"],
-                "title": title,
-                "status": status,
-                "rowText": ad["rowText"],
-            }
-        )
+        out.append({"id": ad["id"], "status": status, "rowText": ad["rowText"]})
     return out
 
 
-async def fetch_decline_reason(page, ad_id: int) -> str:
-    await page.goto(
-        f"https://ads.telegram.org/account/ad/{ad_id}", wait_until="domcontentloaded"
-    )
-    await page.wait_for_timeout(600)
-    body = await page.locator("body").inner_text()
-    reason = ""
-    for pat in (
-        r"Deceptive, misleading, or predatory advertising[^\n]*",
-        r"(?:Reason|Decline reason|Rejection reason|علت|دلیل)[:\s]*([^\n]{5,300})",
-        r"(Editorial[^\n]{0,200})",
-        r"(Language mismatch[^\n]{0,200})",
-        r"(Irrelevant[^\n]{0,200})",
-        r"(Policy[^\n]{0,200})",
-    ):
-        m = re.search(pat, body, re.I)
-        if m:
-            reason = m.group(0).strip()[:400]
-            break
-    if not reason:
-        bits = await page.evaluate(
-            """() => {
-              const texts = [];
-              const nodes = Array.from(document.querySelectorAll(
-                '.decline, .declined, .alert, .notice, .warning, .error, .pr-alert, [class*=decline]'
-              ));
-              for (const n of nodes) {
-                const t = (n.innerText || '').trim();
-                if (t && t.length < 800) texts.push(t.slice(0, 500));
-              }
-              return texts.slice(0, 10);
-            }"""
-        )
-        reason = " | ".join(bits)[:400] if bits else ""
-    return reason
-
-
-async def parse_free_balance(page) -> str | None:
+async def parse_free_balance(page) -> float:
     await page.goto("https://ads.telegram.org/account", wait_until="domcontentloaded")
     await page.wait_for_timeout(800)
     overview = await page.locator("body").inner_text()
     for pat in (
-        r"(?:Free(?:\s+balance)?|Available|Balance|Budget|موجودی)[^\d]*([\d.]+)\s*(?:TON|💎)?",
         r"Budget:\s*💎?\s*([\d.]+)",
         r"💎\s*([\d.]+)",
         r"([\d.]+)\s*TON",
     ):
         m = re.search(pat, overview, re.I)
         if m:
-            return f"{m.group(1)} TON"
-    return None
+            try:
+                return float(m.group(1))
+            except ValueError:
+                continue
+    return 0.0
 
 
 async def delete_ad(page, ad_id: int) -> bool:
     await page.goto(
         f"https://ads.telegram.org/account/ad/{ad_id}", wait_until="domcontentloaded"
     )
-    await page.wait_for_timeout(500)
+    await page.wait_for_timeout(450)
     btn = page.locator("a.delete-ad-btn")
     if await btn.count() == 0:
         return False
     await btn.first.click()
-    await page.wait_for_timeout(450)
+    await page.wait_for_timeout(400)
     confirm = page.locator(
         ".pr-layer-delete-ad .popup-primary-btn, div.popup-button.popup-primary-btn"
     )
     if await confirm.count() == 0:
         return False
     await confirm.first.click()
-    await page.wait_for_timeout(1200)
+    await page.wait_for_timeout(1100)
     print(f"  deleted {ad_id}")
     return True
 
@@ -221,10 +163,10 @@ async def add_bot_target(page, bot_query: str) -> str | None:
     )
     await page.wait_for_timeout(200)
     await wrap.click()
-    await wrap.type(bot_query, delay=25)
-    await page.wait_for_timeout(1100)
+    await wrap.type(bot_query, delay=20)
+    await page.wait_for_timeout(1000)
     await page.keyboard.press("Enter")
-    await page.wait_for_timeout(800)
+    await page.wait_for_timeout(700)
     selected = (
         await page.locator(".js-field-bots-wrap .selected-items").inner_text()
     ).strip()
@@ -240,14 +182,14 @@ async def create_bot_ad(page, title: str, text: str, bot: str, idx: int) -> dict
     await page.goto(
         "https://ads.telegram.org/account/ad/new", wait_until="domcontentloaded"
     )
-    await page.wait_for_timeout(800)
+    await page.wait_for_timeout(700)
     clear = page.get_by_text("Clear Draft", exact=True)
     if await clear.count() and await clear.first.is_visible():
         await clear.first.click()
-        await page.wait_for_timeout(450)
+        await page.wait_for_timeout(400)
 
     await page.locator("label.pr-radio-tab", has_text="Bots").first.click()
-    await page.wait_for_timeout(300)
+    await page.wait_for_timeout(250)
     await page.locator("input[name=title]").fill(title)
     await page.locator("textarea[name=text]").fill(text)
     await page.locator("input[name=promote_url]").fill(PROMOTE)
@@ -269,14 +211,14 @@ async def create_bot_ad(page, title: str, text: str, bot: str, idx: int) -> dict
           if (btn) btn.click();
         }"""
     )
-    await page.wait_for_timeout(2600)
+    await page.wait_for_timeout(2400)
     body = await page.locator("body").inner_text()
     ok = "Create a new ad" in body or (
         "/account/ad/" in page.url and "/new" not in page.url
     )
     if "balance is too low" in body.lower() or "Please choose target" in body:
         ok = False
-    print(("OK" if ok else "FAIL"), idx, title, selected)
+    print(("OK" if ok else "FAIL"), idx, title, "→", selected)
     return {
         "title": title,
         "text": text,
@@ -287,7 +229,6 @@ async def create_bot_ad(page, title: str, text: str, bot: str, idx: int) -> dict
 
 
 async def main() -> None:
-    actions: list[str] = []
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         ctx = await browser.new_context(
@@ -295,121 +236,77 @@ async def main() -> None:
         )
         page = await ctx.new_page()
         await page.goto(ACCOUNT, wait_until="domcontentloaded")
-        await page.wait_for_timeout(1000)
+        await page.wait_for_timeout(900)
 
-        free_balance = await parse_free_balance(page)
-        all_ads = await parse_ads(page)
-        ads = [a for a in all_ads if AD_ID_MIN <= a["id"] <= AD_ID_MAX]
-        if not ads:
-            ads = all_ads  # fallback if window empty
-        await page.screenshot(path="/tmp/ads-moderation-overview.png", full_page=True)
+        before = await parse_free_balance(page)
+        ads = await parse_ads(page)
+        print(f"before_balance={before} ads={len(ads)}")
 
-        statuses: dict[str, int] = {}
+        deleted: list[int] = []
         for a in ads:
-            statuses[a["status"]] = statuses.get(a["status"], 0) + 1
+            if await delete_ad(page, a["id"]):
+                deleted.append(a["id"])
 
-        declined = [a for a in ads if a["status"] == "Declined"]
-        in_review = [a for a in ads if a["status"] == "In Review"]
-        active = [a for a in ads if a["status"] == "Active"]
+        await page.wait_for_timeout(1200)
+        unlocked = await parse_free_balance(page)
+        budget_each = float(BUDGET)
+        max_ads = int(unlocked // budget_each)
+        plan = CAMPAIGNS[:max_ads]
+        print(f"after_delete_balance={unlocked} max_ads={max_ads} planning={len(plan)}")
 
         created: list[dict] = []
-        deleted_ids: list[int] = []
-        declined_reasons: list[dict] = []
+        for i, (title, text) in enumerate(plan, start=1):
+            bot = BOTS[(i - 1) % len(BOTS)]
+            r = await create_bot_ad(page, title, text, bot, i)
+            if not r.get("ok") and r.get("reason") == "bot_not_found":
+                for alt in BOTS:
+                    if alt == bot:
+                        continue
+                    r = await create_bot_ad(page, title, text, alt, i)
+                    if r.get("ok"):
+                        break
+            created.append(r)
+            await page.wait_for_timeout(350)
 
-        if declined:
-            for a in declined:
-                reason = await fetch_decline_reason(page, a["id"])
-                declined_reasons.append(
-                    {"id": a["id"], "title": a.get("title", ""), "reason": reason}
-                )
-                print(f"  declined {a['id']}: {reason[:120]}")
-
-            actions.append(f"delete_declined:{len(declined)}")
-            for a in declined:
-                ok = await delete_ad(page, a["id"])
-                if ok:
-                    deleted_ids.append(a["id"])
-
-            # Recreate same count with rotating bots / campaign pool
-            n = len(declined)
-            actions.append(f"recreate:{n}")
-            for i in range(n):
-                title, text = CAMPAIGNS[i % len(CAMPAIGNS)]
-                # Prefer unused titles when possible: offset by deleted id
-                bot = BOTS[i % len(BOTS)]
-                r = await create_bot_ad(page, title, text, bot, i + 1)
-                if not r.get("ok") and r.get("reason") == "bot_not_found":
-                    for alt in BOTS:
-                        if alt == bot:
-                            continue
-                        r = await create_bot_ad(page, title, text, alt, i + 1)
-                        if r.get("ok"):
-                            break
-                created.append(r)
-
-            # Re-parse after recreate (new ids may be > AD_ID_MAX)
-            free_balance = await parse_free_balance(page)
-            ads = await parse_ads(page)
-            statuses = {}
-            for a in ads:
-                statuses[a["status"]] = statuses.get(a["status"], 0) + 1
-            declined = [a for a in ads if a["status"] == "Declined"]
-            in_review = [a for a in ads if a["status"] == "In Review"]
-            active = [a for a in ads if a["status"] == "Active"]
-
-        # Decide timer action
-        all_active = len(ads) > 0 and len(active) == len(ads) and not declined and not in_review
-        any_in_review = len(in_review) > 0
-        if all_active:
-            action = "all_active_unsubscribe"
-            actions.append("unsubscribe_timer")
-            actions.append("persian_approved")
-            timer = "unsubscribe"
-        elif any_in_review or declined:
-            action = "still_waiting"
-            actions.append("keep_timer")
-            timer = "kept_resubscribed"
-        else:
-            # e.g. On Hold / mixed — keep watching
-            action = "still_waiting"
-            actions.append("keep_timer_nonterminal")
-            timer = "kept_resubscribed"
+        final_bal = await parse_free_balance(page)
+        ads2 = await parse_ads(page)
+        statuses: dict[str, int] = {}
+        for a in ads2:
+            statuses[a["status"]] = statuses.get(a["status"], 0) + 1
 
         out = {
             "checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "free_balance": free_balance,
-            "statuses": statuses,
-            "total": len(ads),
-            "declined": [a["id"] for a in declined],
-            "declined_reasons": declined_reasons,
-            "active": len(active),
-            "in_review": len(in_review),
-            "ids": [a["id"] for a in ads],
-            "ads": ads,
-            "deleted_ids": deleted_ids,
+            "balance_before": before,
+            "balance_after_delete": unlocked,
+            "balance_final": final_bal,
+            "deleted_ids": deleted,
+            "created_ok": sum(1 for c in created if c.get("ok")),
             "created": created,
-            "actions": actions,
-            "action": action,
-            "timer": timer,
-            "delaySeconds": 900,
-            "bot_channel": "none",
+            "statuses": statuses,
+            "ids": [a["id"] for a in ads2],
+            "ads": ads2,
         }
-        Path("/tmp/ads-moderation-tick.json").write_text(
+        Path("/tmp/ads-max-fill-varied.json").write_text(
             json.dumps(out, ensure_ascii=False, indent=2)
         )
-        summary_keys = (
-            "statuses",
-            "total",
-            "free_balance",
-            "action",
-            "timer",
-            "actions",
-            "declined",
-            "declined_reasons",
-            "active",
-            "in_review",
+        print(
+            json.dumps(
+                {
+                    k: out[k]
+                    for k in (
+                        "balance_before",
+                        "balance_after_delete",
+                        "balance_final",
+                        "deleted_ids",
+                        "created_ok",
+                        "statuses",
+                        "ids",
+                    )
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
         )
-        print(json.dumps({k: out[k] for k in summary_keys}, ensure_ascii=False, indent=2))
         await ctx.storage_state(path=str(AUTH))
         await browser.close()
 
