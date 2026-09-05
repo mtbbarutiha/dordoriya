@@ -1192,6 +1192,72 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
   );
 }
 
+/** فقط اولین مشاهده (sent → read) به فرستنده خبر می‌دهد */
+async function notifyDirectMessageViewed(
+  api: Api,
+  viewerId: number,
+  senderId: number,
+): Promise<void> {
+  if (viewerId === senderId) return;
+
+  const { isBlockedEither } = await import("./block.js");
+  const { ensureUserCode } = await import("../db/users.js");
+  const { logger } = await import("../lib/logger.js");
+
+  const [viewer, sender, blocked] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: viewerId },
+      select: {
+        id: true,
+        displayName: true,
+        userCode: true,
+        deletedAt: true,
+        telegramId: true,
+        registered: true,
+      },
+    }),
+    prisma.user.findUnique({
+      where: { id: senderId },
+      select: {
+        id: true,
+        telegramId: true,
+        language: true,
+        deletedAt: true,
+        registered: true,
+      },
+    }),
+    isBlockedEither(viewerId, senderId),
+  ]);
+
+  if (!viewer || viewer.deletedAt || !viewer.registered) return;
+  if (!sender || sender.deletedAt || !sender.registered) return;
+  if (viewer.telegramId >= 9000000000n) return;
+  if (sender.telegramId >= 9000000000n) return;
+  if (blocked) return;
+
+  const code = await ensureUserCode(viewer.id, viewer.userCode);
+  if (!code) return;
+
+  const lang = langOf(sender);
+  const name =
+    viewer.displayName?.trim() || tr(lang, "یک کاربر", "a user");
+  const text = tr(
+    lang,
+    `👁 کاربر ${name} با آیدی /user_${code} پیام دایرکت شما را مشاهده کرد.`,
+    `👁 User ${name} with ID /user_${code} viewed your direct message.`,
+  );
+
+  try {
+    await api.sendMessage(Number(sender.telegramId), text);
+  } catch (err) {
+    logger.warn("dm.view.notify.fail", {
+      viewerId,
+      senderId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export async function viewDirectMessage(
   ctx: Context,
   viewerId: number,
@@ -1212,11 +1278,14 @@ export async function viewDirectMessage(
   }
 
   const from = await prisma.user.findUnique({ where: { id: msg.fromUserId } });
-  if (msg.status === "sent") {
+  const firstView = msg.status === "sent";
+  if (firstView) {
     await prisma.directMessage.update({
       where: { id: msg.id },
       data: { status: "read" },
     });
+    // fire-and-forget — باز شدن پیام نباید به‌خاطر نوتیف بشکند
+    void notifyDirectMessageViewed(ctx.api, viewerId, msg.fromUserId);
   }
 
   const fromName = from?.displayName ?? tr(lang, "یک کاربر", "a user");
