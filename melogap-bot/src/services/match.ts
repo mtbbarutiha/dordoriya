@@ -1142,12 +1142,38 @@ export async function connectUsers(
 
   const langA = langOf(a);
   const langB = langOf(b);
-  // Inline زیر پیام وصل (اختیاری) + ReplyKeyboard منوی چت یک‌بار روی continue
-  // — بدون ReplyKeyboardRemove و بدون is_persistent (رفتار استاندارد تلگرام)
+  // ReplyKeyboard MUST land on connect — otherwise users keep the main menu and
+  // can't tap end-chat. Telegram can't mix Reply+Inline on one message, so:
+  // 1) continue_chat + chattingKeyboard (retried), 2) chat_connected + inline.
   const inlineA = chattingInlineKeyboard(false, langA);
   const inlineB = chattingInlineKeyboard(false, langB);
   const replyA = chattingKeyboard(false, langA);
   const replyB = chattingKeyboard(false, langB);
+
+  async function sendChatReplyKeyboard(
+    chatId: number,
+    lang: Lang,
+    kb: ReturnType<typeof chattingKeyboard>,
+  ): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await api.sendMessage(chatId, t(lang, "continue_chat"), {
+          reply_markup: kb,
+        });
+        return;
+      } catch (err) {
+        console.error("connectUsers reply keyboard failed", {
+          chatId,
+          attempt,
+          err,
+        });
+        await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+      }
+    }
+  }
+
+  await sendChatReplyKeyboard(Number(a.telegramId), langA, replyA);
+  await sendChatReplyKeyboard(Number(b.telegramId), langB, replyB);
 
   const ma = await api.sendMessage(
     Number(a.telegramId),
@@ -1159,16 +1185,7 @@ export async function connectUsers(
     t(langB, "chat_connected"),
     { reply_markup: inlineB },
   );
-  await api
-    .sendMessage(Number(a.telegramId), t(langA, "continue_chat"), {
-      reply_markup: replyA,
-    })
-    .catch(() => undefined);
-  await api
-    .sendMessage(Number(b.telegramId), t(langB, "continue_chat"), {
-      reply_markup: replyB,
-    })
-    .catch(() => undefined);
+
   await logPairMessages({
     aUserId: a.id,
     bUserId: b.id,
