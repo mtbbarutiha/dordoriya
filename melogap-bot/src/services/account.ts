@@ -1,5 +1,7 @@
 import { prisma } from "../db/prisma.js";
 import type { User } from "@prisma/client";
+import type { Context } from "grammy";
+import { tr, normalizeLang, type Lang } from "../i18n/index.js";
 
 /** آرشیو + آزاد کردن telegramId تا کاربر با شناسهٔ جدید بسازد.
  *  اگر coinCost > 0 باشد، همان تراکنش سکه را کم می‌کند؛ در صورت کمبود سکه false برمی‌گرداند.
@@ -84,6 +86,119 @@ export async function previousAccountIds(telegramId: bigint | number) {
     take: 10,
   });
   return rows;
+}
+
+/** آیا این تلگرام‌آیدی قبلاً حساب حذف‌شده داشته؟ */
+export async function hasDeletedAccountHistory(
+  telegramId: number | bigint,
+): Promise<boolean> {
+  const n = await prisma.deletedAccount.count({
+    where: { telegramId: BigInt(telegramId) },
+  });
+  return n > 0;
+}
+
+export function selfAccountDeletedText(
+  lang: Lang | string | null | undefined,
+  opts?: { previousId?: number | null },
+): string {
+  const L = normalizeLang(lang);
+  const prev =
+    opts?.previousId != null
+      ? tr(
+          L,
+          `\nشناسهٔ قبلی: #${opts.previousId}`,
+          `\nPrevious ID: #${opts.previousId}`,
+        )
+      : "";
+  return (
+    tr(
+      L,
+      "🗑️ حسابت حذف شده و دیگر فعال نیست.",
+      "🗑️ Your account was deleted and is no longer active.",
+    ) +
+    prev +
+    "\n\n" +
+    tr(
+      L,
+      "برای ساخت حساب کاملاً جدید، /start را بزن.",
+      "Send /start to create a brand-new account.",
+    )
+  );
+}
+
+export function selfAccountDeletedAlert(
+  lang: Lang | string | null | undefined,
+): string {
+  const L = normalizeLang(lang);
+  return tr(
+    L,
+    "حسابت حذف شده — /start بزن",
+    "Account deleted — send /start",
+  );
+}
+
+export function targetAccountDeletedText(
+  lang: Lang | string | null | undefined,
+): string {
+  const L = normalizeLang(lang);
+  return tr(
+    L,
+    "این کاربر حسابش را حذف کرده و دیگر در دسترس نیست.",
+    "This user deleted their account and is no longer available.",
+  );
+}
+
+export function targetAccountDeletedAlert(
+  lang: Lang | string | null | undefined,
+): string {
+  const L = normalizeLang(lang);
+  return tr(
+    L,
+    "این کاربر حسابش را حذف کرده",
+    "This user deleted their account",
+  );
+}
+
+/** پیام دقیق به خودِ کاربر وقتی حسابش حذف شده (callback → alert، پیام → reply) */
+export async function notifySelfAccountDeleted(
+  ctx: Context,
+  lang: Lang | string | null | undefined = "fa",
+  opts?: { previousId?: number | null },
+): Promise<void> {
+  const L = normalizeLang(lang);
+  const text = selfAccountDeletedText(L, opts);
+  const alert = selfAccountDeletedAlert(L);
+  try {
+    if (ctx.callbackQuery) {
+      await ctx.answerCallbackQuery({ text: alert, show_alert: true });
+    }
+  } catch {
+    /* already answered */
+  }
+  try {
+    await ctx.reply(text, { reply_markup: { remove_keyboard: true } });
+  } catch {
+    /* ignore */
+  }
+}
+
+/** وقتی طرف مقابل حذف شده */
+export async function notifyTargetAccountDeleted(
+  ctx: Context,
+  lang: Lang | string | null | undefined = "fa",
+): Promise<void> {
+  const L = normalizeLang(lang);
+  const alert = targetAccountDeletedAlert(L);
+  try {
+    if (ctx.callbackQuery) {
+      await ctx.answerCallbackQuery({ text: alert, show_alert: true });
+    } else {
+      await ctx.reply(targetAccountDeletedText(L));
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export async function formatAdminUserLine(user: {

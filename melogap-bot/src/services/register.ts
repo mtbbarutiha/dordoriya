@@ -224,24 +224,60 @@ export async function requireRegistered(ctx: Context) {
       ...(from.first_name ? { firstName: from.first_name } : {}),
     });
   }
+
+  const {
+    notifySelfAccountDeleted,
+    previousAccountIds,
+  } = await import("./account.js");
+
+  // حساب soft-delete شده (نادر؛ اگر telegramId هنوز واقعی باشد)
+  if (user.deletedAt || user.state === "deleted") {
+    await notifySelfAccountDeleted(ctx, langOf(user), {
+      previousId: user.id,
+    });
+    return null;
+  }
+
   if (!user.registered) {
+    const prev = await previousAccountIds(from.id);
+    // بعد از حذف دائمی، شل جدید با state=language ساخته می‌شود.
+    // تا وقتی ثبت‌نام را از /start جلو نبرده، پیام دقیق «حساب حذف شده» بده.
+    const midReReg = [
+      "force_join",
+      "country",
+      "province",
+      "city",
+      "gender",
+      "age",
+      "name",
+      "looking",
+    ].includes(user.state);
+    if (prev.length && !midReReg) {
+      await notifySelfAccountDeleted(ctx, langOf(user), {
+        previousId: prev[0]!.originalUserId,
+      });
+      return null;
+    }
     const lang = langOf(user);
+    try {
+      if (ctx.callbackQuery) {
+        await ctx.answerCallbackQuery({
+          text:
+            lang === "en"
+              ? "Complete registration first"
+              : "اول ثبت‌نام را کامل کن",
+          show_alert: true,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
     await ctx.reply(
       lang === "en"
         ? "Please complete registration first.\nContinue from here:"
         : "اول باید ثبت‌نام را کامل کنی.\nاز همین‌جا ادامه بده:",
     );
     await resumeRegistration(ctx, user);
-    return null;
-  }
-
-  if (user.deletedAt) {
-    const lang = langOf(user);
-    await ctx.reply(
-      lang === "en"
-        ? "This account was deleted. Send /start to create a new one."
-        : "این حساب حذف شده. برای ساخت حساب جدید /start بزن.",
-    );
     return null;
   }
 

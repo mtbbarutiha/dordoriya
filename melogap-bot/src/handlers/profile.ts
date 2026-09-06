@@ -485,6 +485,11 @@ profileHandler.callbackQuery("prof:delete:yes", async (ctx) => {
       "",
       tr(
         lang,
+        "منوی قبلی دیگر کار نمی‌کند.",
+        "Your previous menu no longer works.",
+      ),
+      tr(
+        lang,
         "با /start می‌توانی حساب کاملاً جدید بسازی.",
         "Use /start to create a brand-new account.",
       ),
@@ -494,6 +499,7 @@ profileHandler.callbackQuery("prof:delete:yes", async (ctx) => {
         "(Your old ID remains visible to admins)",
       ),
     ].join("\n"),
+    { reply_markup: { remove_keyboard: true } },
   );
 });
 

@@ -760,7 +760,14 @@ featuresHandler.callbackQuery(/^exp:likes?:(\d+)$/, async (ctx) => {
 
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target || target.deletedAt) {
-    await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد" });
+    if (target?.deletedAt) {
+      const { notifyTargetAccountDeleted } = await import("../services/account.js");
+      await notifyTargetAccountDeleted(ctx, langOf(user));
+      return;
+    }
+    await ctx.answerCallbackQuery({
+      text: langOf(user) === "en" ? "User not found" : "کاربر پیدا نشد",
+    });
     return;
   }
 
@@ -947,6 +954,11 @@ featuresHandler.callbackQuery(/^block:on:(\d+)$/, async (ctx) => {
   const lang = user.language === "en" ? "en" : "fa";
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target || target.deletedAt) {
+    if (target?.deletedAt) {
+      const { notifyTargetAccountDeleted } = await import("../services/account.js");
+      await notifyTargetAccountDeleted(ctx, lang);
+      return;
+    }
     await ctx.answerCallbackQuery({
       text: lang === "en" ? "User not found" : "کاربر پیدا نشد",
       show_alert: true,
@@ -1386,6 +1398,11 @@ featuresHandler.callbackQuery(/^watchend:ask:(\d+)$/, async (ctx) => {
 
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target || target.deletedAt) {
+    if (target?.deletedAt) {
+      const { notifyTargetAccountDeleted } = await import("../services/account.js");
+      await notifyTargetAccountDeleted(ctx, lang);
+      return;
+    }
     await ctx.answerCallbackQuery({
       text: lang === "en" ? "User not found" : "کاربر پیدا نشد",
       show_alert: true,
@@ -1568,6 +1585,11 @@ featuresHandler.callbackQuery(/^gift:send:(\d+):(\d+)$/, async (ctx) => {
   const fresh = await prisma.user.findUnique({ where: { id: user.id } });
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!fresh || !target || target.deletedAt) {
+    if (target?.deletedAt) {
+      const { notifyTargetAccountDeleted } = await import("../services/account.js");
+      await notifyTargetAccountDeleted(ctx, langOf(user));
+      return;
+    }
     await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد" });
     return;
   }

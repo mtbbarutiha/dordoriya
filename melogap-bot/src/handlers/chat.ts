@@ -178,8 +178,15 @@ chatHandler.on("message:text", async (ctx, next) => {
 
     const target = await prisma.user.findUnique({ where: { anonCode: code } });
     if (!target || target.deletedAt || target.id === user.id) {
+      if (target?.deletedAt) {
+        const { notifyTargetAccountDeleted } = await import("../services/account.js");
+        await notifyTargetAccountDeleted(ctx, lang);
+        return;
+      }
       await ctx.reply(
-        "مخاطب پیدا نشد. لینک یا کد ناشناس درست را بفرست، یا بازگشت بزن.",
+        lang === "en"
+          ? "Contact not found. Send a valid anonymous link/code, or go back."
+          : "مخاطب پیدا نشد. لینک یا کد ناشناس درست را بفرست، یا بازگشت بزن.",
       );
       return;
     }

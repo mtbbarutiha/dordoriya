@@ -236,6 +236,11 @@ export async function beginDirectCompose(
   const midChat = Boolean(user.chatPartnerId);
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target || target.deletedAt || !target.registered) {
+    if (target?.deletedAt) {
+      const { targetAccountDeletedText } = await import("./account.js");
+      await ctx.reply(targetAccountDeletedText(lang));
+      return false;
+    }
     await ctx.reply(tr(lang, "کاربر پیدا نشد.", "User not found."));
     return false;
   }
@@ -890,6 +895,13 @@ async function createDirectDraftFromInput(
   const target = await prisma.user.findUnique({ where: { id: toUserId } });
   if (!target || target.deletedAt || !target.registered) {
     await patchUser(user.id, { state: restoreState, pendingDirectTo: null });
+    if (target?.deletedAt) {
+      const { targetAccountDeletedText } = await import("./account.js");
+      await ctx.reply(targetAccountDeletedText(lang), {
+        reply_markup: restoreKeyboard,
+      });
+      return;
+    }
     await ctx.reply(tr(lang, "گیرنده پیدا نشد.", "Recipient not found."), {
       reply_markup: restoreKeyboard,
     });
@@ -1037,6 +1049,14 @@ export async function sendDirectDraft(ctx: Context, userId: number, draftId: num
   const target = await prisma.user.findUnique({ where: { id: draft.toUserId } });
   if (!target || target.deletedAt || target.telegramId >= 9000000000n) {
     await prisma.directMessage.delete({ where: { id: draft.id } }).catch(() => undefined);
+    if (target?.deletedAt) {
+      const { notifyTargetAccountDeleted } = await import("./account.js");
+      await notifyTargetAccountDeleted(ctx, lang);
+      await ctx.reply(tr(lang, "گیرنده دیگر در دسترس نیست.", "Recipient is no longer available."), {
+        reply_markup: restoreKeyboard,
+      });
+      return;
+    }
     await ctx.answerCallbackQuery({
       text: tr(lang, "گیرنده در دسترس نیست", "Recipient unavailable"),
     });

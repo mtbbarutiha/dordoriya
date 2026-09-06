@@ -35,7 +35,13 @@ function photoStatusLabelI18n(lang: Lang, status: string | null | undefined): st
 
 export async function sendProfileCard(ctx: Context, userId: number) {
   let user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user || user.deletedAt) return;
+  if (!user || user.deletedAt) {
+    if (user?.deletedAt) {
+      const { notifySelfAccountDeleted } = await import("./account.js");
+      await notifySelfAccountDeleted(ctx, langOf(user), { previousId: user.id });
+    }
+    return;
+  }
   if (!user.userCode) {
     const { ensureUserCode } = await import("../db/users.js");
     await ensureUserCode(user.id, user.userCode);
@@ -139,6 +145,11 @@ export async function showPartnerProfileInChat(
   const partner = await prisma.user.findUnique({ where: { id: partnerId } });
   const lang = langOf(me);
   if (!me || !partner || partner.deletedAt) {
+    if (partner?.deletedAt) {
+      const { targetAccountDeletedText } = await import("./account.js");
+      await ctx.reply(targetAccountDeletedText(lang));
+      return;
+    }
     await ctx.reply(tr(lang, "پروفایل طرف مقابل در دسترس نیست.", "The partner's profile is not available."));
     return;
   }
