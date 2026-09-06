@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { InputFile } from "grammy";
@@ -5,10 +6,20 @@ import { InputFile } from "grammy";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULTS_DIR = path.resolve(__dirname, "../../assets/defaults");
 
+/** مسیر فایل پیش‌فرض؛ اگر فایل اصلی نباشد، اولین جایگزین موجود برمی‌گردد. */
 export function defaultAvatarPath(gender: string | null | undefined): string {
-  if (gender === "female") return path.join(DEFAULTS_DIR, "female.jpg");
-  if (gender === "male") return path.join(DEFAULTS_DIR, "male.jpg");
-  return path.join(DEFAULTS_DIR, "anon.jpg");
+  const preferred =
+    gender === "female"
+      ? "female.jpg"
+      : gender === "male"
+        ? "male.jpg"
+        : "anon.jpg";
+  const candidates = [preferred, "anon.jpg", "male.jpg", "female.jpg"];
+  for (const name of candidates) {
+    const p = path.join(DEFAULTS_DIR, name);
+    if (fs.existsSync(p)) return p;
+  }
+  return path.join(DEFAULTS_DIR, preferred);
 }
 
 type PhotoUser = {

@@ -510,7 +510,24 @@ export async function defaultGenderThumbBuffer(
   const key = `gendef:${defaultCacheKey(gender)}:${size}`;
   const hit = thumbBufCache.get(key);
   if (hit && Date.now() - hit.at < THUMB_TTL_MS) return hit.buf;
-  const buf = await sharp(await fs.readFile(defaultAvatarPath(gender)))
+  let source: Buffer | string = defaultAvatarPath(gender);
+  try {
+    await fs.access(source);
+  } catch {
+    // اگر assets/defaults روی سرور نباشد، ربات نباید کرش کند
+    console.error("default avatar missing; using solid placeholder", source);
+    source = await sharp({
+      create: {
+        width: Math.max(size, 64),
+        height: Math.max(size, 64),
+        channels: 3,
+        background: { r: 40, g: 44, b: 52 },
+      },
+    })
+      .jpeg({ quality: 70 })
+      .toBuffer();
+  }
+  const buf = await sharp(source)
     .rotate()
     .resize(size, size, { fit: "cover", position: "centre" })
     .jpeg({ quality: 78, mozjpeg: true })
