@@ -2,6 +2,7 @@ import { Keyboard, InlineKeyboard } from "grammy";
 import {
   DIAMOND_PACKAGES,
   DAILY_COIN_REWARD,
+  DELETE_ACCOUNT_COST,
   GIFT_AMOUNTS,
   formatToman,
   formatNum,
@@ -798,7 +799,14 @@ export function interestsKeyboard(
 export function confirmDeleteKeyboard(lang: Lang | string | null = "fa") {
   const L = normalizeLang(lang);
   return new InlineKeyboard()
-    .text(tr(L, "🔴🗑 بله، حسابم حذف شود", "🔴🗑 Yes, delete my account"), "prof:delete:yes")
+    .text(
+      tr(
+        L,
+        `🔴🗑 بله، حذف با ${formatNum(DELETE_ACCOUNT_COST)} سکه`,
+        `🔴🗑 Yes, delete for ${formatNum(DELETE_ACCOUNT_COST)} coins`,
+      ),
+      "prof:delete:yes",
+    )
     .danger()
     .row()
     .text(tr(L, "❌ خیر، منصرف شدم", "❌ No, cancel"), "prof:delete:no")
@@ -829,7 +837,14 @@ export function accountManageKeyboard(
     )
     .style(isActive ? "danger" : "success")
     .row()
-    .text(tr(L, "🔴🗑 حذف دائمی حساب", "🔴🗑 Permanently delete account"), "prof:delete")
+    .text(
+      tr(
+        L,
+        `🔴🗑 حذف دائمی حساب (${formatNum(DELETE_ACCOUNT_COST)}💰)`,
+        `🔴🗑 Permanently delete (${formatNum(DELETE_ACCOUNT_COST)}💰)`,
+      ),
+      "prof:delete",
+    )
     .danger()
     .row()
     .text(tr(L, "↩️ بازگشت به پروفایل", "↩️ Back to profile"), "prof:back")

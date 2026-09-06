@@ -10,7 +10,11 @@ import {
   cancelKeyboard,
   accountManageKeyboard,
 } from "../keyboards/main.js";
-import { formatNum, FACE_VERIFY_REWARD } from "../data/packages.js";
+import {
+  formatNum,
+  FACE_VERIFY_REWARD,
+  DELETE_ACCOUNT_COST,
+} from "../data/packages.js";
 import {
   sendProfileCard,
   notifyAdminsPhoto,
@@ -126,15 +130,24 @@ profileHandler.callbackQuery("prof:manage", async (ctx) => {
     return;
   }
   await ctx.answerCallbackQuery();
+  const lang = langOf(user);
   await ctx.reply(
     [
-      "🔴 مدیریت حساب",
+      tr(lang, "🔴 مدیریت حساب", "🔴 Account management"),
       "",
-      "یکی را انتخاب کن:",
-      "• غیرفعال‌سازی: از اکسپلور مخفی می‌شوی (قابل برگشت)",
-      "• حذف دائمی: حساب پاک می‌شود و دیگر برنمی‌گردد",
+      tr(lang, "یکی را انتخاب کن:", "Pick one:"),
+      tr(
+        lang,
+        "• غیرفعال‌سازی: از اکسپلور مخفی می‌شوی (قابل برگشت)",
+        "• Deactivate: hide from explore (reversible)",
+      ),
+      tr(
+        lang,
+        `• حذف دائمی: حساب پاک می‌شود و برنمی‌گردد — هزینه ${formatNum(DELETE_ACCOUNT_COST)} سکه`,
+        `• Permanent delete: account is wiped — costs ${formatNum(DELETE_ACCOUNT_COST)} coins`,
+      ),
     ].join("\n"),
-    { reply_markup: accountManageKeyboard(user.isActive) },
+    { reply_markup: accountManageKeyboard(user.isActive, lang) },
   );
 });
 
@@ -382,16 +395,36 @@ profileHandler.callbackQuery("prof:delete", async (ctx) => {
     await ctx.answerCallbackQuery();
     return;
   }
+  const lang = langOf(user);
   await ctx.answerCallbackQuery();
   await ctx.reply(
-    "⚠️ مطمئنی حسابت حذف شود؟ این کار برگشت‌پذیر نیست.",
-    { reply_markup: confirmDeleteKeyboard() },
+    [
+      tr(
+        lang,
+        "⚠️ مطمئنی حسابت حذف شود؟ این کار برگشت‌پذیر نیست.",
+        "⚠️ Delete your account? This cannot be undone.",
+      ),
+      "",
+      tr(
+        lang,
+        `💰 هزینه: ${formatNum(DELETE_ACCOUNT_COST)} سکه (از موجودی کسر می‌شود)`,
+        `💰 Cost: ${formatNum(DELETE_ACCOUNT_COST)} coins (deducted from balance)`,
+      ),
+      tr(
+        lang,
+        `موجودی فعلی: ${formatNum(user.diamonds)} 💰`,
+        `Current balance: ${formatNum(user.diamonds)} 💰`,
+      ),
+    ].join("\n"),
+    { reply_markup: confirmDeleteKeyboard(lang) },
   );
 });
 
 profileHandler.callbackQuery("prof:delete:no", async (ctx) => {
-  await ctx.answerCallbackQuery({ text: "لغو شد" });
   const user = await requireRegistered(ctx);
+  await ctx.answerCallbackQuery({
+    text: tr(langOf(user), "لغو شد", "Cancelled"),
+  });
   if (user) await sendProfileCard(ctx, user.id);
 });
 
@@ -401,19 +434,65 @@ profileHandler.callbackQuery("prof:delete:yes", async (ctx) => {
     await ctx.answerCallbackQuery();
     return;
   }
-  const { deleteAccountPermanently } = await import("../services/account.js");
+  const lang = langOf(user);
+  if (user.diamonds < DELETE_ACCOUNT_COST) {
+    await ctx.answerCallbackQuery({
+      text: tr(lang, "سکه کافی نیست", "Not enough coins"),
+    });
+    await ctx.reply(
+      tr(
+        lang,
+        `برای پاک کردن حساب به ${formatNum(DELETE_ACCOUNT_COST)} سکه نیاز داری.\nموجودی: ${formatNum(user.diamonds)} 💰`,
+        `Deleting your account needs ${formatNum(DELETE_ACCOUNT_COST)} coins.\nBalance: ${formatNum(user.diamonds)} 💰`,
+      ),
+      { reply_markup: mainKeyboard(lang) },
+    );
+    return;
+  }
   const { leaveQueueOrChat } = await import("../services/match.js");
   await leaveQueueOrChat(ctx.api, user, true);
+  const { deleteAccountPermanently } = await import("../services/account.js");
   const oldId = user.id;
-  await deleteAccountPermanently(user);
-  await ctx.answerCallbackQuery({ text: "حذف شد" });
+  const deleted = await deleteAccountPermanently(user, {
+    coinCost: DELETE_ACCOUNT_COST,
+  });
+  if (!deleted) {
+    await ctx.answerCallbackQuery({
+      text: tr(lang, "سکه کافی نیست", "Not enough coins"),
+    });
+    await ctx.reply(
+      tr(
+        lang,
+        `برای پاک کردن حساب به ${formatNum(DELETE_ACCOUNT_COST)} سکه نیاز داری.`,
+        `Deleting your account needs ${formatNum(DELETE_ACCOUNT_COST)} coins.`,
+      ),
+      { reply_markup: mainKeyboard(lang) },
+    );
+    return;
+  }
+  await ctx.answerCallbackQuery({
+    text: tr(lang, "حذف شد", "Deleted"),
+  });
   await ctx.reply(
     [
-      "🗑️ حسابت حذف شد.",
-      `شناسهٔ قبلی تو: #${oldId}`,
+      tr(lang, "🗑️ حسابت حذف شد.", "🗑️ Your account was deleted."),
+      tr(lang, `شناسهٔ قبلی تو: #${oldId}`, `Previous ID: #${oldId}`),
+      tr(
+        lang,
+        `💰 ${formatNum(DELETE_ACCOUNT_COST)} سکه بابت حذف کسر شد.`,
+        `💰 ${formatNum(DELETE_ACCOUNT_COST)} coins were charged for deletion.`,
+      ),
       "",
-      "با /start می‌توانی حساب کاملاً جدید بسازی.",
-      "(شناسهٔ قدیمی برای ادمین قابل مشاهده می‌ماند)",
+      tr(
+        lang,
+        "با /start می‌توانی حساب کاملاً جدید بسازی.",
+        "Use /start to create a brand-new account.",
+      ),
+      tr(
+        lang,
+        "(شناسهٔ قدیمی برای ادمین قابل مشاهده می‌ماند)",
+        "(Your old ID remains visible to admins)",
+      ),
     ].join("\n"),
   );
 });

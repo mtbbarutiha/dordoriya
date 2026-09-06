@@ -146,6 +146,8 @@ export const BOOST_COST = 40;
 export const BOOST_HOURS = 12;
 /** جایزه تأیید احراز چهره (ویدیو مطابق عکس پروفایل) */
 export const FACE_VERIFY_REWARD = 100;
+/** هزینه پاک کردن دائمی حساب کاربری */
+export const DELETE_ACCOUNT_COST = 100;
 /** جایزه تکمیل هر بخش پروفایل (یک‌بار برای هر بخش) */
 export const PROFILE_SECTION_REWARD = 10;
 /** هر لایک: ۱ سکه از لایک‌کننده → هدیه به طرف مقابل */

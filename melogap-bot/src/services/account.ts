@@ -1,51 +1,80 @@
 import { prisma } from "../db/prisma.js";
 import type { User } from "@prisma/client";
 
-/** آرشیو + آزاد کردن telegramId تا کاربر با شناسهٔ جدید بسازد */
-export async function deleteAccountPermanently(user: User) {
-  await prisma.$transaction(async (tx) => {
-    await tx.deletedAccount.create({
-      data: {
-        originalUserId: user.id,
-        telegramId: user.telegramId,
-        username: user.username,
-        displayName: user.displayName,
-        gender: user.gender,
-        age: user.age,
-        province: user.province,
-        city: user.city,
-      },
-    });
+/** آرشیو + آزاد کردن telegramId تا کاربر با شناسهٔ جدید بسازد.
+ *  اگر coinCost > 0 باشد، همان تراکنش سکه را کم می‌کند؛ در صورت کمبود سکه false برمی‌گرداند.
+ */
+export async function deleteAccountPermanently(
+  user: User,
+  opts?: { coinCost?: number },
+): Promise<boolean> {
+  const coinCost = opts?.coinCost ?? 0;
 
-    // آزاد کردن شناسه یکتاها با مقادیر آرشیوی
-    const stamp = Date.now().toString(36);
-    await tx.user.update({
-      where: { id: user.id },
-      data: {
-        telegramId: BigInt(`-${user.id}`), // دیگر با tg واقعی تداخل ندارد
-        referralCode: `del_${user.id}_${stamp}`,
-        anonCode: `delanon_${user.id}_${stamp}`,
-        deletedAt: new Date(),
-        isActive: false,
-        registered: false,
-        state: "deleted",
-        chatPartnerId: null,
-        pendingAnonTo: null,
-        pendingDirectTo: null,
-        pendingSellCard: null,
-        pendingReportOther: null,
-        photoFileId: null,
-        photoPendingFileId: null,
-        photoStatus: "none",
-        faceVerified: false,
-        facePendingFileId: null,
-        facePendingKind: null,
-        faceStatus: "none",
-        username: null,
-        displayName: `[حذف‌شده #${user.id}]`,
-      },
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (coinCost > 0) {
+        const debited = await tx.user.updateMany({
+          where: {
+            id: user.id,
+            diamonds: { gte: coinCost },
+            deletedAt: null,
+          },
+          data: { diamonds: { decrement: coinCost } },
+        });
+        if (debited.count !== 1) {
+          throw new Error("DELETE_ACCOUNT_NO_COINS");
+        }
+      }
+
+      await tx.deletedAccount.create({
+        data: {
+          originalUserId: user.id,
+          telegramId: user.telegramId,
+          username: user.username,
+          displayName: user.displayName,
+          gender: user.gender,
+          age: user.age,
+          province: user.province,
+          city: user.city,
+        },
+      });
+
+      // آزاد کردن شناسه یکتاها با مقادیر آرشیوی
+      const stamp = Date.now().toString(36);
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          telegramId: BigInt(`-${user.id}`), // دیگر با tg واقعی تداخل ندارد
+          referralCode: `del_${user.id}_${stamp}`,
+          anonCode: `delanon_${user.id}_${stamp}`,
+          deletedAt: new Date(),
+          isActive: false,
+          registered: false,
+          state: "deleted",
+          chatPartnerId: null,
+          pendingAnonTo: null,
+          pendingDirectTo: null,
+          pendingSellCard: null,
+          pendingReportOther: null,
+          photoFileId: null,
+          photoPendingFileId: null,
+          photoStatus: "none",
+          faceVerified: false,
+          facePendingFileId: null,
+          facePendingKind: null,
+          faceStatus: "none",
+          username: null,
+          displayName: `[حذف‌شده #${user.id}]`,
+        },
+      });
     });
-  });
+    return true;
+  } catch (err) {
+    if (err instanceof Error && err.message === "DELETE_ACCOUNT_NO_COINS") {
+      return false;
+    }
+    throw err;
+  }
 }
 
 export async function previousAccountIds(telegramId: bigint | number) {
