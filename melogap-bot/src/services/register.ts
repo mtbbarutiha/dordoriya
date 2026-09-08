@@ -238,6 +238,30 @@ export async function requireRegistered(ctx: Context) {
     return null;
   }
 
+  if (user.bannedAt || user.state === "banned") {
+    const lang = langOf(user);
+    try {
+      if (ctx.callbackQuery) {
+        await ctx.answerCallbackQuery({
+          text:
+            lang === "en"
+              ? "Your account is blocked by admin"
+              : "حسابت توسط ادمین مسدود شده",
+          show_alert: true,
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+    await ctx.reply(
+      lang === "en"
+        ? "🚫 Your account has been blocked by an admin.\nYou cannot use this bot."
+        : "🚫 حسابت توسط ادمین مسدود شده است.\nامکان استفاده از ربات وجود ندارد.",
+      { reply_markup: { remove_keyboard: true } },
+    );
+    return null;
+  }
+
   if (!user.registered) {
     const prev = await previousAccountIds(from.id);
     // بعد از حذف دائمی، شل جدید با state=language ساخته می‌شود.

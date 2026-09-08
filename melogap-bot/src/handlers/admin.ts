@@ -60,6 +60,14 @@ export function adminPanelKeyboard(pendingPhotos: number, pendingFaces: number) 
     .row()
     .text("💰 افزودن سکه به کاربر", "adm:givecoins")
     .row()
+    .text("🗑 حذف عکس کاربر", "adm:clearphoto")
+    .danger()
+    .row()
+    .text("🚫 مسدود کردن کاربر", "adm:ban")
+    .danger()
+    .text("✅ رفع مسدودیت", "adm:unban")
+    .success()
+    .row()
     .text("🎟 مدیریت ووچر (کد هدیه)", "adm:vouchers")
     .row()
     .text("🎁 هدیه سکه به همه کاربران", "adm:giftall")
@@ -1119,6 +1127,290 @@ adminHandler.callbackQuery(/^adm:give:ok:(\d+):(\d+)$/, async (ctx) => {
   }
 });
 
+async function startAdminLookupFlow(
+  ctx: { from?: { id: number }; answerCallbackQuery: Function; reply: Function },
+  opts: {
+    state: string;
+    title: string;
+    cancelKind: "clearphoto" | "ban" | "unban";
+  },
+) {
+  if (!adminOnly(ctx)) {
+    await ctx.answerCallbackQuery({ text: "غیرمجاز" });
+    return;
+  }
+  const { patchUser, findByTelegram } = await import("../db/users.js");
+  const { adminModerationCancelKeyboard } = await import(
+    "../services/adminModeration.js"
+  );
+  const admin = await findByTelegram(ctx.from!.id);
+  if (!admin) {
+    await ctx.answerCallbackQuery({
+      text: "اول یک‌بار /start بزن",
+      show_alert: true,
+    });
+    return;
+  }
+  await patchUser(admin.id, { state: opts.state, pendingAnonTo: null });
+  await ctx.answerCallbackQuery();
+  await ctx.reply(
+    [
+      opts.title,
+      "",
+      "یکی از این‌ها را بفرست:",
+      "• آیدی داخلی: ۱۲۳",
+      "• کد کاربر: Y2FMzi",
+      "• دستور: /user_Y2FMzi",
+      "• یوزرنیم: @username",
+      "• تلگرام‌آیدی عددی",
+      "",
+      "انصراف: دکمه زیر یا /cancel",
+    ].join("\n"),
+    { reply_markup: adminModerationCancelKeyboard(opts.cancelKind) },
+  );
+}
+
+adminHandler.callbackQuery("adm:clearphoto", async (ctx) => {
+  await startAdminLookupFlow(ctx, {
+    state: "admin_clear_photo_code",
+    title: "🗑 حذف عکس کاربر",
+    cancelKind: "clearphoto",
+  });
+});
+
+adminHandler.callbackQuery("adm:ban", async (ctx) => {
+  await startAdminLookupFlow(ctx, {
+    state: "admin_ban_code",
+    title: "🚫 مسدود کردن کاربر از ربات",
+    cancelKind: "ban",
+  });
+});
+
+adminHandler.callbackQuery("adm:unban", async (ctx) => {
+  await startAdminLookupFlow(ctx, {
+    state: "admin_unban_code",
+    title: "✅ رفع مسدودیت کاربر",
+    cancelKind: "unban",
+  });
+});
+
+async function cancelModerationFlow(
+  ctx: {
+    from?: { id: number };
+    answerCallbackQuery: Function;
+    editMessageText: Function;
+    reply: Function;
+  },
+  label: string,
+) {
+  if (!adminOnly(ctx)) {
+    await ctx.answerCallbackQuery({ text: "غیرمجاز" });
+    return;
+  }
+  const { patchUser, findByTelegram } = await import("../db/users.js");
+  const admin = await findByTelegram(ctx.from!.id);
+  if (admin) {
+    await patchUser(admin.id, { state: "idle", pendingAnonTo: null });
+  }
+  await ctx.answerCallbackQuery({ text: "لغو شد" });
+  const s = await getRegistrationStats();
+  const text = [
+    `❌ ${label} لغو شد.`,
+    "",
+    "🛠 پنل ادمین دوردوریا",
+    `📷 عکس pending: ${formatNum(s.pendingPhotos)}`,
+    `✅ احراز pending: ${formatNum(s.pendingFaces)}`,
+  ].join("\n");
+  await ctx
+    .editMessageText(text, {
+      reply_markup: adminPanelKeyboard(s.pendingPhotos, s.pendingFaces),
+    })
+    .catch(async () => {
+      await ctx.reply(`❌ ${label} لغو شد.`, {
+        reply_markup: adminPanelKeyboard(s.pendingPhotos, s.pendingFaces),
+      });
+    });
+}
+
+adminHandler.callbackQuery("adm:clearphoto:cancel", (ctx) =>
+  cancelModerationFlow(ctx, "حذف عکس"),
+);
+adminHandler.callbackQuery("adm:ban:cancel", (ctx) =>
+  cancelModerationFlow(ctx, "مسدودسازی"),
+);
+adminHandler.callbackQuery("adm:unban:cancel", (ctx) =>
+  cancelModerationFlow(ctx, "رفع مسدودیت"),
+);
+
+adminHandler.callbackQuery(/^adm:clearphoto:ok:(\d+)$/, async (ctx) => {
+  if (!adminOnly(ctx)) {
+    await ctx.answerCallbackQuery({ text: "غیرمجاز" });
+    return;
+  }
+  const targetId = Number(ctx.match![1]);
+  const { patchUser, findByTelegram } = await import("../db/users.js");
+  const { prisma } = await import("../db/prisma.js");
+  const {
+    clearUserPhotoByAdmin,
+    notifyTargetSafe,
+  } = await import("../services/adminModeration.js");
+  const { describeTarget } = await import("../services/adminCoins.js");
+  const admin = await findByTelegram(ctx.from!.id);
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (!admin || !target || target.deletedAt) {
+    await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد", show_alert: true });
+    return;
+  }
+  await clearUserPhotoByAdmin(target.id);
+  await patchUser(admin.id, { state: "idle", pendingAnonTo: null });
+  await ctx.answerCallbackQuery({ text: "عکس پاک شد ✅" });
+  const fresh = await prisma.user.findUnique({ where: { id: target.id } });
+  const done = [
+    "✅ عکس کاربر پاک شد",
+    "",
+    await describeTarget(fresh ?? target),
+    "",
+    "عکس و احراز چهره ریست شد.",
+  ].join("\n");
+  await ctx
+    .editMessageText(done, {
+      reply_markup: new InlineKeyboard()
+        .text("🗑 حذف عکس دیگر", "adm:clearphoto")
+        .row()
+        .text("↩️ پنل ادمین", "adm:home"),
+    })
+    .catch(async () => {
+      await ctx.reply(done, {
+        reply_markup: new InlineKeyboard()
+          .text("🗑 حذف عکس دیگر", "adm:clearphoto")
+          .row()
+          .text("↩️ پنل ادمین", "adm:home"),
+      });
+    });
+  await notifyTargetSafe(
+    ctx.api,
+    target,
+    "📷 عکس پروفایلت توسط پشتیبانی حذف شد.\nالان با عکس پیش‌فرض دیده می‌شوی. می‌توانی دوباره عکس بفرستی.",
+  );
+});
+
+adminHandler.callbackQuery(/^adm:ban:ok:(\d+)$/, async (ctx) => {
+  if (!adminOnly(ctx)) {
+    await ctx.answerCallbackQuery({ text: "غیرمجاز" });
+    return;
+  }
+  const targetId = Number(ctx.match![1]);
+  const { patchUser, findByTelegram } = await import("../db/users.js");
+  const { prisma } = await import("../db/prisma.js");
+  const {
+    banUserByAdmin,
+    notifyTargetSafe,
+  } = await import("../services/adminModeration.js");
+  const { describeTarget } = await import("../services/adminCoins.js");
+  const admin = await findByTelegram(ctx.from!.id);
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (!admin || !target || target.deletedAt) {
+    await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد", show_alert: true });
+    return;
+  }
+  if (isAdmin(Number(target.telegramId))) {
+    await ctx.answerCallbackQuery({
+      text: "ادمین را نمی‌شود مسدود کرد",
+      show_alert: true,
+    });
+    return;
+  }
+  try {
+    const { leaveQueueOrChat } = await import("../services/match.js");
+    await leaveQueueOrChat(ctx.api, target, true);
+  } catch {
+    /* ignore */
+  }
+  await banUserByAdmin(target.id);
+  await patchUser(admin.id, { state: "idle", pendingAnonTo: null });
+  await ctx.answerCallbackQuery({ text: "مسدود شد 🚫" });
+  const fresh = await prisma.user.findUnique({ where: { id: target.id } });
+  const done = [
+    "🚫 کاربر از ربات مسدود شد",
+    "",
+    await describeTarget(fresh ?? target),
+  ].join("\n");
+  await ctx
+    .editMessageText(done, {
+      reply_markup: new InlineKeyboard()
+        .text("🚫 مسدود کردن دیگر", "adm:ban")
+        .row()
+        .text("✅ رفع مسدودیت", "adm:unban")
+        .row()
+        .text("↩️ پنل ادمین", "adm:home"),
+    })
+    .catch(async () => {
+      await ctx.reply(done, {
+        reply_markup: new InlineKeyboard()
+          .text("↩️ پنل ادمین", "adm:home"),
+      });
+    });
+  await notifyTargetSafe(
+    ctx.api,
+    target,
+    "🚫 حسابت توسط پشتیبانی مسدود شد.\nامکان استفاده از ربات وجود ندارد.",
+  );
+});
+
+adminHandler.callbackQuery(/^adm:unban:ok:(\d+)$/, async (ctx) => {
+  if (!adminOnly(ctx)) {
+    await ctx.answerCallbackQuery({ text: "غیرمجاز" });
+    return;
+  }
+  const targetId = Number(ctx.match![1]);
+  const { patchUser, findByTelegram } = await import("../db/users.js");
+  const { prisma } = await import("../db/prisma.js");
+  const {
+    unbanUserByAdmin,
+    notifyTargetSafe,
+  } = await import("../services/adminModeration.js");
+  const { describeTarget } = await import("../services/adminCoins.js");
+  const admin = await findByTelegram(ctx.from!.id);
+  const target = await prisma.user.findUnique({ where: { id: targetId } });
+  if (!admin || !target || target.deletedAt) {
+    await ctx.answerCallbackQuery({ text: "کاربر پیدا نشد", show_alert: true });
+    return;
+  }
+  if (!target.bannedAt && target.state !== "banned") {
+    await ctx.answerCallbackQuery({
+      text: "این کاربر مسدود نیست",
+      show_alert: true,
+    });
+    return;
+  }
+  await unbanUserByAdmin(target.id);
+  await patchUser(admin.id, { state: "idle", pendingAnonTo: null });
+  await ctx.answerCallbackQuery({ text: "رفع مسدودیت ✅" });
+  const fresh = await prisma.user.findUnique({ where: { id: target.id } });
+  const done = [
+    "✅ مسدودیت کاربر برداشته شد",
+    "",
+    await describeTarget(fresh ?? target),
+  ].join("\n");
+  await ctx
+    .editMessageText(done, {
+      reply_markup: new InlineKeyboard()
+        .text("✅ رفع مسدودیت دیگر", "adm:unban")
+        .row()
+        .text("↩️ پنل ادمین", "adm:home"),
+    })
+    .catch(async () => {
+      await ctx.reply(done, {
+        reply_markup: new InlineKeyboard().text("↩️ پنل ادمین", "adm:home"),
+      });
+    });
+  await notifyTargetSafe(
+    ctx.api,
+    target,
+    "✅ مسدودیت حسابت برداشته شد.\nدوباره می‌توانی از ربات استفاده کنی. /start بزن.",
+  );
+});
+
 /** دریافت شناسه / مقدار سکه از ادمین */
 adminHandler.on("message:text", async (ctx, next) => {
   if (!adminOnly(ctx)) return next();
@@ -1134,6 +1426,15 @@ adminHandler.on("message:text", async (ctx, next) => {
     giveCoinsCancelKeyboard,
     parseCoinAmount,
   } = await import("../services/adminCoins.js");
+  const {
+    adminModerationCancelKeyboard,
+    clearPhotoConfirmKeyboard,
+    banConfirmKeyboard,
+    unbanConfirmKeyboard,
+    confirmClearPhotoText,
+    confirmBanText,
+    confirmUnbanText,
+  } = await import("../services/adminModeration.js");
 
   const admin = await findByTelegram(ctx.from!.id);
   if (!admin) return next();
@@ -1144,6 +1445,11 @@ adminHandler.on("message:text", async (ctx, next) => {
     admin.state === "admin_give_confirm" ||
     admin.state === "admin_gift_all_amount";
 
+  const inModerationFlow =
+    admin.state === "admin_clear_photo_code" ||
+    admin.state === "admin_ban_code" ||
+    admin.state === "admin_unban_code";
+
   const inVoucherFlow =
     admin.state === "admin_voucher_coins" ||
     admin.state === "admin_voucher_maxuses" ||
@@ -1151,7 +1457,7 @@ adminHandler.on("message:text", async (ctx, next) => {
     admin.state === "admin_voucher_code" ||
     admin.state === "admin_voucher_confirm";
 
-  if (!inGiveFlow && !inVoucherFlow) return next();
+  if (!inGiveFlow && !inVoucherFlow && !inModerationFlow) return next();
 
   // دستورات سیستمی را رد نکن؛ /cancel و /admin در start/admin جدا هستند
   if (
@@ -1172,6 +1478,78 @@ adminHandler.on("message:text", async (ctx, next) => {
   if (menuTexts.has(text)) {
     await patchUser(admin.id, { state: "idle", pendingAnonTo: null });
     return next();
+  }
+
+  if (admin.state === "admin_clear_photo_code") {
+    const target = await resolveAdminTarget(text);
+    if (!target) {
+      await ctx.reply(
+        [
+          "❌ کاربر پیدا نشد.",
+          "",
+          "آیدی / کد / یوزرنیم / تلگرام‌آیدی را دوباره بفرست.",
+          "انصراف: /cancel",
+        ].join("\n"),
+        { reply_markup: adminModerationCancelKeyboard("clearphoto") },
+      );
+      return;
+    }
+    await patchUser(admin.id, {
+      state: "idle",
+      pendingAnonTo: String(target.id),
+    });
+    await ctx.reply(await confirmClearPhotoText(target), {
+      reply_markup: clearPhotoConfirmKeyboard(target.id),
+    });
+    return;
+  }
+
+  if (admin.state === "admin_ban_code") {
+    const target = await resolveAdminTarget(text);
+    if (!target) {
+      await ctx.reply(
+        [
+          "❌ کاربر پیدا نشد.",
+          "",
+          "آیدی / کد / یوزرنیم / تلگرام‌آیدی را دوباره بفرست.",
+          "انصراف: /cancel",
+        ].join("\n"),
+        { reply_markup: adminModerationCancelKeyboard("ban") },
+      );
+      return;
+    }
+    await patchUser(admin.id, {
+      state: "idle",
+      pendingAnonTo: String(target.id),
+    });
+    await ctx.reply(await confirmBanText(target), {
+      reply_markup: banConfirmKeyboard(target.id),
+    });
+    return;
+  }
+
+  if (admin.state === "admin_unban_code") {
+    const target = await resolveAdminTarget(text);
+    if (!target) {
+      await ctx.reply(
+        [
+          "❌ کاربر پیدا نشد.",
+          "",
+          "آیدی / کد / یوزرنیم / تلگرام‌آیدی را دوباره بفرست.",
+          "انصراف: /cancel",
+        ].join("\n"),
+        { reply_markup: adminModerationCancelKeyboard("unban") },
+      );
+      return;
+    }
+    await patchUser(admin.id, {
+      state: "idle",
+      pendingAnonTo: String(target.id),
+    });
+    await ctx.reply(await confirmUnbanText(target), {
+      reply_markup: unbanConfirmKeyboard(target.id),
+    });
+    return;
   }
 
   if (admin.state === "admin_gift_all_amount") {
