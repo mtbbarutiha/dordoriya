@@ -5,9 +5,11 @@ import {
   getRevenueStats,
   getLaunchDashboard,
   getTodayRegistrationByGender,
+  getCoinSpendStats,
   checkForceJoinHealth,
   listPendingPhotos,
   listPendingFaces,
+  type CoinSpendBlock,
 } from "../services/adminStats.js";
 import { formatNum, formatToman } from "../data/packages.js";
 import { formatAdminUserLine } from "../services/account.js";
@@ -76,6 +78,8 @@ export function adminPanelKeyboard(pendingPhotos: number, pendingFaces: number) 
     .text("💵 درآمد فروش سکه", "adm:revenue")
     .primary()
     .row()
+    .text("📉 مصرف سکه کاربران", "adm:spend")
+    .row()
     .text("📊 آمار این ماه", "adm:stats:month")
     .text("📈 آمار ۳ ماه", "adm:stats:3m")
     .row()
@@ -111,7 +115,10 @@ function formatLaunchDashboard(
     `💰 در گردش: ${formatNum(d.coinsCirculation)}`,
     `❤️ لایک امروز: ${formatNum(d.likesToday)}`,
     `🧵 نخ امروز: ${formatNum(d.threadsToday)}`,
-    `📉 خرج تقریبی امروز (لایک+نخ): ${formatNum(d.spentTodayApprox)}`,
+    `📉 مصرف امروز: ${formatNum(d.spentTodayApprox)} سکه`,
+    d.spendToday
+      ? `   لایک ${formatNum(d.spendToday.likeCoins)} · نخ ${formatNum(d.spendToday.threadCoins)} · دایرکت ${formatNum(d.spendToday.dmCoins)} · وصل ${formatNum(d.spendToday.quickMatchCoins)} · فروش ${formatNum(d.spendToday.sellCoins)}`
+      : null,
     "",
     "—— پرداخت ——",
     d.demoPay
@@ -136,7 +143,9 @@ function formatLaunchDashboard(
     forceJoin
       ? `${forceJoin.ok ? "✅" : "⚠️"} ${forceJoin.detail}`
       : "وضعیت چک نشده",
-  ].join("\n");
+  ]
+    .filter((x) => x != null)
+    .join("\n");
 }
 
 function adminHomeText(s: Awaited<ReturnType<typeof getRegistrationStats>>) {
@@ -276,6 +285,8 @@ adminHandler.callbackQuery(/^adm:launch$/, async (ctx) => {
     .text("🔄 بروزرسانی", "adm:launch")
     .row()
     .text("💵 درآمد", "adm:revenue")
+    .text("📉 مصرف", "adm:spend")
+    .row()
     .text("↩️ پنل", "adm:home");
   await ctx.editMessageText(text, { reply_markup: kb }).catch(async () => {
     await ctx.reply(text, { reply_markup: kb });
@@ -298,6 +309,9 @@ adminHandler.command("launch", async (ctx) => {
   await ctx.reply(formatLaunchDashboard(d, forceJoin), {
     reply_markup: new InlineKeyboard()
       .text("🔄 بروزرسانی", "adm:launch")
+      .row()
+      .text("💵 درآمد", "adm:revenue")
+      .text("📉 مصرف", "adm:spend")
       .row()
       .text("🛠 پنل ادمین", "adm:home"),
   });
@@ -533,6 +547,7 @@ adminHandler.callbackQuery("adm:revenue", async (ctx) => {
       reply_markup: new InlineKeyboard()
         .text("🔄 بروزرسانی درآمد", "adm:revenue")
         .row()
+        .text("📉 مصرف سکه", "adm:spend")
         .text("↩️ پنل ادمین", "adm:home"),
     })
     .catch(async () => {
@@ -540,9 +555,79 @@ adminHandler.callbackQuery("adm:revenue", async (ctx) => {
         reply_markup: new InlineKeyboard()
           .text("🔄 بروزرسانی درآمد", "adm:revenue")
           .row()
+          .text("📉 مصرف سکه", "adm:spend")
           .text("↩️ پنل ادمین", "adm:home"),
       });
     });
+});
+
+function formatSpendBlock(title: string, b: CoinSpendBlock): string {
+  return [
+    title,
+    `📉 مجموع: ${formatNum(b.total)} سکه`,
+    `❤️ لایک: ${formatNum(b.likes)} · ${formatNum(b.likeCoins)}💰`,
+    `🧵 نخ: ${formatNum(b.threads)} · ${formatNum(b.threadCoins)}💰`,
+    `✉️ دایرکت: ${formatNum(b.directMsgs)} · ${formatNum(b.dmCoins)}💰`,
+    `⚡ وصل ناشناس: ${formatNum(b.quickMatchCharges)} · ${formatNum(b.quickMatchCoins)}💰`,
+    b.quickMatchRefunded > 0
+      ? `   ♻️ بازپرداخت وصل: ${formatNum(b.quickMatchRefunded)} · ${formatNum(b.quickMatchRefundCoins)}💰 (در مجموع نیست)`
+      : null,
+    `💵 فروش/تسویه: ${formatNum(b.coinSells)} · ${formatNum(b.sellCoins)}💰`,
+  ]
+    .filter((x) => x != null)
+    .join("\n");
+}
+
+adminHandler.callbackQuery("adm:spend", async (ctx) => {
+  if (!adminOnly(ctx)) {
+    await ctx.answerCallbackQuery({ text: "غیرمجاز" });
+    return;
+  }
+  const s = await getCoinSpendStats();
+  await ctx.answerCallbackQuery();
+
+  const top =
+    s.topSpenders.length === 0
+      ? ["در ۷ روز اخیر مصرف قابل‌اندازه‌گیری نبود."]
+      : s.topSpenders.map((row, i) => {
+          const who =
+            row.user?.displayName ??
+            (row.user?.userCode
+              ? `/user_${row.user.userCode}`
+              : `#${row.userId}`);
+          const bal =
+            row.user != null ? ` · موجودی ${formatNum(row.user.diamonds)}` : "";
+          return `${i + 1}) ${who} — ${formatNum(row.spent)}💰${bal}`;
+        });
+
+  const text = [
+    "📉 مصرف سکه کاربران",
+    "(از رویدادهای ثبت‌شده: لایک، نخ، دایرکت، وصل ناشناس، فروش سکه)",
+    "هدیه دستی / شتاب‌دهی / پیام گروهی لیست در این آمار نیست.",
+    "",
+    formatSpendBlock("📅 امروز", s.today),
+    "",
+    formatSpendBlock("↩️ دیروز", s.yesterday),
+    "",
+    formatSpendBlock("📆 ۷ روز اخیر", s.week),
+    "",
+    formatSpendBlock("🗓 این ماه", s.month),
+    "",
+    formatSpendBlock("♾ کل", s.all),
+    "",
+    "—— برترین مصرف‌کننده‌ها (۷ روز) ——",
+    ...top,
+  ].join("\n");
+
+  const kb = new InlineKeyboard()
+    .text("🔄 بروزرسانی مصرف", "adm:spend")
+    .row()
+    .text("💵 درآمد", "adm:revenue")
+    .text("↩️ پنل ادمین", "adm:home");
+
+  await ctx.editMessageText(text, { reply_markup: kb }).catch(async () => {
+    await ctx.reply(text, { reply_markup: kb });
+  });
 });
 
 adminHandler.callbackQuery("adm:stats:month", async (ctx) => {

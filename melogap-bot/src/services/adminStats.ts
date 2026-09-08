@@ -2,6 +2,7 @@ import { prisma } from "../db/prisma.js";
 import {
   LIKE_GIFT_DIAMONDS,
   THREAD_GIFT_COST,
+  DIRECT_MSG_COST,
 } from "../data/packages.js";
 import { formatUptime, getUptimeSec } from "../lib/logger.js";
 import { getPollWatch, HEARTBEAT_FILE } from "../lib/pollWatch.js";
@@ -10,6 +11,203 @@ import { isDemoPayAllowed } from "./diamonds.js";
 import fs from "node:fs";
 
 import { tehranTodayStart } from "./dailyCoin.js";
+
+export type CoinSpendBlock = {
+  likes: number;
+  likeCoins: number;
+  threads: number;
+  threadCoins: number;
+  directMsgs: number;
+  dmCoins: number;
+  quickMatchCharges: number;
+  quickMatchCoins: number;
+  quickMatchRefunded: number;
+  quickMatchRefundCoins: number;
+  coinSells: number;
+  sellCoins: number;
+  /** مجموع خالص مصرف قابل‌اندازه‌گیری */
+  total: number;
+};
+
+async function sumCoinSpend(from?: Date, to?: Date): Promise<CoinSpendBlock> {
+  const createdRange =
+    from || to
+      ? {
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lt: to } : {}),
+        }
+      : undefined;
+
+  const [
+    likes,
+    threads,
+    directMsgs,
+    quickNet,
+    quickRefund,
+    sells,
+  ] = await Promise.all([
+    prisma.interaction.count({
+      where: {
+        type: "like",
+        ...(createdRange ? { createdAt: createdRange } : {}),
+      },
+    }),
+    prisma.interaction.count({
+      where: {
+        type: "thread",
+        ...(createdRange ? { createdAt: createdRange } : {}),
+      },
+    }),
+    prisma.directMessage.count({
+      where: {
+        status: { in: ["sent", "read"] },
+        ...(createdRange ? { createdAt: createdRange } : {}),
+      },
+    }),
+    prisma.quickMatchCharge.aggregate({
+      where: {
+        refundedAt: null,
+        ...(createdRange ? { connectedAt: createdRange } : {}),
+      },
+      _count: true,
+      _sum: { amount: true },
+    }),
+    prisma.quickMatchCharge.aggregate({
+      where: {
+        refundedAt: { not: null },
+        ...(createdRange ? { connectedAt: createdRange } : {}),
+      },
+      _count: true,
+      _sum: { amount: true },
+    }),
+    prisma.coinSellRequest.aggregate({
+      where: {
+        status: { in: ["open", "paid"] },
+        ...(createdRange ? { createdAt: createdRange } : {}),
+      },
+      _count: true,
+      _sum: { coins: true },
+    }),
+  ]);
+
+  const likeCoins = likes * LIKE_GIFT_DIAMONDS;
+  const threadCoins = threads * THREAD_GIFT_COST;
+  const dmCoins = directMsgs * DIRECT_MSG_COST;
+  const quickMatchCoins = quickNet._sum.amount ?? 0;
+  const quickMatchRefundCoins = quickRefund._sum.amount ?? 0;
+  const sellCoins = sells._sum.coins ?? 0;
+
+  return {
+    likes,
+    likeCoins,
+    threads,
+    threadCoins,
+    directMsgs,
+    dmCoins,
+    quickMatchCharges: quickNet._count,
+    quickMatchCoins,
+    quickMatchRefunded: quickRefund._count,
+    quickMatchRefundCoins,
+    coinSells: sells._count,
+    sellCoins,
+    total: likeCoins + threadCoins + dmCoins + quickMatchCoins + sellCoins,
+  };
+}
+
+/** آمار مصرف سکه کاربران (تقریبی از رویدادهای ثبت‌شده) */
+export async function getCoinSpendStats() {
+  const now = new Date();
+  const todayStart = tehranTodayStart();
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const weekStart = new Date(todayStart);
+  weekStart.setDate(weekStart.getDate() - 6);
+  const monthStart = startOfMonth(now.getFullYear(), now.getMonth());
+
+  const [today, yesterday, week, month, all] = await Promise.all([
+    sumCoinSpend(todayStart),
+    sumCoinSpend(yesterdayStart, todayStart),
+    sumCoinSpend(weekStart),
+    sumCoinSpend(monthStart),
+    sumCoinSpend(),
+  ]);
+
+  /** برترین مصرف‌کننده‌ها در ۷ روز اخیر (قابل‌اندازه‌گیری) */
+  const topSpenders = await getTopCoinSpenders(weekStart, 10);
+
+  return { today, yesterday, week, month, all, topSpenders };
+}
+
+async function getTopCoinSpenders(from: Date, limit: number) {
+  const [likeRows, threadRows, dmRows, qmRows, sellRows] = await Promise.all([
+    prisma.interaction.groupBy({
+      by: ["fromUserId"],
+      where: { type: "like", createdAt: { gte: from } },
+      _count: true,
+    }),
+    prisma.interaction.groupBy({
+      by: ["fromUserId"],
+      where: { type: "thread", createdAt: { gte: from } },
+      _count: true,
+    }),
+    prisma.directMessage.groupBy({
+      by: ["fromUserId"],
+      where: {
+        status: { in: ["sent", "read"] },
+        createdAt: { gte: from },
+      },
+      _count: true,
+    }),
+    prisma.quickMatchCharge.groupBy({
+      by: ["payerId"],
+      where: { refundedAt: null, connectedAt: { gte: from } },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.coinSellRequest.groupBy({
+      by: ["userId"],
+      where: {
+        status: { in: ["open", "paid"] },
+        createdAt: { gte: from },
+      },
+      _sum: { coins: true },
+      _count: true,
+    }),
+  ]);
+
+  const map = new Map<number, number>();
+  const add = (userId: number, coins: number) => {
+    map.set(userId, (map.get(userId) ?? 0) + coins);
+  };
+  for (const r of likeRows) add(r.fromUserId, r._count * LIKE_GIFT_DIAMONDS);
+  for (const r of threadRows) add(r.fromUserId, r._count * THREAD_GIFT_COST);
+  for (const r of dmRows) add(r.fromUserId, r._count * DIRECT_MSG_COST);
+  for (const r of qmRows) add(r.payerId, r._sum.amount ?? 0);
+  for (const r of sellRows) add(r.userId, r._sum.coins ?? 0);
+
+  const ranked = [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+  if (ranked.length === 0) return [];
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: ranked.map(([id]) => id) } },
+    select: {
+      id: true,
+      displayName: true,
+      userCode: true,
+      username: true,
+      diamonds: true,
+    },
+  });
+  const byId = new Map(users.map((u) => [u.id, u]));
+
+  return ranked.map(([userId, spent]) => ({
+    userId,
+    spent,
+    user: byId.get(userId) ?? null,
+  }));
+}
 
 function startOfMonth(year: number, month: number) {
   return new Date(year, month, 1);
@@ -352,6 +550,7 @@ export async function getLaunchDashboard() {
     threadsToday,
     pendingOrders,
     paidToday,
+    spendToday,
     dbOk,
   ] = await Promise.all([
     prisma.user.count({ where: { registered: true, deletedAt: null } }),
@@ -393,14 +592,13 @@ export async function getLaunchDashboard() {
       _sum: { amountToman: true, diamonds: true },
       _count: true,
     }),
+    sumCoinSpend(todayStart),
     prisma.$queryRaw`SELECT 1`
       .then(() => true)
       .catch(() => false),
   ]);
 
-  // تقریبی: لایک ۱ سکه + نخ ۵ سکه (هزینه فرستنده)
-  const spentTodayApprox =
-    likesToday * LIKE_GIFT_DIAMONDS + threadsToday * THREAD_GIFT_COST;
+  const spentTodayApprox = spendToday.total;
 
   let heartbeatAgeSec: number | null = null;
   let heartbeatReason = "—";
@@ -431,6 +629,7 @@ export async function getLaunchDashboard() {
     likesToday,
     threadsToday,
     spentTodayApprox,
+    spendToday,
     pendingOrders,
     paidToday: {
       toman: paidToday._sum.amountToman ?? 0,
