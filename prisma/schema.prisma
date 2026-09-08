@@ -62,6 +62,8 @@ model User {
   registered        Boolean   @default(false)
   /// حساب فعال برای اکسپلور/چت
   isActive          Boolean   @default(true)
+  /// مسدود توسط ادمین — ربات برای این کاربر کار نمی‌کند
+  bannedAt          DateTime?
   deletedAt         DateTime?
   state             String    @default("language")
   /// هدف پیام ناشناس (anonCode) — ادمین/ووچر هم از همین فیلد برای draft موقت استفاده می‌کنند

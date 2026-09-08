@@ -125,6 +125,17 @@ startHandler.command("start", async (ctx) => {
     ...(referralCodeFromStart ? { referralCodeFromStart } : {}),
   });
 
+  if (user.bannedAt || user.state === "banned") {
+    const lang = langOf(user);
+    await ctx.reply(
+      lang === "en"
+        ? "🚫 Your account has been blocked by an admin.\nYou cannot use this bot."
+        : "🚫 حسابت توسط ادمین مسدود شده است.\nامکان استفاده از ربات وجود ندارد.",
+      { reply_markup: { remove_keyboard: true } },
+    );
+    return;
+  }
+
   if (!user.registered) {
     if (user.state === "force_join") {
       const { gateRegistrationJoin } = await import("../middleware/forceJoin.js");
@@ -155,7 +166,10 @@ startHandler.command("cancel", async (ctx) => {
     user.state === "admin_give_code" ||
     user.state === "admin_give_amount" ||
     user.state === "admin_give_confirm" ||
-    user.state === "admin_gift_all_amount"
+    user.state === "admin_gift_all_amount" ||
+    user.state === "admin_clear_photo_code" ||
+    user.state === "admin_ban_code" ||
+    user.state === "admin_unban_code"
   ) {
     await patchUser(user.id, { state: "idle", pendingAnonTo: null });
     await ctx.reply(t(lang, "cancelled"), {

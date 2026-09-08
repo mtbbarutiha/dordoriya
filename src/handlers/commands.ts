@@ -100,7 +100,10 @@ commandsHandler.hears(/^\/user_([A-Za-z0-9]+)/, async (ctx, next) => {
   if (
     user.state === "admin_give_code" ||
     user.state === "admin_give_amount" ||
-    user.state === "admin_give_confirm"
+    user.state === "admin_give_confirm" ||
+    user.state === "admin_clear_photo_code" ||
+    user.state === "admin_ban_code" ||
+    user.state === "admin_unban_code"
   ) {
     return next();
   }
