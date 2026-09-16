@@ -6,7 +6,11 @@ import {
 } from "../data/packages.js";
 import { formatUptime, getUptimeSec } from "../lib/logger.js";
 import { getPollWatch, HEARTBEAT_FILE } from "../lib/pollWatch.js";
-import { channelChatId, channelUsername } from "../middleware/forceJoin.js";
+import {
+  channelChatId,
+  channelUsername,
+  requiredChannels,
+} from "../middleware/forceJoin.js";
 import { isDemoPayAllowed } from "./diamonds.js";
 import fs from "node:fs";
 
@@ -646,43 +650,56 @@ export async function getLaunchDashboard() {
     memMb,
     pid: process.pid,
     demoPay: isDemoPayAllowed(),
-    forceJoinChannel: channelUsername(),
-    forceJoinChatId: String(channelChatId()),
+    forceJoinChannel: requiredChannels()
+      .map((c) => c.username)
+      .join(", "),
+    forceJoinChatId: requiredChannels()
+      .map((c) => String(c.chatId))
+      .join(", "),
     nodeEnv: process.env.NODE_ENV ?? "—",
     mode: process.env.MELOGAP_MODE ?? "—",
     webAppUrl: (process.env.WEB_APP_URL ?? "").trim() || null,
   };
 }
 
-/** وضعیت چک عضویت کانال (ربات باید ادمین باشد) */
+/** وضعیت چک عضویت کانال‌ها (ربات باید ادمین هر دو باشد) */
 export async function checkForceJoinHealth(
   api: { getChatMember: (chatId: string | number, userId: number) => Promise<{ status: string }> },
   botId: number,
 ): Promise<{ ok: boolean; detail: string }> {
-  try {
-    const m = await api.getChatMember(channelChatId(), botId);
-    const admin = m.status === "administrator" || m.status === "creator";
-    if (admin) {
-      return { ok: true, detail: `ربات ${m.status} کانال است ✅` };
+  const parts: string[] = [];
+  let allOk = true;
+  for (const ch of requiredChannels()) {
+    try {
+      const m = await api.getChatMember(ch.chatId, botId);
+      const admin = m.status === "administrator" || m.status === "creator";
+      if (admin) {
+        parts.push(`${ch.username}: ${m.status} ✅`);
+      } else {
+        allOk = false;
+        parts.push(`${ch.username}: ${m.status} (ادمین نیست)`);
+      }
+    } catch (err) {
+      allOk = false;
+      const msg =
+        err && typeof err === "object" && "description" in err
+          ? String((err as { description: unknown }).description)
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      if (/inaccessible|CHAT_ADMIN_REQUIRED|not enough rights/i.test(msg)) {
+        parts.push(`${ch.username}: ادمین نیست`);
+      } else {
+        parts.push(`${ch.username}: ${msg.slice(0, 60)}`);
+      }
     }
+  }
+  if (parts.length === 0) {
     return {
       ok: false,
-      detail: `ربات عضو است (${m.status}) ولی ادمین نیست — چک خودکار کار نمی‌کند`,
+      detail: `fallback ${channelUsername()} (${channelChatId()})`,
     };
-  } catch (err) {
-    const msg =
-      err && typeof err === "object" && "description" in err
-        ? String((err as { description: unknown }).description)
-        : err instanceof Error
-          ? err.message
-          : String(err);
-    if (/inaccessible|CHAT_ADMIN_REQUIRED|not enough rights/i.test(msg)) {
-      return {
-        ok: false,
-        detail: "ربات ادمین کانال نیست — member list inaccessible",
-      };
-    }
-    return { ok: false, detail: msg.slice(0, 120) };
   }
+  return { ok: allOk, detail: parts.join(" · ") };
 }
 
