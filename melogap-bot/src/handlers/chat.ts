@@ -216,6 +216,16 @@ chatHandler.on("message:text", async (ctx, next) => {
       await replySilentReject(ctx, target.id, lang);
       return;
     }
+    if (result === "unreachable") {
+      await patchUser(user.id, { state: "idle" });
+      await ctx.reply(
+        lang === "en"
+          ? "Can't reach this user right now (they may have blocked the bot)."
+          : "الان نمی‌شه به این کاربر رسید (ممکنه ربات را بلاک کرده باشه).",
+        { reply_markup: mainKeyboard(lang) },
+      );
+      return;
+    }
     if (result !== "ok") {
       await patchUser(user.id, { state: "idle" });
       await ctx.reply(

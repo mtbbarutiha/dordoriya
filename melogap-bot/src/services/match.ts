@@ -685,6 +685,7 @@ export async function sendChatRequest(
   | "blocked"
   | "blocked_by"
   | "silent"
+  | "unreachable"
 > {
   const source = options?.source ?? "direct";
   const notifySender =
@@ -804,11 +805,16 @@ export async function sendChatRequest(
       },
     });
   } catch (err) {
-    console.error("chat request notify failed", err);
+    const { isIgnorableTelegramError } = await import("../lib/telegramSafe.js");
     await prisma.chatRequest.update({
       where: { id: req.id },
       data: { status: "cancelled" },
     });
+    if (isIgnorableTelegramError(err)) {
+      // طرف ربات را بلاک کرده / اکانت حذف شده — باگ ربات نیست
+      return "unreachable";
+    }
+    console.error("chat request notify failed", err);
     return "busy";
   }
 

@@ -1666,6 +1666,14 @@ featuresHandler.callbackQuery(/^exp:chat:(\d+)$/, async (ctx) => {
     await ctx.reply("درخواست قبلی هنوز باز است.");
     return;
   }
+  if (result === "unreachable") {
+    await ctx.reply(
+      lang === "en"
+        ? "Can't reach this user right now (they may have blocked the bot)."
+        : "الان نمی‌شه به این کاربر رسید (ممکنه ربات را بلاک کرده باشه).",
+    );
+    return;
+  }
   if (result === "busy") {
     await ctx.reply("الان مشغول است.");
     return;
@@ -2248,6 +2256,16 @@ featuresHandler.callbackQuery(/^nearby_chat:(\d+)$/, async (ctx) => {
   if (result === "silent") {
     const { replySilentReject } = await import("../services/chatSilent.js");
     await replySilentReject(ctx, targetId, lang, { asAlert: true });
+    return;
+  }
+  if (result === "unreachable") {
+    await ctx.answerCallbackQuery({
+      text:
+        lang === "en"
+          ? "User unreachable (may have blocked the bot)"
+          : "کاربر در دسترس نیست (شاید ربات را بلاک کرده)",
+      show_alert: true,
+    });
     return;
   }
   if (result !== "ok") {
