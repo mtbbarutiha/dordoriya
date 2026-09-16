@@ -16,12 +16,12 @@ export type MemberStatus = "member" | "not_member" | "unknown";
 
 /** @username یا لینک کانال */
 export function channelUsername(): string {
-  const raw = (process.env.FORCE_JOIN_CHANNEL ?? "@dordoriabot").trim();
+  const raw = (process.env.FORCE_JOIN_CHANNEL ?? "@petdating").trim();
   if (/^https?:\/\//i.test(raw)) {
     const m = raw.match(/t\.me\/([A-Za-z0-9_]+)/i);
-    return m ? `@${m[1]}` : "@dordoriabot";
+    return m ? `@${m[1]}` : "@petdating";
   }
-  if (/^-?\d+$/.test(raw)) return "@dordoriabot";
+  if (/^-?\d+$/.test(raw)) return "@petdating";
   return raw.startsWith("@") ? raw : `@${raw}`;
 }
 
@@ -313,8 +313,8 @@ forceJoinHandler.on("message", async (ctx, next) => {
       const lang = langOf(user);
       await ctx.reply(
         lang === "en"
-          ? "That forward is not from our channel. Forward a post from the Dordoriya channel."
-          : "این فوروارد از کانال دوردوریا نیست. یک پست از کانال را فوروارد کن.",
+          ? "That forward is not from our channel. Forward a post from https://t.me/petdating"
+          : "این فوروارد از کانال نیست. یک پست از https://t.me/petdating را فوروارد کن.",
         { reply_markup: joinKeyboard(lang) },
       );
       return;
