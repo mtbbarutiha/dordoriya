@@ -6,7 +6,7 @@ import { InputFile } from "grammy";
 import type { Api } from "grammy";
 import type { Message } from "grammy/types";
 import { defaultAvatarPath } from "./avatars.js";
-import { fetchWithTimeout } from "./timeout.js";
+import { fetchWithTimeout, withTimeout } from "./timeout.js";
 
 /** محدودیت موازی sharp — روی CPU ضعیف مهم است */
 sharp.concurrency(3);
@@ -173,6 +173,8 @@ export async function overlayFaceBadge(
 }
 
 const downloadInflight = new Map<string, Promise<Buffer>>();
+const GETFILE_TIMEOUT_MS = 4_000;
+const DOWNLOAD_TIMEOUT_MS = 6_000;
 
 async function downloadTelegramFile(api: Api, fileId: string): Promise<Buffer> {
   const hit = rawDownloadCache.get(fileId);
@@ -182,10 +184,15 @@ async function downloadTelegramFile(api: Api, fileId: string): Promise<Buffer> {
   if (inflight) return inflight;
 
   const task = (async () => {
-    const file = await api.getFile(fileId);
+    // getFile گاهی روی شبکه ایران ۱۰–۱۶ثانیه طول می‌کشد و کل آپدیت را timeout می‌کند
+    const file = await withTimeout(
+      api.getFile(fileId),
+      GETFILE_TIMEOUT_MS,
+      "getFile",
+    );
     if (!file.file_path) throw new Error("file_path missing");
     const url = `https://api.telegram.org/file/bot${api.token}/${file.file_path}`;
-    const res = await fetchWithTimeout(url, undefined, 10_000);
+    const res = await fetchWithTimeout(url, undefined, DOWNLOAD_TIMEOUT_MS);
     if (!res.ok) throw new Error(`download failed: ${res.status}`);
     const buf = Buffer.from(await res.arrayBuffer());
     rawDownloadCache.set(fileId, { buf, at: Date.now() });
