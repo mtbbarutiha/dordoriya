@@ -8,8 +8,10 @@ import { logger } from "../lib/logger.js";
 import { withTimeout } from "../lib/timeout.js";
 
 const CACHE_TTL_MS = 30_000;
-const PROMPT_THROTTLE_MS = 45_000;
+const NEGATIVE_CACHE_TTL_MS = 5_000;
+const PROMPT_THROTTLE_MS = 15 * 60_000;
 const MEMBER_CHECK_MS = 8_000;
+const TELEGRAM_SERVICE_USER_ID = 777000;
 const memberCache = new Map<number, { ok: boolean; at: number }>();
 /** فوروارد تأییدشده به‌ازای هر کاربر (کلید = username بدون @) */
 const forwardVerified = new Map<number, Set<string>>();
@@ -232,15 +234,15 @@ export async function checkChannelMembershipDetail(
   unknown: RequiredChannel[];
 }> {
   const cached = memberCache.get(userId);
-  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-    if (cached.ok) {
-      return { status: "member", missing: [], unknown: [] };
-    }
-    return {
-      status: "not_member",
-      missing: requiredChannels(),
-      unknown: [],
-    };
+  if (cached?.ok && Date.now() - cached.at < CACHE_TTL_MS) {
+    return { status: "member", missing: [], unknown: [] };
+  }
+  if (
+    cached &&
+    !cached.ok &&
+    Date.now() - cached.at < NEGATIVE_CACHE_TTL_MS
+  ) {
+    // keep going to real check after a very short negative TTL
   }
 
   const missing: RequiredChannel[] = [];
@@ -452,7 +454,11 @@ export const forceJoinHandler = new Composer();
 forceJoinHandler.use(async (ctx, next) => {
   const from = ctx.from;
   if (!from) return next();
+  if (from.is_bot || from.id === TELEGRAM_SERVICE_USER_ID) return next();
   if (isAdmin(from.id)) return next();
+
+  // فقط چت خصوصی — هرگز در گروه کامنت/کانال پیام عضویت نفرست
+  if (ctx.chat && ctx.chat.type !== "private") return next();
 
   // دکمه تأیید عضویت جداگانه هندل می‌شود
   if (ctx.callbackQuery?.data === "fj:check") return next();
@@ -478,6 +484,8 @@ forceJoinHandler.use(async (ctx, next) => {
 
   const detail = await checkChannelMembershipDetail(ctx, from.id);
   if (detail.status === "member") return next();
+  // اگر چک API شکست خورد، اسپم نکن و ربات را قفل نکن
+  if (detail.status === "unknown") return next();
 
   // فوروارد از کانال‌های اجباری → تأیید تدریجی
   if (msg) {
@@ -537,7 +545,7 @@ forceJoinHandler.use(async (ctx, next) => {
     from.id,
     lang,
     mode,
-    detail.status === "unknown",
+    true,
     Boolean(ctx.callbackQuery),
   );
 });
