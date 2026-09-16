@@ -8,10 +8,12 @@ import { logger } from "../lib/logger.js";
 import { withTimeout } from "../lib/timeout.js";
 
 const CACHE_TTL_MS = 30_000;
+const PROMPT_THROTTLE_MS = 45_000;
 const MEMBER_CHECK_MS = 8_000;
 const memberCache = new Map<number, { ok: boolean; at: number }>();
 /** فوروارد تأییدشده به‌ازای هر کاربر (کلید = username بدون @) */
 const forwardVerified = new Map<number, Set<string>>();
+const lastPromptAt = new Map<number, number>();
 let lastInaccessibleLog = 0;
 
 export type MemberStatus = "member" | "not_member" | "unknown";
@@ -103,20 +105,30 @@ export function joinKeyboard(lang: Lang) {
   return kb;
 }
 
-export function forceJoinPrompt(lang: Lang, withForwardHint = false): string {
+export type ForceJoinPromptMode = "register" | "continue";
+
+export function forceJoinPrompt(
+  lang: Lang,
+  withForwardHint = false,
+  mode: ForceJoinPromptMode = "register",
+): string {
   const channels = requiredChannels();
   const links = channels.map((c) => c.url).join("\n");
   const lines =
     lang === "en"
       ? [
-          "📣 Before registration, join BOTH channels:",
+          mode === "continue"
+            ? "📣 To keep using the bot, join BOTH channels:"
+            : "📣 Before registration, join BOTH channels:",
           links,
           "",
           "1) Tap each join button",
           "2) Then tap «I've joined both»",
         ]
       : [
-          "📣 قبل از ثبت‌نام، عضو هر دو کانال شو:",
+          mode === "continue"
+            ? "📣 برای ادامه کار با ربات، عضو هر دو کانال شو:"
+            : "📣 قبل از ثبت‌نام، عضو هر دو کانال شو:",
           links,
           "",
           "۱) دکمه عضویت هر کانال را بزن",
@@ -220,10 +232,13 @@ export async function checkChannelMembershipDetail(
   unknown: RequiredChannel[];
 }> {
   const cached = memberCache.get(userId);
-  if (cached?.ok && Date.now() - cached.at < CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    if (cached.ok) {
+      return { status: "member", missing: [], unknown: [] };
+    }
     return {
-      status: "member",
-      missing: [],
+      status: "not_member",
+      missing: requiredChannels(),
       unknown: [],
     };
   }
@@ -312,10 +327,53 @@ export function clearForceJoinCache(userId?: number) {
   if (userId == null) {
     memberCache.clear();
     forwardVerified.clear();
+    lastPromptAt.clear();
   } else {
     memberCache.delete(userId);
     forwardVerified.delete(userId);
+    lastPromptAt.delete(userId);
   }
+}
+
+async function sendJoinPrompt(
+  ctx: Context,
+  userId: number,
+  lang: Lang,
+  mode: ForceJoinPromptMode,
+  withForwardHint: boolean,
+  force = false,
+) {
+  const now = Date.now();
+  const prev = lastPromptAt.get(userId) ?? 0;
+  if (!force && now - prev < PROMPT_THROTTLE_MS) return;
+  lastPromptAt.set(userId, now);
+  await ctx.reply(forceJoinPrompt(lang, withForwardHint, mode), {
+    reply_markup: joinKeyboard(lang),
+  });
+}
+
+async function resumeAfterJoin(
+  ctx: Context,
+  dbUser: { id: number; registered: boolean } | null,
+  lang: Lang,
+  from: { id: number; username?: string; first_name?: string },
+) {
+  if (dbUser && !dbUser.registered) {
+    await continueRegistrationAfterJoin(ctx, dbUser.id, lang);
+    return;
+  }
+  if (dbUser?.registered) {
+    const { restoreUserSession } = await import("../services/sessionRestore.js");
+    await restoreUserSession(ctx, dbUser as never, { announce: true });
+    return;
+  }
+  const { ensureUser } = await import("../db/users.js");
+  const created = await ensureUser({
+    telegramId: from.id,
+    ...(from.username ? { username: from.username } : {}),
+    ...(from.first_name ? { firstName: from.first_name } : {}),
+  });
+  await continueRegistrationAfterJoin(ctx, created.id, lang);
 }
 
 function markForwardVerified(userId: number, ch: RequiredChannel) {
@@ -359,9 +417,14 @@ export async function gateRegistrationJoin(
 
   await patchUser(user.id, { state: "force_join", registered: false });
   const lang = langOf(user);
-  await ctx.reply(forceJoinPrompt(lang, detail.status === "unknown"), {
-    reply_markup: joinKeyboard(lang),
-  });
+  await sendJoinPrompt(
+    ctx,
+    telegramId,
+    lang,
+    "register",
+    detail.status === "unknown",
+    true,
+  );
   return false;
 }
 
@@ -381,6 +444,103 @@ function missingAlert(lang: Lang, missing: RequiredChannel[]): string {
 }
 
 export const forceJoinHandler = new Composer();
+
+/**
+ * گیت سراسری: کاربران قدیمی و جدید تا عضو هر دو کانال نباشند
+ * نمی‌توانند از ربات استفاده کنند (ادمین مستثنی است).
+ */
+forceJoinHandler.use(async (ctx, next) => {
+  const from = ctx.from;
+  if (!from) return next();
+  if (isAdmin(from.id)) return next();
+
+  // دکمه تأیید عضویت جداگانه هندل می‌شود
+  if (ctx.callbackQuery?.data === "fj:check") return next();
+
+  // آپدیت‌های سیستمی / کانال
+  if (
+    ctx.channelPost ||
+    ctx.editedChannelPost ||
+    ctx.myChatMember ||
+    ctx.chatMember ||
+    ctx.inlineQuery ||
+    ctx.chosenInlineResult
+  ) {
+    return next();
+  }
+
+  const msg = ctx.message;
+  const user = await findByTelegram(from.id);
+  const lang = user ? langOf(user) : await resolveLang(ctx);
+  const mode: ForceJoinPromptMode = user?.registered
+    ? "continue"
+    : "register";
+
+  const detail = await checkChannelMembershipDetail(ctx, from.id);
+  if (detail.status === "member") return next();
+
+  // فوروارد از کانال‌های اجباری → تأیید تدریجی
+  if (msg) {
+    const matched = matchForwardedRequiredChannel(msg);
+    if (matched) {
+      markForwardVerified(from.id, matched);
+      const after = await checkChannelMembershipDetail(ctx, from.id);
+      if (after.status === "member") {
+        await ctx.reply(
+          lang === "en"
+            ? "✅ Both memberships verified."
+            : "✅ عضویت هر دو کانال تأیید شد.",
+        );
+        await resumeAfterJoin(ctx, user, lang, from);
+        return;
+      }
+      const still = [...after.missing, ...after.unknown];
+      const names =
+        lang === "en"
+          ? still.map((c) => c.labelEn).join(", ")
+          : still.map((c) => c.labelFa).join("، ");
+      await ctx.reply(
+        lang === "en"
+          ? `✅ ${matched.labelEn} verified. Still need: ${names}`
+          : `✅ ${matched.labelFa} تأیید شد. هنوز لازم است: ${names}`,
+        { reply_markup: joinKeyboard(lang) },
+      );
+      return;
+    }
+
+    if (looksLikeForward(msg)) {
+      const links = requiredChannels().map((c) => c.url).join("\n");
+      await ctx.reply(
+        lang === "en"
+          ? `That forward is not from a required channel. Forward from:\n${links}`
+          : `این فوروارد از کانال‌های اجباری نیست. از این‌ها فوروارد کن:\n${links}`,
+        { reply_markup: joinKeyboard(lang) },
+      );
+      return;
+    }
+  }
+
+  if (ctx.callbackQuery) {
+    await ctx.answerCallbackQuery({
+      text: missingAlert(lang, detail.missing),
+      show_alert: true,
+    });
+  }
+
+  // فقط برای ثبت‌نام‌نشده‌ها state را force_join کن — ممبر قدیمی registered می‌ماند
+  if (user && !user.registered) {
+    await patchUser(user.id, { state: "force_join", registered: false });
+  }
+
+  await sendJoinPrompt(
+    ctx,
+    from.id,
+    lang,
+    mode,
+    detail.status === "unknown",
+    Boolean(ctx.callbackQuery),
+  );
+});
 
 forceJoinHandler.callbackQuery("fj:check", async (ctx) => {
   const from = ctx.from;
@@ -403,20 +563,7 @@ forceJoinHandler.callbackQuery("fj:check", async (ctx) => {
     } catch {
       /* ignore */
     }
-    if (dbUser && !dbUser.registered) {
-      await continueRegistrationAfterJoin(ctx, dbUser.id, lang);
-    } else if (dbUser?.registered) {
-      const { restoreUserSession } = await import("../services/sessionRestore.js");
-      await restoreUserSession(ctx, dbUser, { announce: true });
-    } else {
-      const { ensureUser } = await import("../db/users.js");
-      const created = await ensureUser({
-        telegramId: from.id,
-        ...(from.username ? { username: from.username } : {}),
-        ...(from.first_name ? { firstName: from.first_name } : {}),
-      });
-      await continueRegistrationAfterJoin(ctx, created.id, lang);
-    }
+    await resumeAfterJoin(ctx, dbUser, lang, from);
     return;
   }
 
@@ -435,65 +582,5 @@ forceJoinHandler.callbackQuery("fj:check", async (ctx) => {
         : "چک خودکار ممکن نیست. از هر کانال یک پست فوروارد کن.",
     show_alert: true,
   });
-  await ctx.reply(
-    lang === "en"
-      ? "Please forward one post from each required channel to verify."
-      : "لطفاً از هر کانال اجباری یک پست را به همین چت فوروارد کن تا عضویت تأیید شود.",
-  );
-});
-
-/** فوروارد پست کانال در مرحله force_join */
-forceJoinHandler.on("message", async (ctx, next) => {
-  const from = ctx.from;
-  const msg = ctx.message;
-  if (!from || !msg) return next();
-
-  const user = await findByTelegram(from.id);
-  if (!user || user.registered || user.state !== "force_join") return next();
-
-  const matched = matchForwardedRequiredChannel(msg);
-  if (!matched) {
-    if (looksLikeForward(msg)) {
-      const lang = langOf(user);
-      const links = requiredChannels().map((c) => c.url).join("\n");
-      await ctx.reply(
-        lang === "en"
-          ? `That forward is not from a required channel. Forward from:\n${links}`
-          : `این فوروارد از کانال‌های اجباری نیست. از این‌ها فوروارد کن:\n${links}`,
-        { reply_markup: joinKeyboard(lang) },
-      );
-      return;
-    }
-    const lang = langOf(user);
-    await ctx.reply(forceJoinPrompt(lang, true), {
-      reply_markup: joinKeyboard(lang),
-    });
-    return;
-  }
-
-  markForwardVerified(from.id, matched);
-  const lang = langOf(user);
-  const detail = await checkChannelMembershipDetail(ctx, from.id);
-
-  if (detail.status === "member") {
-    await ctx.reply(
-      lang === "en"
-        ? "✅ Both memberships verified."
-        : "✅ عضویت هر دو کانال تأیید شد.",
-    );
-    await continueRegistrationAfterJoin(ctx, user.id, lang);
-    return;
-  }
-
-  const still = [...detail.missing, ...detail.unknown];
-  const names =
-    lang === "en"
-      ? still.map((c) => c.labelEn).join(", ")
-      : still.map((c) => c.labelFa).join("، ");
-  await ctx.reply(
-    lang === "en"
-      ? `✅ ${matched.labelEn} verified. Still need: ${names}`
-      : `✅ ${matched.labelFa} تأیید شد. هنوز لازم است: ${names}`,
-    { reply_markup: joinKeyboard(lang) },
-  );
+  await sendJoinPrompt(ctx, from.id, lang, dbUser?.registered ? "continue" : "register", true, true);
 });
