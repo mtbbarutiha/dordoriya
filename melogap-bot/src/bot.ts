@@ -235,6 +235,16 @@ export function createBot(token: string) {
   // ۱) ترتیبی‌سازی per-chat
   bot.use(sequentialize(getSessionKey));
 
+  // فقط چت خصوصی (+ اینلاین) — گروه کامنت کانال / سوپرگروه را کاملاً نادیده بگیر
+  // تا /start و منو داخل discussion پست نشوند و آپدیت کانال handlerها را درگیر نکند.
+  bot.use(async (ctx, next) => {
+    if (ctx.inlineQuery || ctx.chosenInlineResult) return next();
+    if (ctx.callbackQuery && ctx.chat?.type === "private") return next();
+    if (ctx.chat?.type === "private") return next();
+    // channel_post / گروه / سرویس — بلع بدون پاسخ
+    return;
+  });
+
   // Rate limit قبل از handlerهای سنگین — ضد فلاد تبلیغات
   bot.use(rateLimitMiddleware);
 
