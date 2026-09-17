@@ -14,7 +14,6 @@ import {
   THREAD_GIFT_RECIPIENT,
   LIST_BLAST_COST,
   LIST_BLAST_LIMIT,
-  DAILY_COIN_REWARD,
   COIN_PRICE_TOMAN,
   COIN_PRICE_STARS,
 } from "../data/packages.js";
@@ -246,7 +245,6 @@ export function fullGuide(lang: Lang): string {
       "",
       `💰 ${B.DIAMONDS}`,
       "   Check your balance and buy coin packs.",
-      `   🎁 Daily reward: ${formatNum(DAILY_COIN_REWARD)} free coins — tap the top button once a day`,
       `   🎁 Welcome gift: ${formatNum(WELCOME_DIAMONDS)} coins for new users`,
       "",
       `   Each coin: ${formatNum(COIN_PRICE_STARS)} Star or ${formatNum(COIN_PRICE_TOMAN)} Toman`,
@@ -335,7 +333,6 @@ export function fullGuide(lang: Lang): string {
     "",
     `💰 ${B.DIAMONDS}`,
     "   موجودیت رو ببین و بسته سکه بخر.",
-    `   🎁 سکه روزانه: ${formatNum(DAILY_COIN_REWARD)} سکه رایگان — هر روز یک‌بار دکمه بالای لیست`,
     `   🎁 هدیه ورود: ${formatNum(WELCOME_DIAMONDS)} سکه برای کاربران جدید`,
     "",
     `   هر سکه: ${formatNum(COIN_PRICE_STARS)} Star یا ${formatNum(COIN_PRICE_TOMAN)} تومان`,

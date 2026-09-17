@@ -676,7 +676,9 @@ profileHandler.callbackQuery(/^adm:face:(ok|no):(\d+)$/, async (ctx) => {
       return;
     }
     const fresh = await prisma.user.findUnique({ where: { id: user.id } });
-    await ctx.answerCallbackQuery({ text: "احراز شد +۱۰۰💰" });
+    await ctx.answerCallbackQuery({
+      text: `احراز شد +${formatNum(FACE_VERIFY_REWARD)}💰`,
+    });
     await ctx.api
       .sendMessage(
         Number(user.telegramId),

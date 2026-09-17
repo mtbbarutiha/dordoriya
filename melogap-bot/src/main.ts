@@ -1,14 +1,13 @@
 import { Keyboard, InlineKeyboard } from "grammy";
 import {
   DIAMOND_PACKAGES,
-  DAILY_COIN_REWARD,
+  FACE_VERIFY_REWARD,
   GIFT_AMOUNTS,
   formatToman,
   formatNum,
   packagePickerLabel,
   vipPickerLabel,
 } from "../data/packages.js";
-import { canClaimDailyCoin } from "../services/dailyCoin.js";
 import { threadGiftButtonLabel } from "../services/threadGift.js";
 import {
   countryChoices,
@@ -414,28 +413,11 @@ export function diamondPackagesKeyboard() {
 }
 
 export function coinsShopKeyboard(
-  lastDailyCoinAt: Date | null | undefined,
+  _lastDailyCoinAt: Date | null | undefined,
   lang: Lang | string | null = "fa",
 ) {
   const L = normalizeLang(lang);
   const kb = new InlineKeyboard();
-  if (canClaimDailyCoin(lastDailyCoinAt)) {
-    kb.text(
-      tr(
-        L,
-        `🎁 دریافت ${formatNum(DAILY_COIN_REWARD)} سکه روزانه`,
-        `🎁 Claim ${formatNum(DAILY_COIN_REWARD)} daily coins`,
-      ),
-      "coins:daily",
-    )
-      .success()
-      .row();
-  } else {
-    kb.text(
-      tr(L, "🎁 سکه روزانه (فردا)", "🎁 Daily coins (tomorrow)"),
-      "coins:daily:done",
-    ).row();
-  }
   for (const p of DIAMOND_PACKAGES) {
     if (p.vip) continue;
     kb.text(packagePickerLabel(p), `pkg:${p.id}`).success().row();
@@ -602,7 +584,11 @@ export function profilePanelKeyboard(
     .text(
       faceVerified
         ? tr(L, "احراز شده ✅", "Verified ✅")
-        : tr(L, "احراز چهره (+۱۰۰ 💰)", "Face verify (+100 💰)"),
+        : tr(
+            L,
+            `احراز چهره (+${formatNum(FACE_VERIFY_REWARD)} 💰)`,
+            `Face verify (+${formatNum(FACE_VERIFY_REWARD)} 💰)`,
+          ),
       "prof:face",
     )
     .success()
