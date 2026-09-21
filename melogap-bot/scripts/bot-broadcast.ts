@@ -14,8 +14,9 @@
  *
  * Usage:
  *   npx tsx scripts/bot-broadcast.ts --list
- *   npx tsx scripts/bot-broadcast.ts --dry-run       # counts recipients only
- *   npx tsx scripts/bot-broadcast.ts                 # send whatever is due
+ *   npx tsx scripts/bot-broadcast.ts --dry-run          # counts recipients only
+ *   npx tsx scripts/bot-broadcast.ts --only 8910705725  # smoke-test one account
+ *   npx tsx scripts/bot-broadcast.ts                    # send whatever is due
  */
 import "dotenv/config";
 import fs from "node:fs";
@@ -130,13 +131,18 @@ async function recipients(audience: Audience) {
   });
 }
 
-async function run(item: BroadcastItem, dryRun: boolean): Promise<void> {
+async function run(
+  item: BroadcastItem,
+  dryRun: boolean,
+  only?: bigint,
+): Promise<void> {
   const audience = item.audience ?? "all";
   const list = await recipients(audience);
   const sentLog = loadSentLog();
   const cutoff = Date.now() - MIN_GAP_HOURS * 60 * 60 * 1000;
 
   const targets = list.filter((u) => {
+    if (only != null) return u.telegramId === only;
     // never interrupt an open conversation
     if (u.state === "chatting" && u.chatPartnerId != null) return false;
     const last = sentLog[String(u.id)];
@@ -197,6 +203,11 @@ async function run(item: BroadcastItem, dryRun: boolean): Promise<void> {
     await sleep(SEND_GAP_MS);
   }
 
+  if (only != null) {
+    // smoke test: do not record progress or burn the 20h guard
+    console.log(`[only ${only}] sent=${sent} failed=${failed}`);
+    return;
+  }
   writeJson(sentLogPath(), sentLog);
   item.posted = true;
   item.postedAt = now;
@@ -208,6 +219,8 @@ async function run(item: BroadcastItem, dryRun: boolean): Promise<void> {
 async function main() {
   const argv = process.argv.slice(2);
   const dryRun = argv.includes("--dry-run");
+  const onlyArg = argv[argv.indexOf("--only") + 1];
+  const only = argv.includes("--only") && onlyArg ? BigInt(onlyArg) : undefined;
   const items = loadQueue();
 
   if (argv.includes("--list")) {
@@ -226,7 +239,11 @@ async function main() {
   }
 
   const now = Date.now();
-  const due = items.filter((i) => !i.posted && Date.parse(i.at) <= now);
+  // a smoke test targets the next pending item regardless of its schedule
+  const due =
+    only != null
+      ? items.filter((i) => !i.posted).slice(0, 1)
+      : items.filter((i) => !i.posted && Date.parse(i.at) <= now);
   if (!due.length) {
     const next = items
       .filter((i) => !i.posted)
@@ -239,7 +256,7 @@ async function main() {
   due.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   for (const item of due) {
     try {
-      await run(item, dryRun);
+      await run(item, dryRun, only);
     } catch (err) {
       item.error = err instanceof Error ? err.message : String(err);
       console.error(`ERROR ${item.id}: ${item.error}`);
