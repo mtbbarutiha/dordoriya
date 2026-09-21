@@ -1,0 +1,57 @@
+[
+  {
+    "base": "/opt/cursor/artifacts/assets/base-night-wave.png",
+    "out": "channel-wave-launch-cinematic.jpg",
+    "badge": "هر شب ۲۲:۰۰",
+    "headline": "موج آشنایی شبانه",
+    "sub": "همه همزمان وارد می‌شن، سریع وصل می‌شی",
+    "sub_size": 29,
+    "chips": ["ناشناس", "سریع", "رایگان"],
+    "cta": "امشب ۲۲:۰۰ بیا"
+  },
+  {
+    "base": "/opt/cursor/artifacts/assets/base-mehr-fresh-start.png",
+    "out": "channel-mehr-fresh-start-cinematic.jpg",
+    "badge": "اول مهر",
+    "headline": "مهر، یه شروع تازه",
+    "sub": "هم‌سن و هم‌رشته‌ت آنلاینه.",
+    "chips": ["هم‌سن", "هم‌شهری", "هم‌علاقه"],
+    "cta": "شروع کن"
+  },
+  {
+    "base": "/opt/cursor/artifacts/assets/dordoriya-nearby-base.png",
+    "out": "channel-nearby-howto-cinematic.jpg",
+    "badge": "تا ۱۰۰ کیلومتر",
+    "headline": "کی همین نزدیکیه؟",
+    "sub": "موقعیت دقیقت رو کسی نمی‌بینه.",
+    "chips": ["جستجوی GPS", "شعاع دلخواه", "حریم خصوصی"],
+    "cta": "نزدیک‌ها رو ببین"
+  },
+  {
+    "base": "/opt/cursor/artifacts/assets/base-friday-holiday.png",
+    "out": "channel-friday-holiday-cinematic.jpg",
+    "badge": "جمعه شب",
+    "headline": "جمعه رو تنها تموم نکن",
+    "sub": "یه گپ آروم، بدون قضاوت.",
+    "chips": ["چت ناشناس", "ویس", "فضای امن"],
+    "cta": "همین حالا وارد شو"
+  },
+  {
+    "base": "/opt/cursor/artifacts/assets/base-face-verify-trust.png",
+    "out": "channel-face-verify-cinematic.jpg",
+    "badge": "+۲۰ سکه",
+    "headline": "عکست واقعیه؟",
+    "sub": "نشان اعتماد بگیر، جواب بیشتری بگیر.",
+    "chips": ["نشان اعتماد", "۲۰ سکه جایزه"],
+    "cta": "احراز چهره"
+  },
+  {
+    "base": "/opt/cursor/artifacts/assets/base-safety-privacy.png",
+    "out": "channel-safety-cinematic.jpg",
+    "badge": "امنیت",
+    "headline": "امن آشنا شو",
+    "sub": "کنترل کامل دست خودته.",
+    "chips": ["چت امن", "بلاک و ریپورت", "موقعیت مخفی"],
+    "cta": "بیشتر بدون"
+  }
+]

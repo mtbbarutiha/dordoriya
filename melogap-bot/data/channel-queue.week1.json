@@ -1,0 +1,127 @@
+[
+  {
+    "id": "wave-launch-14050630",
+    "at": "2026-09-21T22:00:00+03:30",
+    "type": "photo",
+    "label": "yekta-wave-launch-14050630",
+    "media": "assets/banners/channel-posts/channel-wave-launch-cinematic.jpg",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "دوردوریا\n\nاز امشب، هر شب ساعت ۲۲:۰۰ «موج آشنایی» داریم.\n\nچرا ساعت مشخص؟ چون وقتی همه همزمان وارد می‌شن، صف خالی نیست و سریع به یه آدم واقعی وصل می‌شی.\n\n🕙 هر شب ۲۲:۰۰ به وقت تهران\n💬 ناشناس، سریع، رایگان\n\nامشب ۲۲:۰۰ اینجا باش\n@dordoriya_bot\nhttps://t.me/dordoriya_bot\n\n#دوردوریا #موج_آشنایی #چت_ناشناس #تنها_نباش #آشنایی"
+  },
+  {
+    "id": "poll-first-message-14050631",
+    "at": "2026-09-22T13:30:00+03:30",
+    "type": "poll",
+    "label": "poll-first-message-14050631",
+    "question": "اولین پیام رو کی باید بفرسته؟",
+    "options": ["دختر شروع کنه: 🙋‍♀️", "پسر شروع کنه: 🙋‍♂️", "هرکی زودتر دید", "فرقی نداره"]
+  },
+  {
+    "id": "wave-night-14050631",
+    "at": "2026-09-22T22:00:00+03:30",
+    "type": "text",
+    "label": "yekta-wave-night-14050631",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "🕙 موج آشنایی — الان\n\nهمه همزمان آنلاین‌اند، پس صف خالی نیست.\nهمین حالا وارد شو و ناشناس وصل شو.\n\n@dordoriya_bot"
+  },
+  {
+    "id": "mehr-fresh-start-14050701",
+    "at": "2026-09-23T13:00:00+03:30",
+    "type": "photo",
+    "label": "yekta-mehr-fresh-start-14050701",
+    "media": "assets/banners/channel-posts/channel-mehr-fresh-start-cinematic.jpg",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "دوردوریا\n\nاول مهر، یه شروع تازه 🍂\n\nمهر فقط شروع درس نیست؛ شروع آشنایی‌های تازه هم هست.\nتو دوردوریا می‌تونی دنبال کسی باشی که:\n\n👥 هم‌سن خودته\n🏙️ هم‌شهری‌ته\n🎯 علاقه‌های مشترک داره\n\nاین مهر رو تنها شروع نکن.\n@dordoriya_bot\nhttps://t.me/dordoriya_bot\n\n#دوردوریا #اول_مهر #آشنایی #هم_سن #هم_شهری #چت_ناشناس"
+  },
+  {
+    "id": "wave-night-14050701",
+    "at": "2026-09-23T22:00:00+03:30",
+    "type": "text",
+    "label": "yekta-wave-night-14050701",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "🕙 اولین شب مهر، موج آشنایی شروع شد\n\nالان شلوغ‌ترین زمان ربات است.\nوارد شو تا سریع وصل شی.\n\n@dordoriya_bot"
+  },
+  {
+    "id": "nearby-howto-14050702",
+    "at": "2026-09-24T19:30:00+03:30",
+    "type": "photo",
+    "label": "yekta-nearby-howto-14050702",
+    "media": "assets/banners/channel-posts/channel-nearby-howto-cinematic.jpg",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "دوردوریا | آموزش کوتاه\n\nکی همین نزدیکیه؟ 📍\n\nخیلی‌ها نمی‌دونن دوردوریا جستجوی GPS داره:\n\n۱. از منو «افراد نزدیک» را بزن\n۲. موقعیتت را بفرست\n۳. شعاع را از ۵ تا ۱۰۰ کیلومتر انتخاب کن\n\n🔒 موقعیت دقیقت هیچ‌وقت به کسی نشون داده نمی‌شه — فقط فاصله تقریبی.\n\nامتحانش کن\n@dordoriya_bot\nhttps://t.me/dordoriya_bot\n\n#دوردوریا #افراد_نزدیک #حریم_خصوصی #آشنایی #چت_ناشناس"
+  },
+  {
+    "id": "wave-night-14050702",
+    "at": "2026-09-24T22:00:00+03:30",
+    "type": "text",
+    "label": "yekta-wave-night-14050702",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "🕙 پنجشنبه شب — شلوغ‌ترین موج هفته\n\nفردا تعطیله، عجله‌ای برای خواب نیست.\nامشب وقت یه گپ طولانیه.\n\n@dordoriya_bot"
+  },
+  {
+    "id": "open-question-14050703",
+    "at": "2026-09-25T12:30:00+03:30",
+    "type": "text",
+    "label": "engage-open-question-14050703",
+    "caption": "جمعه‌ست، یه بازی کوچیک 🎯\n\nبا سه کلمه خودت رو معرفی کن.\nجوابت رو تو کامنت همین پست بنویس.\n\nمثال: آروم · کتاب · شب‌بیدار\n\nبهترین جواب‌ها را بعداً همین‌جا می‌ذاریم."
+  },
+  {
+    "id": "friday-holiday-14050703",
+    "at": "2026-09-25T21:30:00+03:30",
+    "type": "photo",
+    "label": "yekta-friday-holiday-14050703",
+    "media": "assets/banners/channel-posts/channel-friday-holiday-cinematic.jpg",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "دوردوریا\n\nجمعه رو تنها تموم نکن 🌙\n\nشب جمعه سنگین‌ترین شب هفته‌ست. لازم نیست تنها بگذرونیش.\n\n💬 چت ناشناس بدون استرس\n🎤 ویس و دایرکت\n🔒 فضای امن و خصوصی\n\nموج آشنایی همین حالا فعاله.\n@dordoriya_bot\nhttps://t.me/dordoriya_bot\n\n#دوردوریا #شب_جمعه #تنها_نباش #چت_ناشناس #آشنایی"
+  },
+  {
+    "id": "face-verify-14050704",
+    "at": "2026-09-26T13:00:00+03:30",
+    "type": "photo",
+    "label": "yekta-face-verify-14050704",
+    "media": "assets/banners/channel-posts/channel-face-verify-cinematic.jpg",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "دوردوریا | آموزش کوتاه\n\nعکست واقعیه؟ ثابتش کن ✅\n\nاحراز چهره یعنی یه ویدیوی کوتاه می‌فرستی و ادمین تأیید می‌کنه که عکس پروفایلت خودتی.\n\n🛡 نشان اعتماد روی پروفایلت می‌شینه\n💰 ۲۰ سکه جایزه می‌گیری\n💬 جواب گرفتنت خیلی بیشتر می‌شه\n\nپروفایل ← احراز چهره\n@dordoriya_bot\nhttps://t.me/dordoriya_bot\n\n#دوردوریا #احراز_چهره #اعتماد #پروفایل #آشنایی"
+  },
+  {
+    "id": "wave-night-14050704",
+    "at": "2026-09-26T22:00:00+03:30",
+    "type": "text",
+    "label": "yekta-wave-night-14050704",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "🕙 شنبه شب، موج آشنایی\n\nهفته تازه شروع شده؛ اولین شبش را تنها نگذران.\n\n@dordoriya_bot"
+  },
+  {
+    "id": "poll-voice-or-text-14050705",
+    "at": "2026-09-27T13:30:00+03:30",
+    "type": "poll",
+    "label": "poll-voice-or-text-14050705",
+    "question": "تو چت، ویس می‌فرستی یا فقط تایپ می‌کنی؟",
+    "options": ["ویس: 🙋‍♀️", "تایپ: 🙋‍♀️", "ویس: 🙋‍♂️", "تایپ: 🙋‍♂️"]
+  },
+  {
+    "id": "wave-night-14050705",
+    "at": "2026-09-27T22:00:00+03:30",
+    "type": "text",
+    "label": "yekta-wave-night-14050705",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "🕙 یکشنبه شب، موج ۲۲\n\nیه گپ کوتاه قبل خواب، حال روزت را عوض می‌کنه.\n\n@dordoriya_bot"
+  },
+  {
+    "id": "safety-14050706",
+    "at": "2026-09-28T19:30:00+03:30",
+    "type": "photo",
+    "label": "yekta-safety-14050706",
+    "media": "assets/banners/channel-posts/channel-safety-cinematic.jpg",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "دوردوریا\n\nامن آشنا شو 🛡\n\nکنترل کامل دست خودته:\n\n🔒 چت امن — عکس و ویدیو ذخیره و فوروارد نمی‌شه\n📍 موقعیت دقیقت به هیچ‌کس نشون داده نمی‌شه\n🚫 بلاک و ریپورت با یک دکمه\n🕶 هویتت در چت ناشناس فاش نمی‌شه\n\nآشنایی آروم، بدون نگرانی.\n@dordoriya_bot\nhttps://t.me/dordoriya_bot\n\n#دوردوریا #امنیت #حریم_خصوصی #چت_امن #آشنایی"
+  },
+  {
+    "id": "wave-night-14050706",
+    "at": "2026-09-28T22:00:00+03:30",
+    "type": "text",
+    "label": "yekta-wave-night-14050706",
+    "button": "ورود به ربات=https://t.me/Dordoriya_bot",
+    "caption": "🕙 دوشنبه شب، موج آشنایی\n\nوسط هفته سنگینه؛ یه هم‌صحبت کافیه.\n\n@dordoriya_bot"
+  }
+]
